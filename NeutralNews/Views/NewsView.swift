@@ -27,11 +27,9 @@ struct NewsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(news.sourceMedium.pressMedia.name)
-                            .font(.largeTitle)
-                            .fontWeight(.semibold)
+                            .font(.title)
                             .fontWidth(.expanded)
                             .foregroundColor(.secondary)
-//                            .fontDesign(.serif)
                         
                         Text(news.title)
                             .font(.title)
