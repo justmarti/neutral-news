@@ -34,7 +34,7 @@ struct NewsView: View {
                         Text(news.title)
                             .font(.title)
                             .fontWeight(.semibold)
-                            .fontDesign(.serif)
+//                            .fontDesign(.serif)
                         
                         AsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
                             switch phase {

@@ -18,7 +18,7 @@ struct MediaHeadlineView: View {
                 .foregroundColor(.secondary)
             
             Text(news.title)
-                .font(.system(size: 20, design: .serif))
+                .font(.system(size: 20/*, design: .serif*/))
                 .fontWeight(.semibold)
             
             Spacer()
