@@ -54,6 +54,7 @@ struct HomeView: View {
             }
             .searchable(text: $vm.searchText, prompt: "Buscar")
             .navigationTitle(vm.daySelected.dayName)
+            .myNavigationSubtitle(vm.daySelected.formattedDateShort)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { dayMenu }
                 ToolbarItem(placement: .topBarTrailing) { orderMenu }
@@ -157,6 +158,13 @@ struct HomeView: View {
             Spacer()
         }
         .frame(minHeight: UIScreen.main.bounds.height - 300)
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func myNavigationSubtitle(_ subtitle: String) -> some View {
+        if #available(iOS 26.0, *) { self.navigationSubtitle(subtitle) } else { self }
     }
 }
 
