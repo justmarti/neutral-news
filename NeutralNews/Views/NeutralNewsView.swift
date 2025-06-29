@@ -112,7 +112,6 @@ struct NeutralNewsView: View {
 //                    }
 //                }
 //            }
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
     }
 }

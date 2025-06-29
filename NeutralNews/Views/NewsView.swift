@@ -77,7 +77,6 @@ struct NewsView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
-            .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
         }
     }
 }
