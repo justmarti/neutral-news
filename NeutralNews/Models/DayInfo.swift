@@ -14,8 +14,11 @@ struct DayInfo: Identifiable, Hashable {
     let monthName: String
     let date: Date
     
-    var formattedDate: String {
+    var formattedDateLong: String {
         "\(dayName), \(dayNumber) de \(monthName)"
+    }
+    var formattedDateShort: String {
+        "\(dayNumber) de \(monthName)"
     }
     
     var shortFormat: String {
@@ -39,6 +42,8 @@ struct DayInfo: Identifiable, Hashable {
         let calendar = Calendar.current
         let dayFormatter = DateFormatter()
         let monthFormatter = DateFormatter()
+        monthFormatter.locale = Locale(identifier: "es_ES")
+        monthFormatter.dateFormat = "LLLL"
         
         return DayInfo(
             dayName: "Hoy",
