@@ -26,19 +26,12 @@ struct NewsView: View {
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        // TODO: Pedir permiso para usar los logos de los medios?
-                        if let uiImage = UIImage(named: news.sourceMedium.pressMedia.name.normalized()) {
-                            Image(uiImage: uiImage)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(height: 36)
-                        } else {
-                            Text(news.sourceMedium.pressMedia.name)
-                                .font(.title)
-                                .fontWeight(.semibold)
-//                                .fontDesign(.serif)
-                                .foregroundColor(.secondary)
-                        }
+                        Text(news.sourceMedium.pressMedia.name)
+                            .font(.largeTitle)
+                            .fontWeight(.semibold)
+                            .fontWidth(.expanded)
+                            .foregroundColor(.secondary)
+//                            .fontDesign(.serif)
                         
                         Text(news.title)
                             .font(.title)
