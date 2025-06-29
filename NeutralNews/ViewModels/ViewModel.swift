@@ -378,6 +378,11 @@ final class ViewModel: NSObject {
     }
     
     // MARK: - Filtering Methods
+    func getCategoriesOfTheDay() -> [Category] {
+        let categoriesSet = daySelectedNews.compactMap{ Category(rawValue: $0.category) }
+        return Category.allCases.filter { categoriesSet.contains($0) }
+    }
+    
     func filterByCategory(_ category: Category) {
         if categoryFilter.contains(category) {
             categoryFilter.remove(category)

@@ -106,7 +106,7 @@ struct HomeView: View {
     
     var filterMenu: some View {
         Menu {
-            ForEach(Category.allCases, id: \.self) { category in
+            ForEach(vm.getCategoriesOfTheDay(), id: \.self) { category in
                 Button {
                     vm.filterByCategory(category)
                 } label: {
