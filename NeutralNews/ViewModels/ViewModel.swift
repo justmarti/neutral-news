@@ -510,8 +510,15 @@ func getDominantColor(from urlString: String?) async -> Color {
         let (data, _) = try await URLSession.shared.data(from: url)
         guard let image = UIImage(data: data), let cgImage = image.cgImage else { return .gray }
         
-        let width = 10, height = 10
-        let context = CGContext(
+        let originalWidth = cgImage.width
+        let originalHeight = cgImage.height
+        
+        let width = min(10, originalWidth)
+        let height = min(10, originalHeight)
+        
+        guard width > 0, height > 0 else { return .gray }
+        
+        guard let context = CGContext(
             data: nil,
             width: width,
             height: height,
@@ -519,9 +526,10 @@ func getDominantColor(from urlString: String?) async -> Color {
             bytesPerRow: width * 4,
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        )
+        ) else {
+            return .gray
+        }
         
-        guard let context = context else { return .gray }
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
         
         guard let data = context.data else { return .gray }
@@ -535,9 +543,11 @@ func getDominantColor(from urlString: String?) async -> Color {
             b += Int(data.load(fromByteOffset: i + 2, as: UInt8.self))
         }
         
-        return Color(red: Double(r) / Double(255 * pixelCount),
-                     green: Double(g) / Double(255 * pixelCount),
-                     blue: Double(b) / Double(255 * pixelCount))
+        return Color(
+            red: Double(r) / Double(255 * pixelCount),
+            green: Double(g) / Double(255 * pixelCount),
+            blue: Double(b) / Double(255 * pixelCount)
+        )
     } catch {
         return .gray
     }
