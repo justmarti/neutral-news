@@ -65,11 +65,7 @@ struct NeutralNewsView: View {
                                                     .foregroundColor(.secondary)
                                         }
                                     case .failure:
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                            .foregroundColor(.gray)
-                                            .frame(height: 250)
-                                            .clipShape(.rect(cornerRadius: 16))
+                                        EmptyView()
                                     @unknown default:
                                         EmptyView()
                                     }

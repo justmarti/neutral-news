@@ -55,21 +55,7 @@ struct NewsView: View {
                                     .resizable()
                                     .scaledToFit()
                             case .failure:
-                                ZStack {
-                                    RoundedRectangle(cornerRadius: 16)
-                                        .fill(Color.secondary.opacity(0.2))
-                                    VStack {
-                                        Image(systemName: "photo")
-                                            .font(.largeTitle)
-                                        Text("No Image")
-                                            .font(.title)
-                                            .fontWeight(.semibold)
-                                    }
-                                }
-                                .font(.largeTitle)
-                                .frame(height: 250)
-                                .frame(maxWidth: .infinity)
-                                .clipShape(.rect(cornerRadius: 16))
+                                EmptyView()
                             @unknown default:
                                 EmptyView()
                             }
