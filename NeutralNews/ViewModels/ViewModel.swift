@@ -34,6 +34,12 @@ final class ViewModel: NSObject {
         }
     }
     
+    // MARK: - Background Loading Properties
+    private var backgroundLoadingTask: Task<Void, Never>?
+    private var loadedDays = Set<Date>()
+    private var loadedNews = Set<News>()
+    private var loadedNeutralNews = Set<NeutralNews>()
+    
     // MARK: - UI State
     var daySelected: DayInfo = .today {
         didSet {
@@ -121,135 +127,393 @@ final class ViewModel: NSObject {
     // MARK: - Initialization
     override init() {
         super.init()
-        fetchNeutralNewsFromFirestore()
-        fetchNewsFromFirestore()
+        fetchNews(from: .today)
         setupDayChangeTimer()
+        startProgressiveLoading()
+    }
+    
+    deinit {
+        backgroundLoadingTask?.cancel()
+    }
+    
+    // MARK: - Progressive Loading Methods
+    private func startProgressiveLoading() {
+        // Cancelar tarea anterior si existe
+        backgroundLoadingTask?.cancel()
+        
+        backgroundLoadingTask = Task(priority: .utility) {
+            await loadRemainingDays()
+        }
+    }
+    
+    @MainActor
+    private func loadRemainingDays() async {
+        let calendar = Calendar.current
+        let today = Date()
+        
+        // Cargar días en orden de prioridad (empezar por ayer, luego el resto)
+        let priorityOrder = [1, 2, 3, 4, 5, 6] // días hacia atrás
+        
+        for dayOffset in priorityOrder {
+            // Verificar si la tarea fue cancelada
+            if Task.isCancelled { return }
+            
+            guard let dayDate = calendar.date(byAdding: .day, value: -dayOffset, to: today),
+                  !loadedDays.contains(calendar.startOfDay(for: dayDate)) else {
+                continue
+            }
+            
+            let dayInfo = createDayInfo(for: dayDate)
+            
+            // Pequeña pausa para no saturar la red
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 segundos
+            
+            if Task.isCancelled { return }
+            
+            await loadNewsForDayInBackground(dayInfo)
+        }
+    }
+    
+    private func createDayInfo(for date: Date) -> DayInfo {
+        let calendar = Calendar.current
+        let dayFormatter = DateFormatter()
+        let monthFormatter = DateFormatter()
+        
+        dayFormatter.locale = Locale(identifier: "es_ES")
+        dayFormatter.dateFormat = "EEEE"
+        
+        monthFormatter.locale = Locale(identifier: "es_ES")
+        monthFormatter.dateFormat = "MMMM"
+        
+        let dayNumber = calendar.component(.day, from: date)
+        let monthName = monthFormatter.string(from: date)
+        let dayName = dayFormatter.string(from: date).capitalized
+        
+        return DayInfo(
+            dayName: dayName,
+            dayNumber: dayNumber,
+            monthName: monthName,
+            date: date
+        )
+    }
+    
+    private func loadNewsForDayInBackground(_ dayInfo: DayInfo) async {
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: dayInfo.date)
+        
+        // Marcar como cargado para evitar duplicados
+        loadedDays.insert(startOfDay)
+        
+        // Realizar carga en paralelo de neutral news y news
+        async let neutralNewsTask = loadNeutralNewsInBackground(for: dayInfo)
+        async let newsTask = loadNewsInBackground(for: dayInfo)
+        
+        let (neutralNews, news) = await (neutralNewsTask, newsTask)
+        
+        // Actualizar en el hilo principal
+        await MainActor.run {
+            if !neutralNews.isEmpty {
+                self.neutralNews.append(contentsOf: neutralNews)
+                self.classifyNewsByDate()
+            }
+            
+            if !news.isEmpty {
+                self.allNews.append(contentsOf: news)
+                self.filterGroupedNews()
+            }
+        }
+    }
+    
+    private func loadNeutralNewsInBackground(for dayInfo: DayInfo) async -> [NeutralNews] {
+        return await withCheckedContinuation { continuation in
+            let db = Firestore.firestore()
+            let start = Calendar.current.startOfDay(for: dayInfo.date)
+            let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+            
+            db.collection("neutral_news")
+                .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: start))
+                .whereField("date", isLessThan: Timestamp(date: end))
+                .getDocuments { snapshot, error in
+                    guard error == nil,
+                          let documents = snapshot?.documents else {
+                        continuation.resume(returning: [])
+                        return
+                    }
+                    
+                    let fetchedNews = documents.compactMap { doc -> NeutralNews? in
+                        let data = doc.data()
+                        
+                        guard let neutralTitle = data["neutral_title"] as? String,
+                              let neutralDescription = data["neutral_description"] as? String,
+                              let category = data["category"] as? String,
+                              let relevance = data["relevance"] as? Int,
+                              let imageUrl = data["image_url"] as? String,
+                              let imageMedium = data["image_medium"] as? String,
+                              let date = data["date"] as? Timestamp,
+                              let createdAt = data["created_at"] as? Timestamp,
+                              let updatedAt = data["updated_at"] as? Timestamp,
+                              let group = data["group"] as? Int
+                        else { return nil }
+                        
+                        return NeutralNews(
+                            neutralTitle: neutralTitle,
+                            neutralDescription: neutralDescription,
+                            category: category,
+                            relevance: relevance,
+                            imageUrl: imageUrl,
+                            imageMedium: imageMedium,
+                            date: date.dateValue(),
+                            createdAt: createdAt.dateValue(),
+                            updatedAt: updatedAt.dateValue(),
+                            group: group
+                        )
+                    }
+                    
+                    continuation.resume(returning: fetchedNews)
+                }
+        }
+    }
+    
+    private func loadNewsInBackground(for dayInfo: DayInfo) async -> [News] {
+        return await withCheckedContinuation { continuation in
+            let db = Firestore.firestore()
+            let start = Calendar.current.startOfDay(for: dayInfo.date)
+            let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+            
+            db.collection("news")
+                .whereField("pub_date", isGreaterThanOrEqualTo: Timestamp(date: start))
+                .whereField("pub_date", isLessThan: Timestamp(date: end))
+                .whereField("group", isGreaterThan: -1)
+                .getDocuments { snapshot, error in
+                    guard error == nil,
+                          let documents = snapshot?.documents else {
+                        continuation.resume(returning: [])
+                        return
+                    }
+                    
+                    let fetchedNews = documents.compactMap { doc -> News? in
+                        let data = doc.data()
+                        
+                        guard let title = data["title"] as? String,
+                              let description = data["description"] as? String,
+                              let group = data["group"] as? Int,
+                              let category = data["category"] as? String,
+                              let link = data["link"] as? String,
+                              let pubDate = data["pub_date"] as? Timestamp,
+                              let createdAt = data["created_at"] as? Timestamp,
+                              let updatedAt = data["updated_at"] as? Timestamp,
+                              let neutralScore = data["neutral_score"] as? Int,
+                              let sourceMediumRaw = data["source_medium"] as? String,
+                              let sourceMedium = Media(rawValue: sourceMediumRaw)
+                        else { return nil }
+                        
+                        let scrappedDescription = data["scrapped_description"] as? String
+                        let imageUrl = data["image_url"] as? String
+                        let embedding = data["embedding"] as? [Double] ?? []
+                        
+//                        let excludedMedia: Set<String> = ["El Mundo", "Expansión", "elMundo", "expansion"]
+//                        if excludedMedia.contains(sourceMediumRaw) {
+//                            return nil
+//                        }
+                        
+                        return News(
+                            title: title,
+                            description: description,
+                            scrappedDescription: scrappedDescription,
+                            category: category,
+                            imageUrl: imageUrl,
+                            link: link,
+                            pubDate: pubDate.dateValue(),
+                            createdAt: createdAt.dateValue(),
+                            updatedAt: updatedAt.dateValue(),
+                            sourceMedium: sourceMedium,
+                            neutralScore: neutralScore,
+                            group: group,
+                            embedding: embedding
+                        )
+                    }
+                    
+                    continuation.resume(returning: fetchedNews)
+                }
+        }
     }
     
     // MARK: - Firestore Methods
-    func fetchNeutralNewsFromFirestore() {
+    func fetchNews(from day: DayInfo) {
+        fetchNeutralNewsFromFirestore(from: day)
+        fetchNewsFromFirestore(from: day)
+    }
+    
+    func fetchNeutralNewsFromFirestore(from day: DayInfo) {
         isLoadingNeutralNews = true
         
         let db = Firestore.firestore()
-        db.collection("neutral_news").getDocuments { [weak self] snapshot, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("Error fetching neutral news: \(error.localizedDescription)")
-                self.isLoadingNeutralNews = false
-                return
-            }
-            
-            guard let documents = snapshot?.documents else {
-                print("No neutral news found in Firestore")
-                self.isLoadingNeutralNews = false
-                return
-            }
-            
-            let fetchedNeutralNews = documents.compactMap { doc -> NeutralNews? in
-                let data = doc.data()
-                let docID = doc.documentID
+        let start = Calendar.current.startOfDay(for: day.date)
+        let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        
+        db.collection("neutral_news")
+            .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: start))
+            .whereField("date", isLessThan: Timestamp(date: end))
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self else { return }
                 
-                guard let neutralTitle = data["neutral_title"] as? String,
-                      let neutralDescription = data["neutral_description"] as? String,
-                      let category = data["category"] as? String,
-                      let relevance = data["relevance"] as? Int,
-                      let imageUrl = data["image_url"] as? String,
-                      let imageMedium = data["image_medium"] as? String,
-                      let date = data["date"] as? Timestamp,
-                      let createdAt = data["created_at"] as? Timestamp,
-                      let updatedAt = data["updated_at"] as? Timestamp,
-                      let group = data["group"] as? Int
-                else {
-                    print("Error parsing neutral news document: \(docID)")
-                    return nil
+                if let error = error {
+                    print("Error fetching neutral news: \(error.localizedDescription)")
+                    self.isLoadingNeutralNews = false
+                    return
                 }
                 
-                return NeutralNews(
-                    neutralTitle: neutralTitle,
-                    neutralDescription: neutralDescription,
-                    category: category,
-                    relevance: relevance,
-                    imageUrl: imageUrl,
-                    imageMedium: imageMedium,
-                    date: date.dateValue(),
-                    createdAt: createdAt.dateValue(),
-                    updatedAt: updatedAt.dateValue(),
-                    group: group
-                )
-            }
-            
-            DispatchQueue.main.async {
-                self.neutralNews = fetchedNeutralNews.sorted { $0.createdAt > $1.createdAt }
-                self.classifyNewsByDate()
+                guard let documents = snapshot?.documents else {
+                    print("No neutral news found in Firestore")
+                    self.isLoadingNeutralNews = false
+                    return
+                }
                 
-                if !self.allNews.isEmpty {
-                    self.updateNewsToShow(withFilters: false)
+                let fetchedNeutralNews = documents.compactMap { doc -> NeutralNews? in
+                    let data = doc.data()
+                    let docID = doc.documentID
+                    
+                    guard let neutralTitle = data["neutral_title"] as? String,
+                          let neutralDescription = data["neutral_description"] as? String,
+                          let category = data["category"] as? String,
+                          let relevance = data["relevance"] as? Int,
+                          let imageUrl = data["image_url"] as? String,
+                          let imageMedium = data["image_medium"] as? String,
+                          let date = data["date"] as? Timestamp,
+                          let createdAt = data["created_at"] as? Timestamp,
+                          let updatedAt = data["updated_at"] as? Timestamp,
+                          let group = data["group"] as? Int
+                    else {
+                        print("Error parsing neutral news document: \(docID)")
+                        return nil
+                    }
+                    
+                    return NeutralNews(
+                        neutralTitle: neutralTitle,
+                        neutralDescription: neutralDescription,
+                        category: category,
+                        relevance: relevance,
+                        imageUrl: imageUrl,
+                        imageMedium: imageMedium,
+                        date: date.dateValue(),
+                        createdAt: createdAt.dateValue(),
+                        updatedAt: updatedAt.dateValue(),
+                        group: group
+                    )
+                }
+                
+                DispatchQueue.main.async {
+                    let newNeutralNews = fetchedNeutralNews.filter { news in
+                        !self.loadedNeutralNews.contains(news)
+                    }
+                    
+                    // Solo añadir noticias nuevas
+                    if !newNeutralNews.isEmpty {
+                        self.neutralNews.append(contentsOf: newNeutralNews)
+                        self.loadedNeutralNews.formUnion(newNeutralNews)
+                        
+                        self.neutralNews.sort { $0.createdAt > $1.createdAt }
+                    }
+                    
+                    self.classifyNewsByDate()
+                    
+                    // Marcar día como cargado
+                    let calendar = Calendar.current
+                    let startOfDay = calendar.startOfDay(for: day.date)
+                    self.loadedDays.insert(startOfDay)
+                    
                     self.filterGroupedNews()
+                    self.updateNewsToShow(withFilters: false)
+                    
+                    self.isLoadingNeutralNews = false
                 }
-                
-                self.isLoadingNeutralNews = false
             }
-        }
     }
     
-    func fetchNewsFromFirestore() {
+    func fetchNewsFromFirestore(from day: DayInfo) {
         let db = Firestore.firestore()
-        db.collection("news").getDocuments { [weak self] snapshot, error in
-            guard let self = self else { return }
-            
-            if let error = error {
-                print("Error fetching news: \(error.localizedDescription)")
-                return
-            }
-            
-            guard let documents = snapshot?.documents else {
-                print("No news found in Firestore")
-                return
-            }
-            
-            let fetchedNews = documents.compactMap { doc -> News? in
-                let data = doc.data()
-                guard let title = data["title"] as? String,
-                      let description = data["description"] as? String,
-                      let group = data["group"] as? Int,
-                      let category = data["category"] as? String,
-                      let imageUrl = data["image_url"] as? String?,
-                      let link = data["link"] as? String,
-                      let pubDate = data["pub_date"] as? Timestamp,
-                      let neutralScore = data["neutral_score"] as? Int,
-                      let sourceMediumRaw = data["source_medium"] as? String,
-                      let sourceMedium = Media(rawValue: sourceMediumRaw)
-                else { return nil }
+        let start = Calendar.current.startOfDay(for: day.date)
+        let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        
+        db.collection("news")
+            .whereField("pub_date", isGreaterThanOrEqualTo: Timestamp(date: start))
+            .whereField("pub_date", isLessThan: Timestamp(date: end))
+            .whereField("group", isGreaterThan: -1)
+            .getDocuments { [weak self] snapshot, error in
+                guard let self = self else { return }
                 
-                // TODO: Arreglar El Mundo y Expansión?
-                let excludedMedia: Set<String> = ["El Mundo", "Expansión", "elMundo", "expansion"]
-                if excludedMedia.contains(sourceMediumRaw) {
-                    return nil
+                if let error = error {
+                    print("Error fetching news: \(error.localizedDescription)")
+                    return
                 }
                 
-                return News(
-                    title: title,
-                    description: description,
-                    category: category,
-                    imageUrl: imageUrl,
-                    link: link,
-                    pubDate: pubDate.dateValue(),
-                    sourceMedium: sourceMedium,
-                    neutralScore: neutralScore,
-                    group: group
-                )
-            }
-            
-            DispatchQueue.main.async {
-                self.allNews = fetchedNews
-                self.filterGroupedNews()
+                guard let documents = snapshot?.documents else {
+                    print("No news found in Firestore")
+                    return
+                }
                 
-                if !self.neutralNews.isEmpty {
+                let fetchedNews = documents.compactMap { doc -> News? in
+                    let data = doc.data()
+                    let docID = doc.documentID
+                    
+                    guard let title = data["title"] as? String,
+                          let description = data["description"] as? String,
+                          let scrappedDescription = data["scrapped_description"] as? String?,
+                          let group = data["group"] as? Int,
+                          let category = data["category"] as? String,
+                          let imageUrl = data["image_url"] as? String?,
+                          let link = data["link"] as? String,
+                          let pubDate = data["pub_date"] as? Timestamp,
+                          let createdAt = data["created_at"] as? Timestamp,
+                          let updatedAt = data["updated_at"] as? Timestamp,
+                          let neutralScore = data["neutral_score"] as? Int,
+                          let sourceMediumRaw = data["source_medium"] as? String,
+                          let sourceMedium = Media(rawValue: sourceMediumRaw),
+                          let embedding = data["embedding"] as? [Double]?
+                    else {
+                        print("Error parsing news document: \(docID)")
+                        return nil
+                    }
+                    
+                    // TODO: Arreglar El Mundo y Expansión?
+//                    let excludedMedia: Set<String> = ["El Mundo", "Expansión", "elMundo", "expansion"]
+//                    if excludedMedia.contains(sourceMediumRaw) {
+//                        return nil
+//                    }
+                    
+                    return News(
+                        title: title,
+                        description: description,
+                        scrappedDescription: scrappedDescription,
+                        category: category,
+                        imageUrl: imageUrl,
+                        link: link,
+                        pubDate: pubDate.dateValue(),
+                        createdAt: createdAt.dateValue(),
+                        updatedAt: updatedAt.dateValue(),
+                        sourceMedium: sourceMedium,
+                        neutralScore: neutralScore,
+                        group: group,
+                        embedding: embedding ?? []
+                    )
+                }
+                
+                DispatchQueue.main.async {
+                    // Filtrar solo noticias nuevas
+                    let newNews = fetchedNews.filter { news in
+                        !self.loadedNews.contains(news)
+                    }
+                    
+                    // Solo añadir noticias nuevas
+                    if !newNews.isEmpty {
+                        self.allNews.append(contentsOf: newNews)
+                        self.loadedNews.formUnion(newNews) // Más eficiente que forEach
+                    }
+                    
+                    self.filterGroupedNews()
                     self.updateNewsToShow(withFilters: false)
                 }
             }
-        }
     }
     
     // MARK: - News Processing
@@ -287,7 +551,7 @@ final class ViewModel: NSObject {
             self?.setupDayChangeTimer()
         }
     }
-
+    
     func handleDayChange() {
         sevenDaysAgoNews.removeAll()
         sixDaysAgoNews = sevenDaysAgoNews
@@ -304,6 +568,9 @@ final class ViewModel: NSObject {
         if daySelected.dayName == "Hoy" || daySelected.dayName == "Ayer" || lastSevenDays.contains(daySelected) {
             updateNewsToShow(withFilters: true)
         }
+        
+        // Reiniciar carga progresiva para el nuevo día
+        startProgressiveLoading()
     }
     
     func classifyNewsByDate() {
@@ -364,6 +631,14 @@ final class ViewModel: NSObject {
     func changeDay(to dayInfo: DayInfo) {
         if daySelected != dayInfo {
             daySelected = dayInfo
+            
+            let calendar = Calendar.current
+            let startOfDay = calendar.startOfDay(for: dayInfo.date)
+            
+            // Solo hacer fetch si no está cargado
+            if !loadedDays.contains(startOfDay) {
+                fetchNews(from: dayInfo)
+            }
         }
     }
     

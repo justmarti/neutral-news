@@ -49,8 +49,8 @@ struct HomeView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .refreshable {
-                vm.fetchNeutralNewsFromFirestore()
-                vm.fetchNewsFromFirestore()
+                // TODO: Fix refreshable, it duplicate news!
+//                vm.fetchNews(from: vm.daySelected)
             }
             .searchable(text: $vm.searchText, prompt: "Buscar")
             .navigationTitle(vm.daySelected.dayName)

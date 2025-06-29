@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import SwiftUICore
 
 struct PressMedia: Codable, Equatable {
     let name: String
@@ -125,7 +124,7 @@ enum Media: String, CaseIterable, Codable {
 //    }
 //}
 
-enum Category: String, CaseIterable, Decodable {
+enum Category: String, CaseIterable, Decodable, Hashable {
     case economia = "Economía"
     case politica = "Política"
     case ciencia = "Ciencia"
