@@ -49,8 +49,7 @@ struct HomeView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .refreshable {
-                // TODO: Fix refreshable, it duplicate news!
-//                vm.fetchNews(from: vm.daySelected)
+                await vm.refreshNews()
             }
             .searchable(text: $vm.searchText, prompt: "Buscar")
             .navigationTitle(vm.daySelected.dayName)
@@ -59,7 +58,6 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarLeading) { dayMenu }
                 ToolbarItem(placement: .topBarTrailing) { orderMenu }
                 ToolbarItem(placement: .topBarTrailing) { filterMenu }
-//                ToolbarItem(placement: .topBarTrailing) { options }
             }
         }
     }
@@ -77,16 +75,6 @@ struct HomeView: View {
             Label("Cambiar día", systemImage: "calendar")
         }
     }
-    
-    // TODO: Implementar este menu?
-//    var options: some View {
-//        Menu {
-//            orderMenu
-//            filterMenu
-//        } label: {
-//            Label("Opciones", systemImage: "ellipsis.circle")
-//        }
-//    }
     
     var orderMenu: some View {
         Menu {
