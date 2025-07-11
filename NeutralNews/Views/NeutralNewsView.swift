@@ -13,12 +13,12 @@ struct NeutralNewsView: View {
     let relatedNews: [News]
     var namespace: Namespace.ID
     
-    @State private var dominantColor: Color = .gray
+    @State private var vm = NewsDetailViewModel()
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                dominantColor
+                vm.dominantColor
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -98,7 +98,7 @@ struct NeutralNewsView: View {
                     }
                     .frame(minHeight: geometry.size.height)
                     .task {
-                        dominantColor = await getDominantColor(from: news.imageUrl)
+                        await vm.loadDominantColor(from: news.imageUrl)
                     }
                 }
             }

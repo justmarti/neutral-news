@@ -13,7 +13,7 @@ struct NewsView: View {
     let relatedNews: [News]
     var namespace: Namespace.ID
     
-    @State private var dominantColor: Color = .gray
+    @State private var vm = NewsDetailViewModel()
     
     var body: some View {
         GeometryReader { geometry in
@@ -21,7 +21,7 @@ struct NewsView: View {
 //                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom)
 //                    .ignoresSafeArea()
                 
-                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.1)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [vm.dominantColor, vm.dominantColor.opacity(0.1)], startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -71,7 +71,7 @@ struct NewsView: View {
                     .padding()
                     .frame(minHeight: geometry.size.height)
                     .task {
-                        dominantColor = await getDominantColor(from: news.imageUrl)
+                        await vm.loadDominantColor(from: news.imageUrl)
                     }
                 }
             }

@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct HomeView: View {
-    @State private var vm = ViewModel()
+    @State private var vm = NewsListViewModel()
     @State private var date: Date = Date.now
     
     @Namespace private var animationNamespace
