@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @State private var vm = NewsListViewModel()
     @State private var date: Date = Date.now
+    @State private var showOnboarding = !UserDefaults.hasSeenOnboarding
     
     @Namespace private var animationNamespace
     
@@ -59,6 +60,11 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarTrailing) { orderMenu }
                 ToolbarItem(placement: .topBarTrailing) { filterMenu }
             }
+        }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            UserDefaults.hasSeenOnboarding = true
+        } content: {
+            OnboardingView(isPresented: $showOnboarding)
         }
     }
     
