@@ -68,6 +68,7 @@ final class NewsListViewModel {
     
     // MARK: - Initialization
     init() {
+        findNearestDayWithNewsOnLaunch()
         loadNewsForSelectedDay()
         
         // Pre-load cache in background
@@ -125,6 +126,30 @@ final class NewsListViewModel {
             
             await MainActor.run {
                 isLoadingNeutralNews = false
+            }
+        }
+    }
+    
+    private func findNearestDayWithNewsOnLaunch() {
+        // Always fetch today's news first before deciding
+        Task {
+            await newsDataManager.loadNews(for: .today)
+            
+            let todayNews = newsDataManager.getNewsArrayForDay(.today)
+            if !todayNews.isEmpty {
+                return // Today has news after fetch, keep it selected
+            }
+            
+            // Today is empty after fetch, find another day with news
+            for day in lastSevenDays.dropFirst() { // Skip today (index 0)
+                await newsDataManager.loadNews(for: day)
+                let dayNews = newsDataManager.getNewsArrayForDay(day)
+                if !dayNews.isEmpty {
+                    await MainActor.run {
+                        daySelected = day
+                    }
+                    return
+                }
             }
         }
     }
