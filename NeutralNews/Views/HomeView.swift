@@ -53,6 +53,10 @@ struct HomeView: View {
                 await vm.refreshNews()
             }
             .searchable(text: $vm.searchText, prompt: "Buscar")
+            .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
+                Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
+                Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
+            }
             .navigationTitle(vm.daySelected.dayName)
             .myNavigationSubtitle(vm.daySelected.formattedDateShort)
             .toolbar {
