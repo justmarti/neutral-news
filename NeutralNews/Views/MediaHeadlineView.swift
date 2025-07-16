@@ -15,10 +15,10 @@ struct MediaHeadlineView: View {
             Text(news.sourceMedium.pressMedia.name)
                 .font(.title2)
                 .fontWidth(.expanded)
-                .foregroundColor(.secondary)
+                .foregroundStyle(.secondary)
             
             Text(news.title)
-                .font(.system(size: 21/*, design: .serif*/))
+                .font(.system(size: 18/*, design: .serif*/))
                 .fontWeight(.semibold)
             
             Spacer()
@@ -26,7 +26,7 @@ struct MediaHeadlineView: View {
             BiasScoreView(biasScore: news.neutralScore)
         }
         .padding()  
-        .frame(width: 250, height: 250)
+        .frame(width: 220, height: 220)
         .background(.thinMaterial)
         .clipShape(.rect(cornerRadius: 20))
     }

@@ -40,7 +40,7 @@ struct OnboardingView: View {
                 } label: {
                     Text("Comenzar")
                         .font(.headline)
-                        .foregroundColor(.white)
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 50)
                         .background(Color.accentColor)

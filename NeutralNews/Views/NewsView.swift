@@ -29,11 +29,12 @@ struct NewsView: View {
                         Text(news.sourceMedium.pressMedia.name)
                             .font(.title)
                             .fontWidth(.expanded)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(vm.dominantColor.contrastingTextColor.secondary)
                         
                         Text(news.title)
                             .font(.title)
                             .fontWeight(.semibold)
+                            .foregroundStyle(vm.dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
                         
                         AsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
@@ -55,10 +56,12 @@ struct NewsView: View {
                         .clipShape(.rect(cornerRadius: 16))
                         
                         Text(news.description)
+                            .foregroundStyle(vm.dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
                         
                         if let link = URL(string: news.link) {
                             Link("Leer más en la fuente", destination: link)
+                                .foregroundStyle(vm.dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                         }
                         
@@ -66,7 +69,7 @@ struct NewsView: View {
                         
                         Text("Neutral News es independiente, no está asociado a \(news.sourceMedium.pressMedia.name) ni a ningún otro medio de comunicación.")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(vm.dominantColor.contrastingTextColor.secondary)
                     }
                     .padding()
                     .frame(minHeight: geometry.size.height)
