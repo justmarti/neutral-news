@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct NewsView: View {
     let news: News
@@ -21,11 +20,9 @@ struct NewsView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-//                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom)
-//                    .ignoresSafeArea()
-                
-                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.1)], startPoint: .top, endPoint: .bottom)
+                dominantColor
                     .ignoresSafeArea()
+                    .animation(.default, value: dominantColor)
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -80,6 +77,7 @@ struct NewsView: View {
                         await loadDominantColor(from: news.imageUrl)
                     }
                 }
+                .animation(.default, value: dominantColor.contrastingTextColor)
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)

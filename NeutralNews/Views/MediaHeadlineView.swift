@@ -26,7 +26,7 @@ struct MediaHeadlineView: View {
             BiasScoreView(biasScore: news.neutralScore)
         }
         .padding()  
-        .frame(width: 220, height: 220)
+        .frame(width: 230, height: 230)
         .background(.thinMaterial)
         .clipShape(.rect(cornerRadius: 20))
     }

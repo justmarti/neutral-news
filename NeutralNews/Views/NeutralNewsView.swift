@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct NeutralNewsView: View {
     let news: NeutralNews
@@ -15,6 +14,7 @@ struct NeutralNewsView: View {
     
     @State private var dominantColor: Color = .gray
     @State private var isLoadingImage = false
+    @State private var selectedNews: News?
     
     private let imageService = ImageService.shared
     
@@ -89,9 +89,8 @@ struct NeutralNewsView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack {
                                 ForEach(relatedNews) { new in
-                                    NavigationLink {
-                                        NewsView(news: new, relatedNews: relatedNews, namespace: namespace)
-                                            .navigationTransition(.zoom(sourceID: new.id, in: namespace))
+                                    Button {
+                                        selectedNews = new
                                     } label: {
                                         MediaHeadlineView(news: new)
                                             .matchedTransitionSource(id: new.id, in: namespace)
@@ -111,6 +110,21 @@ struct NeutralNewsView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
+            .sheet(item: $selectedNews) { selectedNews in
+                NavigationStack {
+                    NewsView(news: selectedNews, relatedNews: relatedNews, namespace: namespace)
+                        .navigationTitle("")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Cerrar") {
+                                    self.selectedNews = nil
+                                }
+                            }
+                        }
+                }
+                .presentationDragIndicator(.visible)
+            }
 //            .toolbar {
 //                ToolbarItem(placement: .navigationBarTrailing) {
 //                    // TODO: Cambiar el link a Neutral News
