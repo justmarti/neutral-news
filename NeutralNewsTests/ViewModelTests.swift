@@ -16,7 +16,7 @@ struct ViewModelTests {
     
     @Test("NewsListViewModel initialization")
     func testNewsListViewModelInit() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         #expect(viewModel.daySelected.dayName == "Hoy")
         #expect(viewModel.lastSevenDays.count == 7)
@@ -29,7 +29,7 @@ struct ViewModelTests {
     
     @Test("Day selection triggers loading")
     func testDaySelectionTriggersLoading() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         let initialDay = viewModel.daySelected
         
         // Change to different day
@@ -42,7 +42,7 @@ struct ViewModelTests {
     
     @Test("News filtering by search text")
     func testSearchTextFiltering() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         // Set search text
         viewModel.searchText = "política"
@@ -53,7 +53,7 @@ struct ViewModelTests {
     
     @Test("Category filtering")
     func testCategoryFiltering() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         // Test category filter
         viewModel.filterByCategory(.politica)
@@ -69,7 +69,7 @@ struct ViewModelTests {
     
     @Test("Clear all filters")
     func testClearAllFilters() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         // Set some filters
         viewModel.searchText = "test"
@@ -89,7 +89,7 @@ struct ViewModelTests {
     
     @Test("Order by selection")
     func testOrderBySelection() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         #expect(viewModel.orderBy == .hour) // Default
         
@@ -102,7 +102,7 @@ struct ViewModelTests {
     
     @Test("Force load news")
     func testForceLoadNews() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         #expect(!viewModel.isLoadingNeutralNews)
         
@@ -124,7 +124,7 @@ struct ViewModelTests {
     
     @Test("NewsFilterViewModel initialization")
     func testNewsFilterViewModelInit() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         #expect(filterViewModel.searchText.isEmpty)
         #expect(filterViewModel.categoryFilter.isEmpty)
@@ -134,7 +134,7 @@ struct ViewModelTests {
     
     @Test("Filter application with search text")
     func testFilterApplicationWithSearchText() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let mockNews = [
             createMockNeutralNews(title: "Política Nacional", category: "Política"),
@@ -152,7 +152,7 @@ struct ViewModelTests {
     
     @Test("Filter application with category")
     func testFilterApplicationWithCategory() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let mockNews = [
             createMockNeutralNews(title: "News 1", category: "Política"),
@@ -170,7 +170,7 @@ struct ViewModelTests {
     
     @Test("Multiple category filtering")
     func testMultipleCategoryFiltering() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let mockNews = [
             createMockNeutralNews(title: "News 1", category: "Política"),
@@ -191,7 +191,7 @@ struct ViewModelTests {
     
     @Test("Combined search and category filtering")
     func testCombinedFiltering() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let mockNews = [
             createMockNeutralNews(title: "Política Nacional", category: "Política"),
@@ -214,7 +214,7 @@ struct ViewModelTests {
     
     @Test("Sorting by date descending")
     func testSortingByDateDesc() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let now = Date()
         let mockNews = [
@@ -233,7 +233,7 @@ struct ViewModelTests {
     
     @Test("Sorting by relevance")
     func testSortingByRelevance() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let mockNews = [
             createMockNeutralNews(title: "Low Relevance", relevance: 3),
@@ -251,7 +251,7 @@ struct ViewModelTests {
     
     @Test("Sorting by popularity")
     func testSortingByPopularity() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         let mockNews = [
             createMockNeutralNews(title: "Less Popular", group: 1),
@@ -268,7 +268,7 @@ struct ViewModelTests {
     
     @Test("Category toggle functionality")
     func testCategoryToggle() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         #expect(filterViewModel.categoryFilter.isEmpty)
         
@@ -283,46 +283,11 @@ struct ViewModelTests {
         #expect(!filterViewModel.isAnyFilterEnabled)
     }
     
-    // MARK: - NewsDetailViewModel Tests
-    
-    @Test("NewsDetailViewModel initialization")
-    func testNewsDetailViewModelInit() async throws {
-        let viewModel = NewsDetailViewModel()
-        
-        #expect(viewModel.dominantColor == .gray)
-        #expect(!viewModel.isLoadingImage)
-    }
-    
-    @Test("Load dominant color functionality")
-    func testLoadDominantColor() async throws {
-        let viewModel = NewsDetailViewModel()
-        
-        // Test loading with a valid URL
-        await viewModel.loadDominantColor(from: "https://example.com/image.jpg")
-        
-        // Should complete without crashing
-        #expect(!viewModel.isLoadingImage) // Should finish loading
-    }
-    
-    @Test("Reset state functionality")
-    func testResetState() async throws {
-        let viewModel = NewsDetailViewModel()
-        
-        // Change state
-        await viewModel.loadDominantColor(from: "https://example.com/image.jpg")
-        
-        // Reset state
-        viewModel.resetState()
-        
-        #expect(viewModel.dominantColor == .gray)
-        #expect(!viewModel.isLoadingImage)
-    }
-    
     // MARK: - Integration Tests
     
     @Test("NewsListViewModel integration with filters")
     func testNewsListViewModelFilterIntegration() async throws {
-        let viewModel = NewsListViewModel()
+        let viewModel = NewsListViewModel.shared
         
         // Test that changing filters affects isAnyFilterEnabled
         #expect(!viewModel.isAnyFilterEnabled)
@@ -340,7 +305,7 @@ struct ViewModelTests {
     
     @Test("Filter performance with large dataset", .timeLimit(.minutes(1)))
     func testFilterPerformanceWithLargeDataset() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         // Create large dataset
         let largeDataset = (1...10000).map { index in
@@ -373,7 +338,7 @@ struct ViewModelTests {
     
     @Test("Handle empty news arrays in filters")
     func testFilterWithEmptyArray() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         filterViewModel.searchText = "anything"
         filterViewModel.categoryFilter = [.politica]
@@ -385,7 +350,7 @@ struct ViewModelTests {
     
     @Test("Handle invalid search patterns")
     func testInvalidSearchPatterns() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         let mockNews = [createMockNeutralNews(title: "Test News")]
         
         // Test with special characters

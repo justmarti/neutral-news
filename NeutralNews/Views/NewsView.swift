@@ -13,7 +13,10 @@ struct NewsView: View {
     let relatedNews: [News]
     var namespace: Namespace.ID
     
-    @State private var vm = NewsDetailViewModel()
+    @State private var dominantColor: Color = .gray
+    @State private var isLoadingImage = false
+    
+    private let imageService = ImageService.shared
     
     var body: some View {
         GeometryReader { geometry in
@@ -21,7 +24,7 @@ struct NewsView: View {
 //                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom)
 //                    .ignoresSafeArea()
                 
-                LinearGradient(colors: [vm.dominantColor, vm.dominantColor.opacity(0.1)], startPoint: .top, endPoint: .bottom)
+                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.1)], startPoint: .top, endPoint: .bottom)
                     .ignoresSafeArea()
                 
                 ScrollView {
@@ -29,12 +32,12 @@ struct NewsView: View {
                         Text(news.sourceMedium.pressMedia.name)
                             .font(.title)
                             .fontWidth(.expanded)
-                            .foregroundStyle(vm.dominantColor.contrastingTextColor.secondary)
+                            .foregroundStyle(dominantColor.contrastingTextColor.secondary)
                         
                         Text(news.title)
                             .font(.title)
                             .fontWeight(.semibold)
-                            .foregroundStyle(vm.dominantColor.contrastingTextColor)
+                            .foregroundStyle(dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
                         
                         AsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
@@ -56,12 +59,12 @@ struct NewsView: View {
                         .clipShape(.rect(cornerRadius: 16))
                         
                         Text(news.description)
-                            .foregroundStyle(vm.dominantColor.contrastingTextColor)
+                            .foregroundStyle(dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
                         
                         if let link = URL(string: news.link) {
                             Link("Leer más en la fuente", destination: link)
-                                .foregroundStyle(vm.dominantColor.contrastingTextColor)
+                                .foregroundStyle(dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                         }
                         
@@ -69,17 +72,28 @@ struct NewsView: View {
                         
                         Text("Neutral News es independiente, no está asociado a \(news.sourceMedium.pressMedia.name) ni a ningún otro medio de comunicación.")
                             .font(.caption)
-                            .foregroundStyle(vm.dominantColor.contrastingTextColor.secondary)
+                            .foregroundStyle(dominantColor.contrastingTextColor.secondary)
                     }
                     .padding()
                     .frame(minHeight: geometry.size.height)
                     .task {
-                        await vm.loadDominantColor(from: news.imageUrl)
+                        await loadDominantColor(from: news.imageUrl)
                     }
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
+        }
+    }
+    
+    private func loadDominantColor(from imageUrl: String?) async {
+        isLoadingImage = true
+        
+        let color = await imageService.getDominantColor(from: imageUrl)
+        
+        await MainActor.run {
+            self.dominantColor = color
+            self.isLoadingImage = false
         }
     }
 }

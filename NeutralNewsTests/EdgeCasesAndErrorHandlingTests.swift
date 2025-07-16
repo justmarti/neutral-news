@@ -220,7 +220,7 @@ struct EdgeCasesAndErrorHandlingTests {
     
     @Test("Unicode and special character handling")
     func testUnicodeHandling() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         // Create news with various unicode characters
         let unicodeNews = [
@@ -248,7 +248,7 @@ struct EdgeCasesAndErrorHandlingTests {
     
     @Test("Extremely long text handling")
     func testExtremelyLongTextHandling() async throws {
-        let filterViewModel = NewsFilterViewModel()
+        let filterViewModel = NewsFilterViewModel.shared
         
         // Create news with extremely long content
         let longTitle = String(repeating: "Very Long Title ", count: 1000) // ~16KB title

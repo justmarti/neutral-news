@@ -10,10 +10,11 @@ import SwiftUI
 
 @Observable
 final class NewsListViewModel {
+    static let shared = NewsListViewModel()
     
     // MARK: - Dependencies
     private let newsDataManager = NewsDataManager.shared
-    private let filterViewModel = NewsFilterViewModel()
+    private let filterViewModel = NewsFilterViewModel.shared
     
     // MARK: - UI State
     var daySelected: DayInfo = .today {
@@ -67,7 +68,9 @@ final class NewsListViewModel {
     }
     
     // MARK: - Initialization
-    init() {
+    private init() {
+        print("💡 NewsListViewModel initialized")
+        
         findNearestDayWithNewsOnLaunch()
         loadNewsForSelectedDay()
         

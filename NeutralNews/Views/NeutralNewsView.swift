@@ -13,13 +13,17 @@ struct NeutralNewsView: View {
     let relatedNews: [News]
     var namespace: Namespace.ID
     
-    @State private var vm = NewsDetailViewModel()
+    @State private var dominantColor: Color = .gray
+    @State private var isLoadingImage = false
+    
+    private let imageService = ImageService.shared
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                vm.dominantColor
+                dominantColor
                     .ignoresSafeArea()
+                    .animation(.default, value: dominantColor)
                 
                 ScrollView {
                     VStack {
@@ -38,12 +42,12 @@ struct NeutralNewsView: View {
                             }
                             .font(.subheadline)
                             .fontWidth(.expanded)
-                            .foregroundStyle(vm.dominantColor.contrastingTextColor.secondary)
+                            .foregroundStyle(dominantColor.contrastingTextColor.secondary)
                             
                             Text(news.neutralTitle)
                                 .font(.title)
                                 .fontWeight(.semibold)
-                                .foregroundStyle(vm.dominantColor.contrastingTextColor)
+                                .foregroundStyle(dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                             
                             AsyncImage(url: URL(string: news.imageUrl)) { phase in
@@ -63,7 +67,7 @@ struct NeutralNewsView: View {
                                             // TODO: Si el medio es El Mundo o Expansión, no hay su noticia abajo, arreglar
                                             Text("Imagen extraída de \(Media.from(news.imageMedium)?.pressMedia.name ?? ""), ver su noticia al final de la página.")
                                                     .font(.footnote)
-                                                    .foregroundStyle(vm.dominantColor.contrastingTextColor.secondary)
+                                                    .foregroundStyle(dominantColor.contrastingTextColor.secondary)
                                         }
                                     case .failure:
                                         EmptyView()
@@ -75,7 +79,7 @@ struct NeutralNewsView: View {
                             .frame(maxWidth: .infinity)
                             
                             Text(news.neutralDescription)
-                                .foregroundStyle(vm.dominantColor.contrastingTextColor)
+                                .foregroundStyle(dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                         }
                         .padding()
@@ -100,9 +104,10 @@ struct NeutralNewsView: View {
                     }
                     .frame(minHeight: geometry.size.height)
                     .task {
-                        await vm.loadDominantColor(from: news.imageUrl)
+                        await loadDominantColor(from: news.imageUrl)
                     }
                 }
+                .animation(.default, value: dominantColor.contrastingTextColor)
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
@@ -114,6 +119,17 @@ struct NeutralNewsView: View {
 //                    }
 //                }
 //            }
+        }
+    }
+    
+    private func loadDominantColor(from imageUrl: String?) async {
+        isLoadingImage = true
+        
+        let color = await imageService.getDominantColor(from: imageUrl)
+        
+        await MainActor.run {
+            self.dominantColor = color
+            self.isLoadingImage = false
         }
     }
 }
