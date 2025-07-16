@@ -48,7 +48,6 @@ struct HomeView: View {
                     .frame(minHeight: UIScreen.main.bounds.height - 250)
                 }
             }
-            .scrollBounceBehavior(.basedOnSize)
             .refreshable {
                 await vm.refreshNews()
             }
