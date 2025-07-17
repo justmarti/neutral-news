@@ -25,9 +25,7 @@ struct OnboardingView: View {
         .background(Color(.systemBackground))
         .overlay(alignment: .topTrailing) {
             Button("Saltar") {
-                withAnimation(.easeInOut(duration: 0.4)) {
-                    isPresented = false
-                }
+                isPresented = false
             }
             .font(.body)
             .foregroundStyle(.blue)

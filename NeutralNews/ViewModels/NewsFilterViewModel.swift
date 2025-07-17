@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import SwiftUI
 
 enum SearchScope: CaseIterable {
     case daySelected
@@ -17,8 +16,9 @@ enum SearchScope: CaseIterable {
 final class NewsFilterViewModel {
     static let shared = NewsFilterViewModel()
     
+    // MARK: - Init
     private init() {
-        print("🔫 NewsFilterViewModel initialized")
+        print("🪼 NewsFilterViewModel initialised")
     }
     
     // MARK: - Dependencies

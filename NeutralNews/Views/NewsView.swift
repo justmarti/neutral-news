@@ -36,6 +36,7 @@ struct NewsView: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
+//                            .lineHeight(.tight)
                         
                         AsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
                             switch phase {
@@ -61,7 +62,6 @@ struct NewsView: View {
                         
                         if let link = URL(string: news.link) {
                             Link("Leer más en la fuente", destination: link)
-                                .foregroundStyle(dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                         }
                         

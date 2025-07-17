@@ -33,6 +33,7 @@ struct HomeView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        .animation(.default, value: vm.newsToShow)
                     }
                     .padding(.horizontal)
                 }

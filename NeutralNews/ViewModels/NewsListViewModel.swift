@@ -6,11 +6,23 @@
 //
 
 import Foundation
-import SwiftUI
 
 @Observable
 final class NewsListViewModel {
     static let shared = NewsListViewModel()
+    
+    // MARK: - Init
+    private init() {
+        print("🦐 NewsListViewModel initialised")
+        
+        findNearestDayWithNewsOnLaunch()
+        loadNewsForSelectedDay()
+        
+        // Pre-load cache in background
+        Task {
+            await newsDataManager.preloadCache()
+        }
+    }
     
     // MARK: - Dependencies
     private let newsDataManager = NewsDataManager.shared
@@ -41,11 +53,7 @@ final class NewsListViewModel {
     
     var searchText: String {
         get { filterViewModel.searchText }
-        set { 
-            withAnimation {
-                filterViewModel.searchText = newValue
-            }
-        }
+        set { filterViewModel.searchText = newValue }
     }
     
     var categoryFilter: Set<Category> {
@@ -65,19 +73,6 @@ final class NewsListViewModel {
     var searchScope: SearchScope {
         get { filterViewModel.searchScope }
         set { filterViewModel.searchScope = newValue }
-    }
-    
-    // MARK: - Initialization
-    private init() {
-        print("💡 NewsListViewModel initialized")
-        
-        findNearestDayWithNewsOnLaunch()
-        loadNewsForSelectedDay()
-        
-        // Pre-load cache in background
-        Task {
-            await newsDataManager.preloadCache()
-        }
     }
     
     // MARK: - Public Methods
