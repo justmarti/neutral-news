@@ -21,7 +21,7 @@ struct NeutralNewsView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                dominantColor
+                dominantColor.adaptiveBackground
                     .ignoresSafeArea()
                     .animation(.default, value: dominantColor)
                 
@@ -42,12 +42,11 @@ struct NeutralNewsView: View {
                             }
                             .font(.subheadline)
                             .fontWidth(.expanded)
-                            .foregroundStyle(dominantColor.contrastingTextColor.secondary)
+                            .foregroundStyle(.secondary)
                             
                             Text(news.neutralTitle)
                                 .font(.title)
                                 .fontWeight(.semibold)
-                                .foregroundStyle(dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                             
                             AsyncImage(url: URL(string: news.imageUrl)) { phase in
@@ -67,7 +66,7 @@ struct NeutralNewsView: View {
                                             // TODO: Si el medio es El Mundo o Expansión, no hay su noticia abajo, arreglar
                                             Text("Imagen extraída de \(Media.from(news.imageMedium)?.pressMedia.name ?? ""), ver su noticia al final de la página.")
                                                     .font(.footnote)
-                                                    .foregroundStyle(dominantColor.contrastingTextColor.secondary)
+                                                    .foregroundStyle(.secondary)
                                         }
                                     case .failure:
                                         EmptyView()
@@ -79,7 +78,6 @@ struct NeutralNewsView: View {
                             .frame(maxWidth: .infinity)
                             
                             Text(news.neutralDescription)
-                                .foregroundStyle(dominantColor.contrastingTextColor)
 //                                .fontDesign(.serif)
                         }
                         .padding()
@@ -106,7 +104,7 @@ struct NeutralNewsView: View {
                         await loadDominantColor(from: news.imageUrl)
                     }
                 }
-                .animation(.default, value: dominantColor.contrastingTextColor)
+                .animation(.default, value: dominantColor)
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)

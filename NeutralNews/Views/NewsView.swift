@@ -20,7 +20,7 @@ struct NewsView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                dominantColor
+                dominantColor.adaptiveBackground
                     .ignoresSafeArea()
                     .animation(.default, value: dominantColor)
                 
@@ -29,12 +29,11 @@ struct NewsView: View {
                         Text(news.sourceMedium.pressMedia.name)
                             .font(.title)
                             .fontWidth(.expanded)
-                            .foregroundStyle(dominantColor.contrastingTextColor.secondary)
+                            .foregroundStyle(.secondary)
                         
                         Text(news.title)
                             .font(.title)
                             .fontWeight(.semibold)
-                            .foregroundStyle(dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
 //                            .lineHeight(.tight)
                         
@@ -57,7 +56,6 @@ struct NewsView: View {
                         .clipShape(.rect(cornerRadius: 16))
                         
                         Text(news.description)
-                            .foregroundStyle(dominantColor.contrastingTextColor)
 //                            .fontDesign(.serif)
                         
                         if let link = URL(string: news.link) {
@@ -69,7 +67,7 @@ struct NewsView: View {
                         
                         Text("Neutral News es independiente, no está asociado a \(news.sourceMedium.pressMedia.name) ni a ningún otro medio de comunicación.")
                             .font(.caption)
-                            .foregroundStyle(dominantColor.contrastingTextColor.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .padding()
                     .frame(minHeight: geometry.size.height)
@@ -77,7 +75,7 @@ struct NewsView: View {
                         await loadDominantColor(from: news.imageUrl)
                     }
                 }
-                .animation(.default, value: dominantColor.contrastingTextColor)
+                .animation(.default, value: dominantColor)
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
