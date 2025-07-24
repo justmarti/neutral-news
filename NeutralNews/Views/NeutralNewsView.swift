@@ -123,15 +123,18 @@ struct NeutralNewsView: View {
                 }
                 .presentationDragIndicator(.visible)
             }
-//            .toolbar {
-//                ToolbarItem(placement: .navigationBarTrailing) {
-//                    // TODO: Cambiar el link a Neutral News
-//                    ShareLink(item: URL(string: "https://www.apple.com")!) {
-//                        Label("Compartir", systemImage: "square.and.arrow.up")
-//                    }
-//                }
-//            }
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    ShareLink(item: generateShareURL()) {
+                        Label("Compartir", systemImage: "square.and.arrow.up")
+                    }
+                }
+            }
         }
+    }
+    
+    private func generateShareURL() -> URL {
+        return DeepLinkService.generateShareURL(for: news)
     }
     
     private func loadDominantColor(from imageUrl: String?) async {

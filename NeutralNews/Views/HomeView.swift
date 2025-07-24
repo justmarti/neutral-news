@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
     @State private var showOnboarding = !UserDefaults.hasSeenOnboarding
+    @State private var targetNews: NeutralNews?
     
     @Namespace private var animationNamespace
     
@@ -63,13 +64,31 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarTrailing) { orderMenu }
                 ToolbarItem(placement: .topBarTrailing) { filterMenu }
             }
+            .navigationDestination(item: $targetNews) { news in
+                NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
+            }
         }
         .fullScreenCover(isPresented: $showOnboarding) {
             UserDefaults.hasSeenOnboarding = true
         } content: {
             OnboardingView(isPresented: $showOnboarding)
         }
+        .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
+            if let news = newValue {
+                print("🎯 Vista recibió noticia objetivo: \(news.neutralTitle)")
+                targetNews = news
+                
+                // Retrasar limpieza para asegurar navegación
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    vm.deepLinkTargetNews = nil
+                }
+            }
+        }
+        .onAppear {
+            vm.checkPendingDeepLink()
+        }
     }
+    
     
     var dayMenu: some View {
         Menu {

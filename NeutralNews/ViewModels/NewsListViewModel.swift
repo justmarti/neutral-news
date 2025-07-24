@@ -151,4 +151,51 @@ final class NewsListViewModel {
             }
         }
     }
+    
+    private var pendingDeepLink: DeepLinkService.DeepLinkData?
+    var deepLinkTargetNews: NeutralNews?
+    
+    func findNews(group: Int, date: Date) -> NeutralNews? {
+        let calendar = Calendar.current
+        return newsDataManager.neutralNews.first { news in
+            news.group == group && calendar.isDate(news.date, inSameDayAs: date)
+        }
+    }
+    
+    func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
+        // Si hay datos, procesar inmediatamente
+        if !newsDataManager.neutralNews.isEmpty {
+            processDeepLink(deepLinkData)
+        } else {
+            // Si no hay datos, guardar para procesar cuando lleguen
+            pendingDeepLink = deepLinkData
+        }
+    }
+    
+    private func processDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
+        print("🔄 Procesando deep link en ViewModel - group: \(deepLinkData.group)")
+        
+        // Cambiar al día correcto
+        let dayInfo = DayInfo(date: deepLinkData.date)
+        changeDay(to: dayInfo)
+        
+        // Esperar a que la vista se actualice después del cambio de día
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            // Buscar y marcar la noticia objetivo
+            if let news = self.findNews(group: deepLinkData.group, date: deepLinkData.date) {
+                print("✅ Noticia encontrada: \(news.neutralTitle)")
+                self.deepLinkTargetNews = news
+            } else {
+                print("❌ Noticia no encontrada - group: \(deepLinkData.group), total news: \(self.newsDataManager.neutralNews.count)")
+            }
+        }
+        
+        pendingDeepLink = nil
+    }
+    
+    func checkPendingDeepLink() {
+        guard let pendingDeepLink = pendingDeepLink,
+              !newsDataManager.neutralNews.isEmpty else { return }
+        processDeepLink(pendingDeepLink)
+    }
 }

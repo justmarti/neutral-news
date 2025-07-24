@@ -15,6 +15,12 @@ struct NeutralNewsApp: App {
     var body: some Scene {
         WindowGroup {
             HomeView()
+                .onOpenURL { url in
+                    print("🔗 Deep link recibido: \(url)")
+                    if let deepLinkData = DeepLinkService.parseDeepLink(url) {
+                        NewsListViewModel.shared.handleDeepLink(deepLinkData)
+                    }
+                }
         }
     }
 }
