@@ -52,7 +52,9 @@ struct HomeView: View {
             .refreshable {
                 await vm.refreshNews()
             }
-            .searchable(text: $vm.searchText, prompt: "Buscar")
+            .myToolbar()
+            .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
+            .mySearchToolbarMinimize()
             .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
                 Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
                 Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
@@ -181,6 +183,25 @@ extension View {
     @ViewBuilder
     func myNavigationSubtitle(_ subtitle: String) -> some View {
         if #available(iOS 26.0, *) { self.navigationSubtitle(subtitle) } else { self }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func mySearchToolbarMinimize() -> some View {
+        if #available(iOS 26.0, *) { self.searchToolbarBehavior(.minimize) } else { self }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func myToolbar() -> some View {
+        if #available(iOS 26.0, *) {
+            self.toolbar {
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            }
+        } else { self }
     }
 }
 
