@@ -17,15 +17,12 @@ final class NewsDataManager {
     // MARK: - Data Collections
     private(set) var allNews = [News]()
     private(set) var neutralNews = [NeutralNews]()
-    private(set) var groupsOfNews = [[News]]()
     
     // MARK: - Optimized News by Day Storage
     private(set) var newsByDay: [Date: Set<NeutralNews>] = [:]
     
     // MARK: - Optimized Cache Management
     private var loadedDays = Set<Date>()
-    private var loadedNewsIds = Set<String>()
-    private var loadedNeutralNewsIds = Set<String>()
     
     // MARK: - Background Loading
     private var backgroundLoadingTask: Task<Void, Never>?
@@ -169,7 +166,7 @@ final class NewsDataManager {
     }
     
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
-        groupsOfNews.first(where: { $0.first?.group == neutralNews.group }) ?? []
+        return allNews.filter { neutralNews.sourceIds.contains($0.id) }
     }
     
     func isDayLoaded(_ day: DayInfo) -> Bool {
@@ -200,26 +197,23 @@ final class NewsDataManager {
         regularNews fetchedNews: [News],
         for date: Date
     ) {
-        // Add only truly new neutral news
-        let newNeutralNews = fetchedNeutralNews.filter { news in
-            !self.loadedNeutralNewsIds.contains(news.id)
+        // Add only truly new neutral news that don't exist yet
+        let newNeutralNews = fetchedNeutralNews.filter { fetchedNews in
+            !neutralNews.contains { existingNews in existingNews.id == fetchedNews.id }
         }
         
         if !newNeutralNews.isEmpty {
             self.neutralNews.append(contentsOf: newNeutralNews)
-            self.loadedNeutralNewsIds.formUnion(newNeutralNews.map(\.id))
             self.addNewsToDay(newNeutralNews, for: date)
         }
         
-        // Add only truly new regular news
-        let newNews = fetchedNews.filter { news in
-            !self.loadedNewsIds.contains(news.id)
+        // Add only truly new regular news that don't exist yet
+        let newNews = fetchedNews.filter { fetchedNews in
+            !allNews.contains { existingNews in existingNews.id == fetchedNews.id }
         }
         
         if !newNews.isEmpty {
             self.allNews.append(contentsOf: newNews)
-            self.loadedNewsIds.formUnion(newNews.map(\.id))
-            self.filterGroupedNews()
         }
     }
     
@@ -231,32 +225,26 @@ final class NewsDataManager {
         // Step 1: Update existing neutral news with fresh data
         let fetchedNeutralNewsDict = Dictionary(uniqueKeysWithValues: fetchedNeutralNews.map { ($0.id, $0) })
         
-        // Update existing items in neutralNews array
         for i in neutralNews.indices {
             if let freshNews = fetchedNeutralNewsDict[neutralNews[i].id] {
-                let oldDate = Calendar.current.startOfDay(for: neutralNews[i].date)
-                if oldDate == date {
-                    neutralNews[i] = freshNews
-                }
+                neutralNews[i] = freshNews
             }
         }
         
-        // Step 2: Add genuinely new items
-        let newNeutralNews = fetchedNeutralNews.filter { news in
-            !self.loadedNeutralNewsIds.contains(news.id)
+        // Step 2: Add only genuinely new items that don't exist yet
+        let newNeutralNews = fetchedNeutralNews.filter { fetchedNews in
+            !neutralNews.contains { existingNews in existingNews.id == fetchedNews.id }
         }
         
         if !newNeutralNews.isEmpty {
-            self.neutralNews.append(contentsOf: newNeutralNews)
-            self.loadedNeutralNewsIds.formUnion(newNeutralNews.map(\.id))
+            neutralNews.append(contentsOf: newNeutralNews)
         }
         
-        // Step 3: Update the day collection with ALL current news for this day
+        // Step 3: Update the day collection with fresh data
         if newsByDay[date] == nil {
             newsByDay[date] = Set<NeutralNews>()
         }
         
-        // Replace the day's collection with fresh data
         newsByDay[date] = Set(fetchedNeutralNews)
         
         // Step 4: Handle regular news similarly
@@ -265,25 +253,18 @@ final class NewsDataManager {
         // Update existing items
         for i in allNews.indices {
             if let freshNews = fetchedNewsDict[allNews[i].id] {
-                let oldDate = Calendar.current.startOfDay(for: allNews[i].pubDate)
-                if oldDate == date {
-                    allNews[i] = freshNews
-                }
+                allNews[i] = freshNews
             }
         }
         
-        // Add new items
-        let newNews = fetchedNews.filter { news in
-            !self.loadedNewsIds.contains(news.id)
+        // Add only genuinely new items that don't exist yet
+        let newNews = fetchedNews.filter { fetchedNews in
+            !allNews.contains { existingNews in existingNews.id == fetchedNews.id }
         }
         
         if !newNews.isEmpty {
-            self.allNews.append(contentsOf: newNews)
-            self.loadedNewsIds.formUnion(newNews.map(\.id))
+            allNews.append(contentsOf: newNews)
         }
-        
-        // Step 5: Update grouped news
-        self.filterGroupedNews()
     }
     
     private func addNewsToDay(_ news: [NeutralNews], for date: Date) {
@@ -361,20 +342,6 @@ final class NewsDataManager {
         )
     }
     
-    private func filterGroupedNews() {
-        let groupedNews = Dictionary(grouping: allNews, by: { $0.group })
-        let filteredGroups = groupedNews.filter { $0.value.count > 1 && $0.key != -1 }
-        
-        let sortedGroups = filteredGroups.sorted { group1, group2 in
-            guard let latestNews1 = group1.value.first, let latestNews2 = group2.value.first else {
-                return false
-            }
-            return latestNews1.pubDate > latestNews2.pubDate
-        }
-        
-        groupsOfNews = sortedGroups.map { $0.value }
-    }
-    
     
     private func cleanOldMemoryDataIfNeeded() {
         let calendar = Calendar.current
@@ -400,7 +367,5 @@ final class NewsDataManager {
             let newsDate = calendar.startOfDay(for: news.pubDate)
             return newsDate < sevenDaysAgo
         }
-        
-        filterGroupedNews()
     }
 }

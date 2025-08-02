@@ -8,7 +8,7 @@
 import Foundation
 
 struct NeutralNews: Codable, Hashable, Identifiable {
-    var id = UUID().uuidString
+    var id: String
     let neutralTitle: String
     let neutralDescription: String
     let category: String
@@ -19,20 +19,18 @@ struct NeutralNews: Codable, Hashable, Identifiable {
     let createdAt: Date
     let updatedAt: Date
     var group: Int
+    let sourceIds: [String]
     
     static func == (lhs: NeutralNews, rhs: NeutralNews) -> Bool {
-        lhs.group == rhs.group &&
-        lhs.neutralTitle == rhs.neutralTitle &&
-        lhs.neutralDescription == rhs.neutralDescription
+        lhs.id == rhs.id
     }
     
     func hash(into hasher: inout Hasher) {
-        hasher.combine(group)
-        hasher.combine(neutralTitle)
-        hasher.combine(neutralDescription)
+        hasher.combine(id)
     }
     
     static let mock = NeutralNews(
+        id: "mock-id",
         neutralTitle: "Lorem ipsum dolor sit amet",
         neutralDescription: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         category: Category.economia.rawValue,
@@ -42,6 +40,7 @@ struct NeutralNews: Codable, Hashable, Identifiable {
         date: .now,
         createdAt: .now,
         updatedAt: .now,
-        group: 0
+        group: 0,
+        sourceIds: ["mock-news-1", "mock-news-2"]
     )
 }

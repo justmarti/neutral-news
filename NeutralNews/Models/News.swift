@@ -8,7 +8,7 @@
 import Foundation
 
 struct News: Codable, Identifiable, Hashable {
-    var id = UUID().uuidString
+    var id: String
     let title: String
     let description: String
     let scrappedDescription: String?
@@ -24,15 +24,15 @@ struct News: Codable, Identifiable, Hashable {
     var embedding: [Double]
     
     static func == (lhs: News, rhs: News) -> Bool {
-        lhs.link == rhs.link && lhs.group == rhs.group
+        lhs.id == rhs.id
     }
     
     func hash(into hasher: inout Hasher) {
-        hasher.combine(link)
-        hasher.combine(group)
+        hasher.combine(id)
     }
     
     static let mock = News(
+        id: "mock-id",
         title: "Lorem ipsum dolor sit amet",
         description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         scrappedDescription: nil,

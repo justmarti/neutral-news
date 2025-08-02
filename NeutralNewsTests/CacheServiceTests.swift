@@ -231,7 +231,8 @@ struct CacheServiceTests {
     // MARK: - Helper Methods
     
     private func createMockNeutralNews(for date: Date, id: String = "1", title: String = "Test News") -> NeutralNews {
-        var news = NeutralNews(
+        return NeutralNews(
+            id: id,
             neutralTitle: title,
             neutralDescription: "Test description",
             category: "Test",
@@ -241,14 +242,14 @@ struct CacheServiceTests {
             date: date,
             createdAt: date,
             updatedAt: date,
-            group: 1
+            group: 1,
+            sourceIds: ["test-news-1", "test-news-2"]
         )
-        news.id = id
-        return news
     }
     
     private func createMockNews(for date: Date, id: String = "1", title: String = "Test News") -> News {
-        var news = News(
+        return News(
+            id: id,
             title: title,
             description: "Test description",
             scrappedDescription: nil,
@@ -263,7 +264,5 @@ struct CacheServiceTests {
             group: 1,
             embedding: [0.1, 0.2, 0.3]
         )
-        news.id = id
-        return news
     }
 }

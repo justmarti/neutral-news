@@ -26,7 +26,7 @@ final class FirestoreService {
             .getDocuments()
         
         return snapshot.documents.compactMap { doc -> NeutralNews? in
-            parseNeutralNews(from: doc.data())
+            parseNeutralNews(from: doc.data(), documentID: doc.documentID)
         }
     }
     
@@ -44,13 +44,13 @@ final class FirestoreService {
             .getDocuments()
         
         return snapshot.documents.compactMap { doc -> News? in
-            parseNews(from: doc.data())
+            parseNews(from: doc.data(), documentID: doc.documentID)
         }
     }
     
     // MARK: - Private Parsing Methods
     
-    private func parseNeutralNews(from data: [String: Any]) -> NeutralNews? {
+    private func parseNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
         guard let neutralTitle = data["neutral_title"] as? String,
               let neutralDescription = data["neutral_description"] as? String,
               let category = data["category"] as? String,
@@ -60,10 +60,12 @@ final class FirestoreService {
               let date = data["date"] as? Timestamp,
               let createdAt = data["created_at"] as? Timestamp,
               let updatedAt = data["updated_at"] as? Timestamp,
-              let group = data["group"] as? Int
+              let group = data["group"] as? Int,
+              let sourceIds = data["source_ids"] as? [String]
         else { return nil }
         
         return NeutralNews(
+            id: documentID,
             neutralTitle: neutralTitle,
             neutralDescription: neutralDescription,
             category: category,
@@ -73,11 +75,12 @@ final class FirestoreService {
             date: date.dateValue(),
             createdAt: createdAt.dateValue(),
             updatedAt: updatedAt.dateValue(),
-            group: group
+            group: group,
+            sourceIds: sourceIds
         )
     }
     
-    private func parseNews(from data: [String: Any]) -> News? {
+    private func parseNews(from data: [String: Any], documentID: String) -> News? {
         guard let title = data["title"] as? String,
               let description = data["description"] as? String,
               let group = data["group"] as? Int,
@@ -96,6 +99,7 @@ final class FirestoreService {
         let embedding = data["embedding"] as? [Double] ?? []
         
         return News(
+            id: documentID,
             title: title,
             description: description,
             scrappedDescription: scrappedDescription,

@@ -175,6 +175,7 @@ struct EdgeCasesAndErrorHandlingTests {
         let futureDate = Date(timeIntervalSince1970: 2147483647) // Year 2038 - safe timestamp limit
         
         let extremeNeutralNews = NeutralNews(
+            id: "extreme-test",
             neutralTitle: "",  // Empty title
             neutralDescription: String(repeating: "a", count: 100000), // Very long description
             category: "🎉🔥💻", // Emoji category
@@ -184,7 +185,8 @@ struct EdgeCasesAndErrorHandlingTests {
             date: extremeDate,
             createdAt: futureDate,
             updatedAt: extremeDate,
-            group: Int.max // Maximum integer
+            group: Int.max, // Maximum integer
+            sourceIds: [] // Empty array
         )
         
         // Should create without crashing
@@ -339,7 +341,8 @@ struct EdgeCasesAndErrorHandlingTests {
         description: String = "Test description",
         category: String = "Test"
     ) -> NeutralNews {
-        var news = NeutralNews(
+        return NeutralNews(
+            id: id,
             neutralTitle: title,
             neutralDescription: description,
             category: category,
@@ -349,10 +352,9 @@ struct EdgeCasesAndErrorHandlingTests {
             date: Date(),
             createdAt: Date(),
             updatedAt: Date(),
-            group: 1
+            group: 1,
+            sourceIds: ["test-news-1", "test-news-2"]
         )
-        news.id = id
-        return news
     }
 }
 
