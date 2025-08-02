@@ -12,6 +12,7 @@ final class CacheService {
     static let shared = CacheService()
     
     private var modelContainer: ModelContainer
+    private var lastCleanupDate: Date?
     
     // TTL Configuration (more aggressive for better performance)
     private enum TTL {
@@ -32,9 +33,23 @@ final class CacheService {
         return ModelContext(modelContainer)
     }
     
+    // MARK: - Auto-Cleanup
+    
+    private func cleanExpiredCacheIfNeeded() {
+        let now = Date()
+        // Only clean if more than 6 hours have passed since last cleanup
+        if let lastClean = lastCleanupDate, now.timeIntervalSince(lastClean) < 6 * 3600 {
+            return
+        }
+        
+        cleanExpiredCache()
+        lastCleanupDate = now
+    }
+    
     // MARK: - Cache Check Methods
     
     func isCacheValid(for day: DayInfo) -> Bool {
+        cleanExpiredCacheIfNeeded()
         let context = createContext()
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)
@@ -58,6 +73,7 @@ final class CacheService {
     // MARK: - Neutral News Cache Methods
     
     func getCachedNeutralNews(for day: DayInfo) -> [NeutralNews] {
+        cleanExpiredCacheIfNeeded()
         let context = createContext()
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)
@@ -120,6 +136,7 @@ final class CacheService {
     // MARK: - Regular News Cache Methods
     
     func getCachedNews(for day: DayInfo) -> [News] {
+        cleanExpiredCacheIfNeeded()
         let context = createContext()
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)

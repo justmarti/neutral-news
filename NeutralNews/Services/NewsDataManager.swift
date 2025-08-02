@@ -29,7 +29,6 @@ final class NewsDataManager {
     
     // MARK: - Background Loading
     private var backgroundLoadingTask: Task<Void, Never>?
-    private var lastExecutionDate: Date?
     
     // MARK: - Computed Properties
     var lastSevenDays: [DayInfo] {
@@ -67,7 +66,6 @@ final class NewsDataManager {
     
     private init() {
         startProgressiveLoading()
-        setupDayChangeTimer()
     }
     
     deinit {
@@ -160,6 +158,7 @@ final class NewsDataManager {
     }
     
     func getNewsForDay(_ dayInfo: DayInfo) -> Set<NeutralNews> {
+        cleanOldMemoryDataIfNeeded()
         let startOfDay = Calendar.current.startOfDay(for: dayInfo.date)
         return newsByDay[startOfDay] ?? Set<NeutralNews>()
     }
@@ -376,30 +375,16 @@ final class NewsDataManager {
         groupsOfNews = sortedGroups.map { $0.value }
     }
     
-    private func setupDayChangeTimer() {
-        let calendar = Calendar.current
-        var components = DateComponents()
-        components.hour = 0
-        components.minute = 0
-        components.second = 0
-        
-        guard let tomorrow = calendar.nextDate(after: Date(), matching: components, matchingPolicy: .nextTime) else { return }
-        
-        let timeInterval = tomorrow.timeIntervalSince(Date())
-        
-        Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { [weak self] _ in
-            self?.handleDayChange()
-            self?.setupDayChangeTimer()
-        }
-    }
     
-    private func handleDayChange() {
+    private func cleanOldMemoryDataIfNeeded() {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let sevenDaysAgo = calendar.date(byAdding: .day, value: -7, to: today)!
         
         // Remove old data from memory (older than 7 days)
         let oldDates = newsByDay.keys.filter { $0 < sevenDaysAgo }
+        guard !oldDates.isEmpty else { return }
+        
         oldDates.forEach { date in
             newsByDay[date] = nil
             loadedDays.remove(date)
@@ -416,11 +401,6 @@ final class NewsDataManager {
             return newsDate < sevenDaysAgo
         }
         
-        // Clean cache and refresh group filtering
-        cacheService.cleanExpiredCache()
         filterGroupedNews()
-        
-        lastExecutionDate = Date()
-        startProgressiveLoading()
     }
 }
