@@ -47,7 +47,7 @@ struct NeutralNewsView: View {
                             Text(news.neutralTitle)
                                 .font(.title)
                                 .fontWeight(.semibold)
-//                                .fontDesign(.serif)
+                                .fontDesign(.serif)
                             
                             AsyncImage(url: URL(string: news.imageUrl)) { phase in
                                 VStack(alignment: .leading, spacing: 4) {
