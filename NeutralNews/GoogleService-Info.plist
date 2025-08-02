@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.espinosa.marti.NeutralNews</string>
+	<string>dev.itram.news</string>
 	<key>PROJECT_ID</key>
 	<string>neutralnews-ca548</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:550879612407:ios:ac5952a8821a6cabd232f2</string>
+	<string>1:550879612407:ios:cf3f5fa21c8456e6d232f2</string>
 </dict>
 </plist>
