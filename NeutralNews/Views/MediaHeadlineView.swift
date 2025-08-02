@@ -28,7 +28,7 @@ struct MediaHeadlineView: View {
         .padding()  
         .frame(width: 230, height: 230)
         .background(.thinMaterial)
-        .clipShape(.rect(cornerRadius: 20))
+        .clipShape(.rect(cornerRadius: 24))
     }
 }
 
