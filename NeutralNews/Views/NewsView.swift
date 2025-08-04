@@ -37,7 +37,7 @@ struct NewsView: View {
                             .fontDesign(.serif)
 //                            .lineHeight(.tight)
                         
-                        AsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
+                        CachedAsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
                             switch phase {
                             case .empty:
                                 ShimmerView()

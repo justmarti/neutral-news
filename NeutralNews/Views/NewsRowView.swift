@@ -56,7 +56,7 @@ struct NewsImageView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                AsyncImage(url: URL(string: imageUrl ?? "")) { phase in
+                CachedAsyncImage(url: URL(string: imageUrl ?? "")) { phase in
                     if let image = phase.image {
                         image
                             .resizable()
