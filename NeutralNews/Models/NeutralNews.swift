@@ -8,7 +8,7 @@
 import Foundation
 
 struct NeutralNews: Codable, Hashable, Identifiable {
-    var id: String
+    let id: String
     let neutralTitle: String
     let neutralDescription: String
     let category: String
@@ -18,7 +18,7 @@ struct NeutralNews: Codable, Hashable, Identifiable {
     let date: Date
     let createdAt: Date
     let updatedAt: Date
-    var group: Int
+    let group: Int
     let sourceIds: [String]
     
     static func == (lhs: NeutralNews, rhs: NeutralNews) -> Bool {

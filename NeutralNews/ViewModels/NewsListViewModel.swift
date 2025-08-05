@@ -155,7 +155,7 @@ final class NewsListViewModel {
     private var pendingDeepLink: DeepLinkService.DeepLinkData?
     var deepLinkTargetNews: NeutralNews?
     
-    func findNews(group: Int, date: Date) -> NeutralNews? {
+    private func findNews(group: Int, date: Date) -> NeutralNews? {
         let calendar = Calendar.current
         return newsDataManager.neutralNews.first { news in
             news.group == group && calendar.isDate(news.date, inSameDayAs: date)

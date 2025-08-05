@@ -286,4 +286,3 @@ struct NewsDataManagerTests {
         )
     }
 }
-

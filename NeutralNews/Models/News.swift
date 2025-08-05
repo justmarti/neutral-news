@@ -8,7 +8,7 @@
 import Foundation
 
 struct News: Codable, Identifiable, Hashable {
-    var id: String
+    let id: String
     let title: String
     let description: String
     let scrappedDescription: String?
@@ -19,9 +19,9 @@ struct News: Codable, Identifiable, Hashable {
     let createdAt: Date
     let updatedAt: Date
     let sourceMedium: Media
-    var neutralScore: Int
-    var group: Int
-    var embedding: [Double]
+    let neutralScore: Int
+    let group: Int
+    let embedding: [Double]
     
     static func == (lhs: News, rhs: News) -> Bool {
         lhs.id == rhs.id

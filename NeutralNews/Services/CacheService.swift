@@ -16,8 +16,8 @@ final class CacheService {
     
     // TTL Configuration (more aggressive for better performance)
     private enum TTL {
-        static let today: TimeInterval = 45 * 60        // 45 minutes
-        static let yesterday: TimeInterval = 4 * 60 * 60  // 4 hours  
+        static let today: TimeInterval = 45 * 60          // 45 minutes
+        static let yesterday: TimeInterval = 4 * 60 * 60  // 4 hours
         static let older: TimeInterval = 24 * 60 * 60     // 24 hours
     }
     

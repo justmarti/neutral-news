@@ -92,7 +92,7 @@ struct HomeView: View {
     }
     
     
-    var dayMenu: some View {
+    private var dayMenu: some View {
         Menu {
             ForEach(vm.lastSevenDays) { day in
                 Button {
@@ -106,7 +106,7 @@ struct HomeView: View {
         }
     }
     
-    var orderMenu: some View {
+    private var orderMenu: some View {
         Menu {
             Button {
                 vm.orderBy = .hour
@@ -122,7 +122,7 @@ struct HomeView: View {
         }
     }
     
-    var filterMenu: some View {
+    private var filterMenu: some View {
         Menu {
             ForEach(vm.getCategoriesOfTheDay(), id: \.self) { category in
                 Button {
@@ -152,7 +152,7 @@ struct HomeView: View {
         }
     }
     
-    var noResultsView: some View {
+    private var noResultsView: some View {
         VStack {
             Spacer()
             ContentUnavailableView(
@@ -165,7 +165,7 @@ struct HomeView: View {
         .frame(minHeight: UIScreen.main.bounds.height - 200)
     }
     
-    var noNewsYetView: some View {
+    private var noNewsYetView: some View {
         VStack {
             Spacer()
             ContentUnavailableView(
