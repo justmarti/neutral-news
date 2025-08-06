@@ -14,81 +14,90 @@ struct HomeView: View {
     
     @Namespace private var animationNamespace
     
+    @ObservedObject var config: AppConfig
+    
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                    noResultsView
-                } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                    noNewsYetView
-                } else {
-                    LazyVStack {
-                        ForEach(vm.newsToShow) { neutralNews in
-                            NavigationLink {
-                                NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
-                                    .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
-                            } label: {
-                                NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
-                                    .padding(.vertical, 4)
-                                    .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
+        Group {
+            if config.isInMaintenance {
+                MaintenanceView(config: config)
+            } else {
+                NavigationStack {
+                    ScrollView {
+                        if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+                            noResultsView
+                        } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+                            noNewsYetView
+                        } else {
+                            LazyVStack {
+                                ForEach(vm.newsToShow) { neutralNews in
+                                    NavigationLink {
+                                        NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
+                                            .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
+                                    } label: {
+                                        NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
+                                            .padding(.vertical, 4)
+                                            .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .animation(.default, value: vm.newsToShow)
                             }
-                            .buttonStyle(.plain)
+                            .padding(.horizontal)
                         }
-                        .animation(.default, value: vm.newsToShow)
+                        
+                        if vm.isLoadingNeutralNews {
+                            VStack {
+                                Spacer()
+                                ProgressView()
+                                    .controlSize(.large)
+                                Spacer()
+                            }
+                            .frame(minHeight: UIScreen.main.bounds.height - 250)
+                        }
                     }
-                    .padding(.horizontal)
-                }
-                
-                if vm.isLoadingNeutralNews {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                            .controlSize(.large)
-                        Spacer()
+                    .refreshable {
+                        await vm.refreshNews()
                     }
-                    .frame(minHeight: UIScreen.main.bounds.height - 250)
+                    .myToolbar()
+                    .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
+                    .mySearchToolbarMinimize()
+                    .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
+                        Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
+                        Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
+                    }
+                    .navigationTitle(vm.daySelected.dayName)
+                    .myNavigationSubtitle(vm.daySelected.formattedDateShort)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) { dayMenu }
+                        ToolbarItem(placement: .topBarTrailing) { orderMenu }
+                        ToolbarItem(placement: .topBarTrailing) { filterMenu }
+                    }
+                    .navigationDestination(item: $targetNews) { news in
+                        NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
+                    }
+                }
+                .fullScreenCover(isPresented: $showOnboarding) {
+                    UserDefaults.hasSeenOnboarding = true
+                } content: {
+                    OnboardingView(isPresented: $showOnboarding)
+                }
+                .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
+                    if let news = newValue {
+                        print("🎯 Vista recibió noticia objetivo: \(news.neutralTitle)")
+                        targetNews = news
+                        
+                        // Retrasar limpieza para asegurar navegación
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            vm.deepLinkTargetNews = nil
+                        }
+                    }
+                }
+                .onAppear {
+                    vm.checkPendingDeepLink()
                 }
             }
-            .refreshable {
-                await vm.refreshNews()
-            }
-            .myToolbar()
-            .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
-            .mySearchToolbarMinimize()
-            .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
-                Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
-                Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
-            }
-            .navigationTitle(vm.daySelected.dayName)
-            .myNavigationSubtitle(vm.daySelected.formattedDateShort)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { dayMenu }
-                ToolbarItem(placement: .topBarTrailing) { orderMenu }
-                ToolbarItem(placement: .topBarTrailing) { filterMenu }
-            }
-            .navigationDestination(item: $targetNews) { news in
-                NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
-            }
         }
-        .fullScreenCover(isPresented: $showOnboarding) {
-            UserDefaults.hasSeenOnboarding = true
-        } content: {
-            OnboardingView(isPresented: $showOnboarding)
-        }
-        .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
-            if let news = newValue {
-                print("🎯 Vista recibió noticia objetivo: \(news.neutralTitle)")
-                targetNews = news
-                
-                // Retrasar limpieza para asegurar navegación
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    vm.deepLinkTargetNews = nil
-                }
-            }
-        }
-        .onAppear {
-            vm.checkPendingDeepLink()
-        }
+        .animation(.default, value: config.isInMaintenance)
     }
     
     
@@ -153,29 +162,21 @@ struct HomeView: View {
     }
     
     private var noResultsView: some View {
-        VStack {
-            Spacer()
-            ContentUnavailableView(
-                "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
-                systemImage: "magnifyingglass",
-                description: Text("Prueba con otra búsqueda o selecciona otro día.")
-            )
-            Spacer()
-        }
-        .frame(minHeight: UIScreen.main.bounds.height - 200)
+        ContentUnavailableView(
+            "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
+            systemImage: "magnifyingglass",
+            description: Text("Prueba con otra búsqueda o selecciona otro día.")
+        )
+        .containerRelativeFrame([.horizontal, .vertical])
     }
     
     private var noNewsYetView: some View {
-        VStack {
-            Spacer()
-            ContentUnavailableView(
-                "No hay noticias de \(vm.daySelected.dayName) aún",
-                systemImage: "newspaper",
-                description: Text("Prueba en unos minutos o selecciona otro día.")
-            )
-            Spacer()
-        }
-        .frame(minHeight: UIScreen.main.bounds.height - 300)
+        ContentUnavailableView(
+            "No hay noticias de \(vm.daySelected.dayName) aún",
+            systemImage: "newspaper",
+            description: Text("Prueba en unos minutos o selecciona otro día.")
+        )
+        .containerRelativeFrame([.horizontal, .vertical])
     }
 }
 
@@ -206,5 +207,5 @@ extension View {
 }
 
 #Preview {
-    HomeView()
+    HomeView(config: AppConfig(isTestMode: true))
 }

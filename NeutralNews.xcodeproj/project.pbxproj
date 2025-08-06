@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4111E2762D8761DE0057CA98 /* FirebaseAuth */; };
+		416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 416D20D32E4371690070F565 /* FirebaseRemoteConfig */; };
 		41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736212D820C8F00E08EA1 /* FirebaseFirestore */; };
 		41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736232D820C8F00E08EA1 /* FirebaseFunctions */; };
 /* End PBXBuildFile section */
@@ -68,6 +69,7 @@
 				41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */,
 				4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */,
 				41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */,
+				416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -138,6 +140,7 @@
 				41A736212D820C8F00E08EA1 /* FirebaseFirestore */,
 				41A736232D820C8F00E08EA1 /* FirebaseFunctions */,
 				4111E2762D8761DE0057CA98 /* FirebaseAuth */,
+				416D20D32E4371690070F565 /* FirebaseRemoteConfig */,
 			);
 			productName = NeutralNews;
 			productReference = 419D2FB72D11C96500D95E22 /* NeutralNews.app */;
@@ -509,6 +512,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		416D20D32E4371690070F565 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
 		};
 		41A736212D820C8F00E08EA1 /* FirebaseFirestore */ = {
 			isa = XCSwiftPackageProductDependency;
