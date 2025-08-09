@@ -113,6 +113,10 @@ final class NewsListViewModel {
         filterViewModel.clearFilters()
     }
     
+    func resetToDefaults() {
+        filterViewModel.resetToDefaults()
+    }
+    
     // MARK: - Private Methods
     
     private func loadNewsForSelectedDay() {

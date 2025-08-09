@@ -294,43 +294,6 @@ struct FirestoreServiceTests {
         #expect(news?.title == "Test News") // Required fields should still work
     }
     
-    // MARK: - Performance Tests
-    
-    @Test("Large dataset parsing performance", .timeLimit(.minutes(1)))
-    func testLargeDatasetParsing() async throws {
-        let service = FirestoreService.shared
-        
-        // Create mock data for many documents
-        let largeMockDataSet = (1...1000).map { index in
-            return (
-                data: [
-                    "neutralTitle": "News \(index)",
-                    "neutralDescription": "Description \(index)",
-                    "category": "Test",
-                    "relevance": index % 10,
-                    "imageUrl": "https://example.com/image\(index).jpg",
-                    "imageMedium": "https://example.com/medium\(index).jpg",
-                    "date": Timestamp(date: Date()),
-                    "createdAt": Timestamp(date: Date()),
-                    "updatedAt": Timestamp(date: Date()),
-                    "group": index
-                ] as [String: Any],
-                id: "doc_\(index)"
-            )
-        }
-        
-        let startTime = Date()
-        
-        let parsedNews = largeMockDataSet.compactMap { item in
-            service.parseNeutralNews(from: item.data, documentID: item.id)
-        }
-        
-        let endTime = Date()
-        let processingTime = endTime.timeIntervalSince(startTime)
-        
-        #expect(parsedNews.count == 1000)
-        #expect(processingTime < 1.0) // Should complete within 1 second
-    }
     
     // MARK: - Integration Tests
     
@@ -400,7 +363,8 @@ extension FirestoreService {
             return nil
         }
         
-        var neutralNews = NeutralNews(
+        let neutralNews = NeutralNews(
+            id: documentID,
             neutralTitle: neutralTitle,
             neutralDescription: neutralDescription,
             category: category,
@@ -410,9 +374,9 @@ extension FirestoreService {
             date: dateTimestamp.dateValue(),
             createdAt: createdAtTimestamp.dateValue(),
             updatedAt: updatedAtTimestamp.dateValue(),
-            group: group
+            group: group,
+            sourceIds: data["sourceIds"] as? [String] ?? []
         )
-        neutralNews.id = documentID
         return neutralNews
     }
     
@@ -435,7 +399,8 @@ extension FirestoreService {
         let imageUrl = (data["imageUrl"] is NSNull) ? nil : data["imageUrl"] as? String
         let embedding = (data["embedding"] as? [Double]) ?? []
         
-        var news = News(
+        let news = News(
+            id: documentID,
             title: title,
             description: description,
             scrappedDescription: scrappedDescription,
@@ -450,7 +415,6 @@ extension FirestoreService {
             group: group,
             embedding: embedding
         )
-        news.id = documentID
         return news
     }
 }

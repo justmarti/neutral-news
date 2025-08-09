@@ -88,6 +88,13 @@ final class NewsFilterViewModel {
         categoryFilter.removeAll()
     }
     
+    func resetToDefaults() {
+        categoryFilter.removeAll()
+        searchText = ""
+        searchScope = .daySelected
+        orderBy = .hour
+    }
+    
     // MARK: - Private Methods
     
     private func sortNews(_ news: [NeutralNews]) -> [NeutralNews] {

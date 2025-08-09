@@ -22,7 +22,43 @@ final class NewsDataManager {
     private(set) var newsByDay: [Date: Set<NeutralNews>] = [:]
     
     // MARK: - Optimized Cache Management
-    private var loadedDays = Set<Date>()
+    private var loadedDays: Set<Date> = Set<Date>()
+    
+    // Helper functions to avoid bridging issues with Date in Set and Dictionary operations
+    private func isDateLoaded(_ date: Date) -> Bool {
+        return (loadedDays as Set<Date>).contains(date)
+    }
+    
+    private func markDateAsLoaded(_ date: Date) {
+        loadedDays.insert(date)
+    }
+    
+    private func removeDateFromLoaded(_ date: Date) {
+        loadedDays.remove(date)
+    }
+    
+    private func removeNewsForDate(_ date: Date) {
+        newsByDay.removeValue(forKey: date)
+    }
+    
+    private func getNewsSetForDate(_ date: Date) -> Set<NeutralNews> {
+        return newsByDay[date] ?? Set<NeutralNews>()
+    }
+    
+    private func setNewsForDate(_ news: Set<NeutralNews>, date: Date) {
+        newsByDay[date] = news
+    }
+    
+    private func ensureNewsSetExists(for date: Date) {
+        if newsByDay[date] == nil {
+            newsByDay[date] = Set<NeutralNews>()
+        }
+    }
+    
+    private func addNewsToDate(_ news: Set<NeutralNews>, date: Date) {
+        ensureNewsSetExists(for: date)
+        newsByDay[date]?.formUnion(news)
+    }
     
     // MARK: - Background Loading
     private var backgroundLoadingTask: Task<Void, Never>?
@@ -76,7 +112,7 @@ final class NewsDataManager {
         let startOfDay = calendar.startOfDay(for: day.date)
         
         // Skip if already loaded unless forced refresh
-        guard !loadedDays.contains(startOfDay) || forceRefresh else { return }
+        guard !isDateLoaded(startOfDay) || forceRefresh else { return }
         
         // Step 1: Try cache first (unless force refresh)
         if !forceRefresh && cacheService.isCacheValid(for: day) {
@@ -91,7 +127,7 @@ final class NewsDataManager {
                     regularNews: cachedNews,
                     for: startOfDay
                 )
-                self.loadedDays.insert(startOfDay)
+                self.markDateAsLoaded(startOfDay)
             }
             return
         }
@@ -123,7 +159,7 @@ final class NewsDataManager {
                 }
                 
                 // Mark day as loaded
-                self.loadedDays.insert(startOfDay)
+                self.markDateAsLoaded(startOfDay)
                 
                 // Cache the fresh data after processing
                 self.cacheService.cacheNeutralNews(fetchedNeutralNews, for: day)
@@ -144,7 +180,7 @@ final class NewsDataManager {
                         regularNews: cachedNews,
                         for: startOfDay
                     )
-                    self.loadedDays.insert(startOfDay)
+                    self.markDateAsLoaded(startOfDay)
                 }
             }
         }
@@ -157,7 +193,7 @@ final class NewsDataManager {
     func getNewsForDay(_ dayInfo: DayInfo) -> Set<NeutralNews> {
         cleanOldMemoryDataIfNeeded()
         let startOfDay = Calendar.current.startOfDay(for: dayInfo.date)
-        return newsByDay[startOfDay] ?? Set<NeutralNews>()
+        return getNewsSetForDate(startOfDay)
     }
     
     func getNewsArrayForDay(_ day: DayInfo) -> [NeutralNews] {
@@ -172,7 +208,7 @@ final class NewsDataManager {
     func isDayLoaded(_ day: DayInfo) -> Bool {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day.date)
-        return loadedDays.contains(startOfDay)
+        return isDateLoaded(startOfDay)
     }
     
     func getCacheStats() -> (memory: Int, persistent: (neutralNews: Int, news: Int)) {
@@ -241,11 +277,8 @@ final class NewsDataManager {
         }
         
         // Step 3: Update the day collection with fresh data
-        if newsByDay[date] == nil {
-            newsByDay[date] = Set<NeutralNews>()
-        }
-        
-        newsByDay[date] = Set(fetchedNeutralNews)
+        ensureNewsSetExists(for: date)
+        setNewsForDate(Set(fetchedNeutralNews), date: date)
         
         // Step 4: Handle regular news similarly
         let fetchedNewsDict = Dictionary(uniqueKeysWithValues: fetchedNews.map { ($0.id, $0) })
@@ -268,10 +301,7 @@ final class NewsDataManager {
     }
     
     private func addNewsToDay(_ news: [NeutralNews], for date: Date) {
-        if newsByDay[date] == nil {
-            newsByDay[date] = Set<NeutralNews>()
-        }
-        newsByDay[date]?.formUnion(news)
+        addNewsToDate(Set(news), date: date)
     }
     
     private func startProgressiveLoading() {
@@ -297,7 +327,7 @@ final class NewsDataManager {
             let startOfDay = calendar.startOfDay(for: dayDate)
             
             // Skip if already loaded in memory
-            if loadedDays.contains(startOfDay) { continue }
+            if isDateLoaded(startOfDay) { continue }
             
             let dayInfo = createDayInfo(for: dayDate)
             
@@ -353,8 +383,8 @@ final class NewsDataManager {
         guard !oldDates.isEmpty else { return }
         
         oldDates.forEach { date in
-            newsByDay[date] = nil
-            loadedDays.remove(date)
+            removeNewsForDate(date)
+            removeDateFromLoaded(date)
         }
         
         // Also clean old news from arrays
