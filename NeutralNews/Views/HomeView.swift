@@ -13,7 +13,6 @@ struct HomeView: View {
     @State private var targetNews: NeutralNews?
     
     @Namespace private var animationNamespace
-    
     @ObservedObject var config: AppConfig
     
     var body: some View {
@@ -22,59 +21,22 @@ struct HomeView: View {
                 MaintenanceView(config: config)
             } else {
                 NavigationStack {
-                    ScrollView {
-                        if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                            noResultsView
-                        } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                            noNewsYetView
-                        } else {
-                            LazyVStack {
-                                ForEach(vm.newsToShow) { neutralNews in
-                                    NavigationLink {
-                                        NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
-                                            .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
-                                    } label: {
-                                        NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
-                                            .padding(.vertical, 4)
-                                            .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                                .animation(.default, value: vm.newsToShow)
-                            }
-                            .padding(.horizontal)
+                    newsContentView
+                        .navigationTitle(vm.daySelected.dayName)
+                        .myNavigationSubtitle(vm.daySelected.formattedDateShort)
+                        .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
+                        .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
+                            Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
+                            Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
                         }
-                        
-                        if vm.isLoadingNeutralNews {
-                            VStack {
-                                Spacer()
-                                ProgressView()
-                                    .controlSize(.large)
-                                Spacer()
-                            }
-                            .frame(minHeight: UIScreen.main.bounds.height - 250)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) { dayMenu }
+                            ToolbarItem(placement: .topBarTrailing) { orderMenu }
+                            ToolbarItem(placement: .topBarTrailing) { filterMenu }
                         }
-                    }
-                    .refreshable {
-                        await vm.refreshNews()
-                    }
-                    .myToolbar()
-                    .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
-                    .mySearchToolbarMinimize()
-                    .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
-                        Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
-                        Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
-                    }
-                    .navigationTitle(vm.daySelected.dayName)
-                    .myNavigationSubtitle(vm.daySelected.formattedDateShort)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) { dayMenu }
-                        ToolbarItem(placement: .topBarTrailing) { orderMenu }
-                        ToolbarItem(placement: .topBarTrailing) { filterMenu }
-                    }
-                    .navigationDestination(item: $targetNews) { news in
-                        NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
-                    }
+                        .navigationDestination(item: $targetNews) { news in
+                            NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
+                        }
                 }
                 .fullScreenCover(isPresented: $showOnboarding) {
                     UserDefaults.hasSeenOnboarding = true
@@ -105,6 +67,42 @@ struct HomeView: View {
         .animation(.default, value: config.isInMaintenance)
     }
     
+    // MARK: - Content Views
+    
+    private var newsContentView: some View {
+        ScrollView {
+            if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+                noResultsView
+            } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+                noNewsYetView
+            } else {
+                newsListView
+            }
+        }
+        .refreshable {
+            await vm.refreshNews()
+        }
+    }
+    
+    private var newsListView: some View {
+        LazyVStack {
+            ForEach(vm.newsToShow) { neutralNews in
+                NavigationLink {
+                    NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
+                        .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
+                } label: {
+                    NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
+                        .padding(.vertical, 4)
+                        .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
+                }
+                .buttonStyle(.plain)
+            }
+            .animation(.default, value: vm.newsToShow)
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Menu Views
     
     private var dayMenu: some View {
         Menu {
@@ -184,6 +182,8 @@ struct HomeView: View {
         .containerRelativeFrame([.horizontal, .vertical])
     }
 }
+
+// MARK: - View Extensions
 
 extension View {
     @ViewBuilder
