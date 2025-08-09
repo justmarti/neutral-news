@@ -37,6 +37,7 @@ struct HomeView: View {
                         .navigationDestination(item: $targetNews) { news in
                             NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
                         }
+                        .background(Color("nn-background"))
                 }
                 .fullScreenCover(isPresented: $showOnboarding) {
                     UserDefaults.hasSeenOnboarding = true
