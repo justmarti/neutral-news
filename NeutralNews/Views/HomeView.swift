@@ -95,6 +95,11 @@ struct HomeView: View {
                 .onAppear {
                     vm.checkPendingDeepLink()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    Task {
+                        await vm.refreshNews()
+                    }
+                }
             }
         }
         .animation(.default, value: config.isInMaintenance)

@@ -32,7 +32,9 @@ final class NewsListViewModel {
     var daySelected: DayInfo = .today {
         didSet {
             if daySelected != oldValue {
-                loadNewsForSelectedDay()
+                Task {
+                    await refreshNews()
+                }
             }
         }
     }
@@ -92,7 +94,9 @@ final class NewsListViewModel {
     }
     
     func refreshNews() async {
+        isLoadingNeutralNews = true
         await newsDataManager.refreshNews(for: daySelected)
+        isLoadingNeutralNews = false
     }
     
     func forceLoadNews() async {
