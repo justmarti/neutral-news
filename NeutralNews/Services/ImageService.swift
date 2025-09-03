@@ -23,7 +23,7 @@ final class ImageService: @unchecked Sendable {
     
     @MainActor
     func getDominantColor(from urlString: String?) async -> Color {
-        guard let urlString = urlString else { return .gray }
+        guard let urlString = urlString else { return .nnBackground }
         
         let cachedColor = await getCachedColor(for: urlString)
         if let cached = cachedColor {
@@ -35,17 +35,17 @@ final class ImageService: @unchecked Sendable {
             return cachedImageColor
         }
         
-        guard let url = URL(string: urlString) else { return .gray }
+        guard let url = URL(string: urlString) else { return .nnBackground }
         
         do {
             let (data, _) = try await urlSession.data(from: url)
-            guard let image = UIImage(data: data), let cgImage = image.cgImage else { return .gray }
+            guard let image = UIImage(data: data), let cgImage = image.cgImage else { return .nnBackground }
             
             let color = extractDominantColor(from: cgImage)
             await setCachedColor(color, for: urlString)
             return color
         } catch {
-            return .gray
+            return .nnBackground
         }
     }
     
@@ -86,7 +86,7 @@ final class ImageService: @unchecked Sendable {
         let width = min(10, originalWidth)
         let height = min(10, originalHeight)
         
-        guard width > 0, height > 0 else { return .gray }
+        guard width > 0, height > 0 else { return .nnBackground }
         
         guard let context = CGContext(
             data: nil,
@@ -97,12 +97,12 @@ final class ImageService: @unchecked Sendable {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            return .gray
+            return .nnBackground
         }
         
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
         
-        guard let data = context.data else { return .gray }
+        guard let data = context.data else { return .nnBackground }
         
         var r = 0, g = 0, b = 0
         let pixelCount = width * height
