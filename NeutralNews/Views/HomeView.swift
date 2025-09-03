@@ -24,6 +24,8 @@ struct HomeView: View {
                 NavigationStack {
                     newsContentView
                         .navigationTitle(vm.daySelected.dayName)
+                        // TODO: Mirar que opción es mejor para el title
+                        .toolbarTitleDisplayMode(.inlineLarge)
                         .myNavigationSubtitle(vm.daySelected.formattedDateShort)
                         .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
                         .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
@@ -38,7 +40,7 @@ struct HomeView: View {
                         .navigationDestination(item: $targetNews) { news in
                             NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
                         }
-                        .background(Color("nn-background"))
+                        .accentGradientBackground
                 }
                 .fullScreenCover(isPresented: $showOnboarding) {
                     hasSeenOnboarding = true
@@ -47,11 +49,14 @@ struct HomeView: View {
                 }
                 .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
                     if let news = newValue {
-                        print("🎯 Vista recibió noticia objetivo: \(news.neutralTitle)")
+#if DEBUG
+                        print("🎯 View received target news: \(news.neutralTitle)")
+#endif
                         targetNews = news
                         
                         // Retrasar limpieza para asegurar navegación
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        Task {
+                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
                             vm.deepLinkTargetNews = nil
                         }
                     }
@@ -189,6 +194,24 @@ struct HomeView: View {
 // MARK: - View Extensions
 
 extension View {
+    var accentGradientBackground: some View {
+        background {
+            Color("nn-background")
+                .ignoresSafeArea()
+            
+            RadialGradient(
+                gradient: Gradient(colors: [
+                    Color.accentColor.opacity(0.5),
+                    Color.clear
+                ]),
+                center: .top,
+                startRadius: -300,
+                endRadius: 500
+            )
+            .ignoresSafeArea()
+        }
+    }
+    
     @ViewBuilder
     func myNavigationSubtitle(_ subtitle: String) -> some View {
         if #available(iOS 26.0, *) { self.navigationSubtitle(subtitle) } else { self }
