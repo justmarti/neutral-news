@@ -12,6 +12,18 @@ final class FirestoreService {
     static let shared = FirestoreService()
     private let db = Firestore.firestore()
     
+    private enum Collection {
+        #if DEBUG
+        static let reports = "reports_dev"
+        static let neutralNews = "neutral_news"
+        static let news = "news"
+        #else
+        static let reports = "reports"
+        static let neutralNews = "neutral_news"
+        static let news = "news"
+        #endif
+    }
+    
     private init() {}
     
     // MARK: - Neutral News Methods
@@ -20,7 +32,7 @@ final class FirestoreService {
         let start = Calendar.current.startOfDay(for: day.date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
         
-        let snapshot = try await db.collection("neutral_news")
+        let snapshot = try await db.collection(Collection.neutralNews)
             .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: start))
             .whereField("date", isLessThan: Timestamp(date: end))
             .getDocuments()
@@ -31,13 +43,33 @@ final class FirestoreService {
     }
     
     
+    // MARK: - Reports Methods
+    
+    func submitReport(for news: NeutralNews, problemType: Problem) async throws {
+        let reportData: [String: Any] = [
+            "news_id": news.id,
+            "news_title": news.neutralTitle,
+            "group": news.group,
+            "problem_type": problemType.title,
+            "date": Timestamp(date: Date.now)
+        ]
+        
+#if DEBUG
+        print("📤 Submitting report data: \(reportData)")
+#endif
+        let docRef = try await db.collection(Collection.reports).addDocument(data: reportData)
+#if DEBUG
+        print("📄 Report created with ID: \(docRef.documentID)")
+#endif
+    }
+    
     // MARK: - News Methods
     
     func fetchNews(for day: DayInfo) async throws -> [News] {
         let start = Calendar.current.startOfDay(for: day.date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
         
-        let snapshot = try await db.collection("news")
+        let snapshot = try await db.collection(Collection.news)
             .whereField("pub_date", isGreaterThanOrEqualTo: Timestamp(date: start))
             .whereField("pub_date", isLessThan: Timestamp(date: end))
             .whereField("group", isGreaterThan: -1)
