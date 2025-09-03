@@ -9,7 +9,8 @@ import SwiftUI
 
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
-    @State private var showOnboarding = !UserDefaults.hasSeenOnboarding
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @State private var showOnboarding = false
     @State private var targetNews: NeutralNews?
     
     @Namespace private var animationNamespace
@@ -40,7 +41,7 @@ struct HomeView: View {
                         .background(Color("nn-background"))
                 }
                 .fullScreenCover(isPresented: $showOnboarding) {
-                    UserDefaults.hasSeenOnboarding = true
+                    hasSeenOnboarding = true
                 } content: {
                     OnboardingView(isPresented: $showOnboarding)
                 }
@@ -56,6 +57,7 @@ struct HomeView: View {
                     }
                 }
                 .onAppear {
+                    showOnboarding = !hasSeenOnboarding
                     vm.checkPendingDeepLink()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
