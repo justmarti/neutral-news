@@ -13,8 +13,6 @@ final class NewsListViewModel {
     
     // MARK: - Init
     private init() {
-        print("🦐 NewsListViewModel initialised")
-        
         findNearestDayWithNewsOnLaunch()
         loadNewsForSelectedDay()
         
@@ -181,20 +179,27 @@ final class NewsListViewModel {
     }
     
     private func processDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
-        print("🔄 Procesando deep link en ViewModel - group: \(deepLinkData.group)")
+#if DEBUG
+        print("🔄 Processing deep link in ViewModel - group: \(deepLinkData.group)")
+#endif
         
         // Cambiar al día correcto
         let dayInfo = DayInfo(date: deepLinkData.date)
         changeDay(to: dayInfo)
         
         // Esperar a que la vista se actualice después del cambio de día
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        Task {
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
             // Buscar y marcar la noticia objetivo
             if let news = self.findNews(group: deepLinkData.group, date: deepLinkData.date) {
-                print("✅ Noticia encontrada: \(news.neutralTitle)")
+#if DEBUG
+                print("✅ News found: \(news.neutralTitle)")
+#endif
                 self.deepLinkTargetNews = news
             } else {
-                print("❌ Noticia no encontrada - group: \(deepLinkData.group), total news: \(self.newsDataManager.neutralNews.count)")
+#if DEBUG
+                print("❌ News not found - group: \(deepLinkData.group), total news: \(self.newsDataManager.neutralNews.count)")
+#endif
             }
         }
         

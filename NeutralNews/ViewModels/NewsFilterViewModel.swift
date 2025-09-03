@@ -16,11 +16,6 @@ enum SearchScope: CaseIterable {
 final class NewsFilterViewModel {
     static let shared = NewsFilterViewModel()
     
-    // MARK: - Init
-    private init() {
-        print("🪼 NewsFilterViewModel initialised")
-    }
-    
     // MARK: - Dependencies
     private let newsDataManager = NewsDataManager.shared
     
