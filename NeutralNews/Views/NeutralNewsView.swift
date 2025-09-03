@@ -12,19 +12,13 @@ struct NeutralNewsView: View {
     let relatedNews: [News]
     var namespace: Namespace.ID
     
-    @State private var dominantColor: Color = .gray
-    @State private var isLoadingImage = false
+    @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
+    @State private var isShowingReportProblemSheet = false
     @State private var selectedNews: News?
-    
-    private let imageService = ImageService.shared
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                dominantColor.adaptiveBackground
-                    .ignoresSafeArea()
-                    .animation(.default, value: dominantColor)
-                
                 ScrollView {
                     VStack {
                         VStack(alignment: .leading, spacing: 16) {
@@ -100,11 +94,7 @@ struct NeutralNewsView: View {
                         }
                     }
                     .frame(minHeight: geometry.size.height)
-                    .task {
-                        await loadDominantColor(from: news.imageUrl)
-                    }
                 }
-                .animation(.default, value: dominantColor)
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
@@ -123,6 +113,11 @@ struct NeutralNewsView: View {
                 }
                 .presentationDragIndicator(.visible)
             }
+            .sheet(isPresented: $isShowingReportProblemSheet) {
+                ReportProblemView(news: news)
+                    .presentationDetents([.height(200), .large])
+            }
+            .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     ShareLink(item: generateShareURL()) {
@@ -130,21 +125,6 @@ struct NeutralNewsView: View {
                     }
                 }
             }
-        }
-    }
-    
-    private func generateShareURL() -> URL {
-        return DeepLinkService.generateShareURL(for: news)
-    }
-    
-    private func loadDominantColor(from imageUrl: String?) async {
-        isLoadingImage = true
-        
-        let color = await imageService.getDominantColor(from: imageUrl)
-        
-        await MainActor.run {
-            self.dominantColor = color
-            self.isLoadingImage = false
         }
     }
 }

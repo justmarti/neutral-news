@@ -12,17 +12,10 @@ struct NewsView: View {
     let relatedNews: [News]
     var namespace: Namespace.ID
     
-    @State private var dominantColor: Color = .gray
-    @State private var isLoadingImage = false
-    
-    private let imageService = ImageService.shared
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                dominantColor.adaptiveBackground
-                    .ignoresSafeArea()
-                    .animation(.default, value: dominantColor)
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -71,27 +64,14 @@ struct NewsView: View {
                     }
                     .padding()
                     .frame(minHeight: geometry.size.height)
-                    .task {
-                        await loadDominantColor(from: news.imageUrl)
-                    }
                 }
-                .animation(.default, value: dominantColor)
             }
+            .dominantColorBackground(from: news.imageUrl)
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
         }
     }
     
-    private func loadDominantColor(from imageUrl: String?) async {
-        isLoadingImage = true
-        
-        let color = await imageService.getDominantColor(from: imageUrl)
-        
-        await MainActor.run {
-            self.dominantColor = color
-            self.isLoadingImage = false
-        }
-    }
 }
 
 #Preview {
