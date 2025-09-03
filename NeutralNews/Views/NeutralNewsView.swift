@@ -93,6 +93,7 @@ struct NeutralNewsView: View {
                             .padding(.horizontal, 16)
                         }
                     }
+                    // TODO: Esto es necesario?
                     .frame(minHeight: geometry.size.height)
                 }
             }
@@ -120,9 +121,11 @@ struct NeutralNewsView: View {
             .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    ShareLink(item: generateShareURL()) {
-                        Label("Compartir", systemImage: "square.and.arrow.up")
-                    }
+                    NeutralNewsOptionsMenu(
+                        news: news,
+                        isBackgroundColorEnabled: $isBackgroundColorEnabled,
+                        isShowingReportProblemSheet: $isShowingReportProblemSheet
+                    )
                 }
             }
         }
