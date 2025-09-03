@@ -9,8 +9,7 @@ import SwiftUI
 
 struct BiasScoreView: View {
     var biasScore: Int
-    let maxScore = 100
-    let dimensions: CGFloat = 17
+    let maxScore = 50
     
     @State private var showInfo: Bool = false
     
@@ -76,7 +75,7 @@ struct BiasScoreView: View {
     
     private var infoPopover : some View {
         HStack {
-            Image(systemName: "\(Int(biasScore/2)).circle")
+            Image(systemName: "\(Int(biasScore)).circle")
                 .font(.largeTitle)
                 .foregroundStyle(.accent, .secondary)
             
