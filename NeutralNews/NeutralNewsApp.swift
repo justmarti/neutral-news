@@ -24,7 +24,9 @@ struct NeutralNewsApp: App {
                     config.startFetching()
                 }
                 .onOpenURL { url in
-                    print("🔗 Deep link recibido: \(url)")
+#if DEBUG
+                    print("🔗 Deep link received: \(url)")
+#endif
                     if let deepLinkData = DeepLinkService.parseDeepLink(url) {
                         NewsListViewModel.shared.handleDeepLink(deepLinkData)
                     }

@@ -220,7 +220,9 @@ final class CacheService {
             for item in expiredItems {
                 context.delete(item)
             }
+#if DEBUG
             print("Cleaned \(expiredItems.count) expired neutral news items")
+#endif
             saveContext(context)
         } catch {
             print("Error cleaning expired neutral news: \(error)")
@@ -243,7 +245,9 @@ final class CacheService {
             for item in expiredItems {
                 context.delete(item)
             }
+#if DEBUG
             print("Cleaned \(expiredItems.count) expired news items")
+#endif
             saveContext(context)
         } catch {
             print("Error cleaning expired news: \(error)")
@@ -342,7 +346,9 @@ final class CacheService {
             try context.delete(model: CachedNeutralNews.self)
             try context.delete(model: CachedNews.self)
             saveContext(context)
+#if DEBUG
             print("All cache cleared")
+#endif
         } catch {
             print("Error clearing all cache: \(error)")
         }

@@ -41,7 +41,9 @@ final class AppConfig: ObservableObject {
             _ = try await remoteConfig.fetchAndActivate()
             isInMaintenance = remoteConfig["maintenance_mode"].boolValue
         } catch {
+#if DEBUG
             print("⚠️ Remote Config fetch error: \(error.localizedDescription)")
+#endif
         }
     }
 }

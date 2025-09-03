@@ -15,20 +15,28 @@ struct DeepLinkService {
     }
     
     static func parseDeepLink(_ url: URL) -> DeepLinkData? {
-        print("🔍 Procesando deep link: \(url)")
+#if DEBUG
+        print("🔍 Processing deep link: \(url)")
+#endif
         
         let queryItems = extractQueryItems(from: url)
         guard let queryItems = queryItems else {
-            print("❌ No se encontraron parámetros en: \(url)")
+#if DEBUG
+            print("❌ No parameters found in: \(url)")
+#endif
             return nil
         }
         
         guard let deepLinkData = parseQueryItems(queryItems) else {
-            print("❌ Parámetros faltantes o inválidos")
+#if DEBUG
+            print("❌ Missing or invalid parameters")
+#endif
             return nil
         }
         
-        print("✅ Deep link válido - group: \(deepLinkData.group), date: \(deepLinkData.date)")
+#if DEBUG
+        print("✅ Valid deep link - group: \(deepLinkData.group), date: \(deepLinkData.date)")
+#endif
         return deepLinkData
     }
     

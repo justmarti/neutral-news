@@ -116,7 +116,9 @@ final class NewsDataManager {
         
         // Step 1: Try cache first (unless force refresh)
         if !forceRefresh && cacheService.isCacheValid(for: day) {
+#if DEBUG
             print("📱 Cache HIT for \(day.dayName)")
+#endif
             
             let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
             let cachedNews = cacheService.getCachedNews(for: day)
@@ -133,7 +135,9 @@ final class NewsDataManager {
         }
         
         // Step 2: Cache miss or force refresh - fetch from Firebase
+#if DEBUG
         print("🔥 Cache MISS for \(day.dayName) - fetching from Firebase")
+#endif
         
         do {
             async let neutralNewsTask = FirestoreService.shared.fetchNeutralNews(for: day)
@@ -166,14 +170,18 @@ final class NewsDataManager {
                 self.cacheService.cacheNews(fetchedNews, for: day)
             }
         } catch {
+#if DEBUG
             print("❌ Error loading news for \(day.dayName): \(error.localizedDescription)")
+#endif
             
             // Fallback: try to load from cache even if potentially stale
             let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
             let cachedNews = cacheService.getCachedNews(for: day)
             
             if !cachedNeutralNews.isEmpty || !cachedNews.isEmpty {
+#if DEBUG
                 print("🔄 Using stale cache as fallback for \(day.dayName)")
+#endif
                 await MainActor.run {
                     self.addNewNewsForDay(
                         neutralNews: cachedNeutralNews,
@@ -221,7 +229,9 @@ final class NewsDataManager {
         // Pre-load today in case it's not cached yet
         let today = DayInfo.today
         if !cacheService.isCacheValid(for: today) {
+#if DEBUG
             print("🔥 Pre-loading today's cache")
+#endif
             await loadNews(for: today)
         }
     }
@@ -333,7 +343,9 @@ final class NewsDataManager {
             
             // Check cache validity first - if valid, load immediately without delay
             if cacheService.isCacheValid(for: dayInfo) {
+#if DEBUG
                 print("🚀 Fast cache load for background day: \(dayInfo.dayName)")
+#endif
                 await loadNews(for: dayInfo)
                 continue
             }
@@ -344,7 +356,9 @@ final class NewsDataManager {
             
             if Task.isCancelled { return }
             
+#if DEBUG
             print("🐌 Firebase fetch for background day: \(dayInfo.dayName)")
+#endif
             await loadNews(for: dayInfo)
         }
     }
