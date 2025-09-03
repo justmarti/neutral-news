@@ -33,9 +33,7 @@ struct HomeView: View {
                             Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
                         }
                         .toolbar {
-                            ToolbarItem(placement: .topBarLeading) { dayMenu }
-                            ToolbarItem(placement: .topBarTrailing) { orderMenu }
-                            ToolbarItem(placement: .topBarTrailing) { filterMenu }
+                            HomeToolbar(vm: vm).content
                         }
                         .navigationDestination(item: $targetNews) { news in
                             NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
@@ -108,68 +106,6 @@ struct HomeView: View {
             .animation(.default, value: vm.newsToShow)
         }
         .padding(.horizontal)
-    }
-    
-    // MARK: - Menu Views
-    
-    private var dayMenu: some View {
-        Menu {
-            ForEach(vm.lastSevenDays) { day in
-                Button {
-                    vm.changeDay(to: day)
-                } label: {
-                    Label(day.dayName, systemImage: day == vm.daySelected ? "\(day.dayNumber).square.fill" : "\(day.dayNumber).square")
-                }
-            }
-        } label: {
-            Label("Cambiar día", systemImage: "calendar")
-        }
-    }
-    
-    private var orderMenu: some View {
-        Menu {
-            Button {
-                vm.orderBy = .hour
-            } label: { Label("Hora", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock") }
-            Button {
-                vm.orderBy = .relevance
-            } label: { Label("Relevancia", systemImage: vm.orderBy == .relevance ? "bolt.fill" : "bolt") }
-            Button {
-                vm.orderBy = .popularity
-            } label: { Label("Popularidad", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame") }
-        } label: {
-            Label("Ordenar", systemImage: "arrow.up.arrow.down.circle")
-        }
-    }
-    
-    private var filterMenu: some View {
-        Menu {
-            ForEach(vm.getCategoriesOfTheDay(), id: \.self) { category in
-                Button {
-                    vm.filterByCategory(category)
-                } label: {
-                    Label {
-                        Label(category.rawValue, systemImage: category.systemImageName)
-                    } icon: {
-                        if vm.categoryFilter.contains(category) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-            
-            if vm.isAnyFilterEnabled {
-                Section {
-                    Button(role: .destructive) {
-                        vm.clearFilters()
-                    } label: {
-                        Label("Borrar filtros", systemImage: "trash")
-                    }
-                }
-            }
-        } label: {
-            Label("Filtrar", systemImage: vm.isAnyFilterEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-        }
     }
     
     private var noResultsView: some View {
