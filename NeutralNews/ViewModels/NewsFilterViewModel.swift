@@ -19,17 +19,37 @@ final class NewsFilterViewModel {
     // MARK: - Dependencies
     private let newsDataManager = NewsDataManager.shared
     
+    // MARK: - Filter Change Callback
+    var onFiltersChanged: (() -> Void)?
+    private var debounceTask: Task<Void, Never>?
+    
     // MARK: - Properties
     var searchText: String = "" {
         didSet {
             if searchText.isEmpty {
                 searchScope = .daySelected
             }
+            debounceFilterChange()
         }
     }
-    var searchScope: SearchScope = .daySelected
-    var categoryFilter: Set<Category> = []
-    var orderBy: OrderBy = .hour
+    
+    var searchScope: SearchScope = .daySelected {
+        didSet {
+            debounceFilterChange()
+        }
+    }
+    
+    var categoryFilter: Set<Category> = [] {
+        didSet {
+            debounceFilterChange()
+        }
+    }
+    
+    var orderBy: OrderBy = .hour {
+        didSet {
+            debounceFilterChange()
+        }
+    }
     
     // MARK: - Computed Properties
     var isAnyFilterEnabled: Bool {
@@ -39,31 +59,33 @@ final class NewsFilterViewModel {
     // MARK: - Public Methods
     
     func applyFilters(to news: [NeutralNews], daySelected: DayInfo? = nil) -> [NeutralNews] {
+        // Early return for empty input
+        guard !news.isEmpty else { return [] }
+        
         var filteredNews = news
         
         // Apply search scope filter
         if searchScope == .daySelected, let daySelected = daySelected {
-            filteredNews = filteredNews.filter { news in
-                Calendar.current.isDate(news.date, inSameDayAs: daySelected.date)
+            let targetDate = daySelected.date
+            filteredNews = filteredNews.filter { newsItem in
+                Calendar.current.isDate(newsItem.date, inSameDayAs: targetDate)
             }
         }
-        // If searchScope is .lastSevenDays, use all news (no date filtering)
         
         // Apply category filter
         if !categoryFilter.isEmpty {
-            filteredNews = filteredNews.filter { news in
-                categoryFilter.contains { category in
-                    news.category.normalized() == category.rawValue.normalized()
-                }
+            let normalizedCategories = Set(categoryFilter.map { $0.rawValue.normalized() })
+            filteredNews = filteredNews.filter { newsItem in
+                normalizedCategories.contains(newsItem.category.normalized())
             }
         }
         
         // Apply search filter
         if !searchText.isEmpty {
             let normalizedQuery = searchText.normalizedSearchString()
-            filteredNews = filteredNews.filter {
-                $0.neutralTitle.normalizedSearchString().contains(normalizedQuery) ||
-                $0.neutralDescription.normalizedSearchString().contains(normalizedQuery)
+            filteredNews = filteredNews.filter { newsItem in
+                newsItem.neutralTitle.normalizedSearchString().contains(normalizedQuery) ||
+                newsItem.neutralDescription.normalizedSearchString().contains(normalizedQuery)
             }
         }
         
@@ -92,8 +114,32 @@ final class NewsFilterViewModel {
     
     // MARK: - Private Methods
     
+    private func debounceFilterChange() {
+        debounceTask?.cancel()
+        
+        debounceTask = Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            
+            guard !Task.isCancelled else { return }
+            
+            await MainActor.run {
+                onFiltersChanged?()
+            }
+        }
+    }
+    
     private func sortNews(_ news: [NeutralNews]) -> [NeutralNews] {
-        return news.sorted { news1, news2 in
+        // Pre-compute popularity scores to avoid expensive calls during sorting
+        let popularityCache: [String: Int] = {
+            guard orderBy == .popularity else { return [:] }
+            var cache: [String: Int] = [:]
+            for newsItem in news {
+                cache[newsItem.id] = newsDataManager.getRelatedNews(from: newsItem).count
+            }
+            return cache
+        }()
+        
+        return news.sorted { (news1: NeutralNews, news2: NeutralNews) -> Bool in
             // Prioritize search matches in titles
             if !searchText.isEmpty {
                 let normalizedQuery = searchText.normalizedSearchString()
@@ -114,9 +160,9 @@ final class NewsFilterViewModel {
             case .relevance:
                 return news1.relevance > news2.relevance
             case .popularity:
-                let relatedNews1Count = newsDataManager.getRelatedNews(from: news1).count
-                let relatedNews2Count = newsDataManager.getRelatedNews(from: news2).count
-                return relatedNews1Count > relatedNews2Count
+                let count1 = popularityCache[news1.id] ?? 0
+                let count2 = popularityCache[news2.id] ?? 0
+                return count1 > count2
             }
         }
     }

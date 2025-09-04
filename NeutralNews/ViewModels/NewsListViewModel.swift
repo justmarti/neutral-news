@@ -16,7 +16,10 @@ final class NewsListViewModel {
         findNearestDayWithNewsOnLaunch()
         loadNewsForSelectedDay()
         
-        // Pre-load cache in background
+        filterViewModel.onFiltersChanged = { [weak self] in
+            self?.handleFilterChanges()
+        }
+        
         Task {
             await newsDataManager.preloadCache()
         }
@@ -46,49 +49,43 @@ final class NewsListViewModel {
     
     var newsToShow: [NeutralNews] {
         if isShowingAllDays {
-            return filterViewModel.applyFilters(to: paginatedNews, daySelected: daySelected)
+            return paginationManager.paginatedItems
         } else {
             let dayNews = newsDataManager.getNewsArrayForDay(daySelected)
             return filterViewModel.applyFilters(to: dayNews, daySelected: daySelected)
         }
     }
     
+    var isLoadingMore: Bool {
+        paginationManager.isLoading
+    }
+    
     private var allAvailableNews: [NeutralNews] {
-        Array(Set(newsDataManager.neutralNews))
-            .sorted { $0.date > $1.date }
+        let currentNews = newsDataManager.neutralNews
+        let currentHash = currentNews.count
+        
+        // Cache optimization: avoid recalculations
+        if currentHash != lastNewsDataHash {
+            cachedAllNews = Array(Set(currentNews)).sorted { $0.date > $1.date }
+            lastNewsDataHash = currentHash
+        }
+        
+        return cachedAllNews
     }
     
     var searchText: String {
         get { filterViewModel.searchText }
-        set { 
-            filterViewModel.searchText = newValue
-            if isShowingAllDays {
-                resetPagination()
-                loadInitialPage()
-            }
-        }
+        set { filterViewModel.searchText = newValue }
     }
     
     var categoryFilter: Set<Category> {
         get { filterViewModel.categoryFilter }
-        set { 
-            filterViewModel.categoryFilter = newValue
-            if isShowingAllDays {
-                resetPagination()
-                loadInitialPage()
-            }
-        }
+        set { filterViewModel.categoryFilter = newValue }
     }
     
     var orderBy: OrderBy {
         get { filterViewModel.orderBy }
-        set { 
-            filterViewModel.orderBy = newValue
-            if isShowingAllDays {
-                resetPagination()
-                loadInitialPage()
-            }
-        }
+        set { filterViewModel.orderBy = newValue }
     }
     
     var isAnyFilterEnabled: Bool {
@@ -103,11 +100,9 @@ final class NewsListViewModel {
     var isShowingAllDays = false
     
     // MARK: - Pagination
-    private var paginatedNews: [NeutralNews] = []
-    private var currentPage = 0
-    private let pageSize = 20
-    var isLoadingMore = false
-    var hasMorePages = true
+    private let paginationManager = PaginationManager<NeutralNews>()
+    private var cachedAllNews: [NeutralNews] = []
+    private var lastNewsDataHash: Int = 0
     
     // MARK: - Public Methods
     
@@ -120,8 +115,8 @@ final class NewsListViewModel {
     func changeToAllDays() {
         isShowingAllDays = true
         searchScope = .lastSevenDays
-        resetPagination()
-        loadInitialPage()
+        let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
+        paginationManager.configure(with: filteredNews)
     }
     
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
@@ -130,7 +125,7 @@ final class NewsListViewModel {
     
     func getCategoriesOfTheDay() -> [Category] {
         let newsToFilter = isShowingAllDays 
-            ? newsToShow
+            ? allAvailableNews
             : newsDataManager.getNewsArrayForDay(daySelected)
         let categoriesSet = Set(newsToFilter.compactMap { Category(rawValue: $0.category) })
         return Category.allCases.filter { categoriesSet.contains($0) }
@@ -208,64 +203,23 @@ final class NewsListViewModel {
     
     // MARK: - Pagination Methods
     
-    private func resetPagination() {
-        paginatedNews.removeAll()
-        currentPage = 0
-        hasMorePages = true
-        isLoadingMore = false
-    }
-    
-    private func loadInitialPage() {
-        guard hasMorePages else { return }
-        
-        let startIndex = 0
-        let endIndex = min(pageSize, allAvailableNews.count)
-        
-        guard startIndex < allAvailableNews.count else {
-            hasMorePages = false
-            return
-        }
-        
-        let newItems = Array(allAvailableNews[startIndex..<endIndex])
-        paginatedNews = newItems
-        currentPage = 1
-        
-        hasMorePages = endIndex < allAvailableNews.count
-    }
-    
     func loadNextPage() {
-        guard hasMorePages && !isLoadingMore else { return }
-        
-        isLoadingMore = true
-        
-        // Simulate network delay for smooth UX
-        Task {
-            await MainActor.run {
-                let startIndex = currentPage * pageSize
-                let endIndex = min(startIndex + pageSize, allAvailableNews.count)
-                
-                guard startIndex < allAvailableNews.count else {
-                    hasMorePages = false
-                    isLoadingMore = false
-                    return
-                }
-                
-                let newItems = Array(allAvailableNews[startIndex..<endIndex])
-                paginatedNews.append(contentsOf: newItems)
-                currentPage += 1
-                
-                hasMorePages = endIndex < allAvailableNews.count
-                isLoadingMore = false
-            }
-        }
+        paginationManager.loadNextPage()
     }
     
     func shouldLoadMore(currentItem: NeutralNews) -> Bool {
-        guard isShowingAllDays,
-              let lastItem = paginatedNews.last,
-              lastItem.id == currentItem.id else { return false }
-        
-        return hasMorePages && !isLoadingMore
+        guard isShowingAllDays else { return false }
+        return paginationManager.shouldLoadMore(for: currentItem)
+    }
+    
+    private func refreshPaginationIfNeeded() {
+        guard isShowingAllDays else { return }
+        let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
+        paginationManager.reconfigure(with: filteredNews)
+    }
+    
+    private func handleFilterChanges() {
+        refreshPaginationIfNeeded()
     }
     
     private func findNews(group: Int, date: Date) -> NeutralNews? {
