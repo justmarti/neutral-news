@@ -46,13 +46,22 @@ struct HomeToolbar {
         Menu {
             Button {
                 vm.orderBy = .hour
-            } label: { Label("Hora", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock") }
+            } label: {
+                Label("Hora", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
+                Text("Últimas noticias")
+            }
             Button {
                 vm.orderBy = .relevance
-            } label: { Label("Relevancia", systemImage: vm.orderBy == .relevance ? "bolt.fill" : "bolt") }
+            } label: {
+                Label("Relevancia", systemImage: vm.orderBy == .relevance ? "bolt.fill" : "bolt")
+                Text("Las más importantes")
+            }
             Button {
                 vm.orderBy = .popularity
-            } label: { Label("Popularidad", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame") }
+            } label: {
+                Label("Popularidad", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
+                Text("Las más comentadas")
+            }
         } label: {
             Label("Ordenar", systemImage: "arrow.up.arrow.down.circle")
         }
