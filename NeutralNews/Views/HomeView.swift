@@ -23,14 +23,16 @@ struct HomeView: View {
             } else {
                 NavigationStack {
                     newsContentView
-                        .navigationTitle(vm.daySelected.dayName)
+                        .navigationTitle(vm.isShowingAllDays ? "Noticias" : vm.daySelected.dayName)
                         // TODO: Mirar que opción es mejor para el title
                         .toolbarTitleDisplayMode(.inlineLarge)
-                        .myNavigationSubtitle(vm.daySelected.formattedDateShort)
+                        .myNavigationSubtitle(vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort)
                         .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
-                        .searchScopes($vm.searchScope, activation: .onSearchPresentation) {
-                            Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
-                            Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
+                        .searchScopes(vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope, activation: .onSearchPresentation) {
+                            if !vm.isShowingAllDays {
+                                Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
+                                Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
+                            }
                         }
                         .toolbar {
                             HomeToolbar(vm: vm).content

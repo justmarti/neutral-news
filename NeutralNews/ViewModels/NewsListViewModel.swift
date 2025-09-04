@@ -75,10 +75,19 @@ final class NewsListViewModel {
         set { filterViewModel.searchScope = newValue }
     }
     
+    var isShowingAllDays = false
+    
     // MARK: - Public Methods
     
     func changeDay(to dayInfo: DayInfo) {
+        isShowingAllDays = false
         daySelected = dayInfo
+        searchScope = .daySelected
+    }
+    
+    func changeToAllDays() {
+        isShowingAllDays = true
+        searchScope = .lastSevenDays
     }
     
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
@@ -86,8 +95,10 @@ final class NewsListViewModel {
     }
     
     func getCategoriesOfTheDay() -> [Category] {
-        let dayNews = newsDataManager.getNewsArrayForDay(daySelected)
-        let categoriesSet = dayNews.compactMap { Category(rawValue: $0.category) }
+        let newsToFilter = isShowingAllDays 
+            ? newsToShow
+            : newsDataManager.getNewsArrayForDay(daySelected)
+        let categoriesSet = Set(newsToFilter.compactMap { Category(rawValue: $0.category) })
         return Category.allCases.filter { categoriesSet.contains($0) }
     }
     

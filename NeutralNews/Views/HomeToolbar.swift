@@ -30,11 +30,20 @@ struct HomeToolbar {
     
     private var dayMenu: some View {
         Menu {
+            Button {
+                vm.changeToAllDays()
+            } label: {
+                Label("Todas las noticias", systemImage: vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack")
+            }
+            
+            Divider()
+            
             ForEach(vm.lastSevenDays) { day in
                 Button {
                     vm.changeDay(to: day)
                 } label: {
-                    Label(day.dayName, systemImage: day == vm.daySelected ? "\(day.dayNumber).square.fill" : "\(day.dayNumber).square")
+                    // TODO: Usar number.calendar ?
+                    Label(day.dayName, systemImage: (!vm.isShowingAllDays && day == vm.daySelected) ? "\(day.dayNumber).square.fill" : "\(day.dayNumber).square")
                 }
             }
         } label: {
