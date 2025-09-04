@@ -104,8 +104,26 @@ struct HomeView: View {
                         .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
                 }
                 .buttonStyle(.plain)
+                .onAppear {
+                    if vm.shouldLoadMore(currentItem: neutralNews) {
+                        vm.loadNextPage()
+                    }
+                }
             }
             .animation(.default, value: vm.newsToShow)
+            
+            // Loading indicator for pagination
+            if vm.isLoadingMore {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Cargando más noticias...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+            }
         }
         .padding(.horizontal)
     }
