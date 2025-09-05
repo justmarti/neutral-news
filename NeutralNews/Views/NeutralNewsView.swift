@@ -106,7 +106,7 @@ struct NeutralNewsView: View {
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .topBarTrailing) {
-                                Button("Cerrar") {
+                                Button("Cerrar", systemImage: "xmark") {
                                     self.selectedNews = nil
                                 }
                             }

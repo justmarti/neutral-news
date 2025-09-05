@@ -34,6 +34,7 @@ struct HomeToolbar {
                 vm.changeToAllDays()
             } label: {
                 Label("Todas las noticias", systemImage: vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack")
+                Text("Últimos 7 días")
             }
             
             Divider()
