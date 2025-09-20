@@ -7,12 +7,20 @@
 
 import SwiftUI
 import FirebaseCore
+import RevenueCat
+import RevenueCatUI
 
 @main
 struct NeutralNewsApp: App {
     @StateObject private var config = AppConfig()
     
-    init() { FirebaseApp.configure() }
+    init() {
+        FirebaseApp.configure()
+        
+        if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
+            Purchases.configure(with: .init(withAPIKey: apiKey))
+        }
+    }
     
     var body: some Scene {
         WindowGroup {
@@ -31,6 +39,7 @@ struct NeutralNewsApp: App {
                         NewsListViewModel.shared.handleDeepLink(deepLinkData)
                     }
                 }
+                .presentPaywallIfNeeded(requiredEntitlementIdentifier: "pro")
         }
     }
 }

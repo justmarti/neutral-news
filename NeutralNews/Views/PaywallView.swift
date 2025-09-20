@@ -13,7 +13,7 @@ struct PaywallView: View {
     
     var body: some View {
         if #available(iOS 17.0, *) {
-            SubscriptionStoreView(groupID: "21731256") {
+            SubscriptionStoreView(groupID: "21774114") {
                 VStack(spacing: 20) {
                     Image(systemName: "crown.fill")
                         .font(.system(size: 60))
@@ -21,7 +21,7 @@ struct PaywallView: View {
                         .symbolEffect(.bounce, value: true)
                     
                     VStack(spacing: 8) {
-                        Text("Neutral News Pro")
+                        Text("Facts Pro")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .multilineTextAlignment(.center)
