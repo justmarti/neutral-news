@@ -14,7 +14,6 @@ struct NeutralNewsView: View {
     
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var isShowingReportProblemSheet = false
-    @State private var selectedNews: News?
     
     var body: some View {
         GeometryReader { geometry in
@@ -81,8 +80,9 @@ struct NeutralNewsView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack {
                                 ForEach(relatedNews) { new in
-                                    Button {
-                                        selectedNews = new
+                                    NavigationLink {
+                                        NewsView(news: new, relatedNews: relatedNews, namespace: namespace)
+                                            .navigationTransition(.zoom(sourceID: new.id, in: namespace))
                                     } label: {
                                         MediaHeadlineView(news: new)
                                             .matchedTransitionSource(id: new.id, in: namespace)
@@ -99,21 +99,6 @@ struct NeutralNewsView: View {
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
-            .sheet(item: $selectedNews) { selectedNews in
-                NavigationStack {
-                    NewsView(news: selectedNews, relatedNews: relatedNews, namespace: namespace)
-                        .navigationTitle("")
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .topBarTrailing) {
-                                Button("Cerrar", systemImage: "xmark") {
-                                    self.selectedNews = nil
-                                }
-                            }
-                        }
-                }
-                .presentationDragIndicator(.visible)
-            }
             .sheet(isPresented: $isShowingReportProblemSheet) {
                 ReportProblemView(news: news)
                     .presentationDetents([.height(200), .large])

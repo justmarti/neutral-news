@@ -11,12 +11,12 @@ struct NewsView: View {
     let news: News
     let relatedNews: [News]
     var namespace: Namespace.ID
-    
+
+    @State private var showSafari = false
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(news.sourceMedium.pressMedia.name)
@@ -52,8 +52,16 @@ struct NewsView: View {
 //                            .fontDesign(.serif)
                         
                         if let link = URL(string: news.link) {
-                            Link("Leer más en la fuente", destination: link)
-//                                .fontDesign(.serif)
+                            Button {
+                                showSafari = true
+                            } label: {
+                                HStack {
+                                    Text("Leer en la fuente")
+                                    Image(systemName: "arrow.up.right")
+                                }
+                                .fontWeight(.semibold)
+                            }
+                            .safariSheet(url: link, isPresented: $showSafari)
                         }
                         
                         Spacer()
