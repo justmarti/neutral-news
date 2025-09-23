@@ -12,71 +12,39 @@ struct PaywallView: View {
     @Binding var isPresented: Bool
     
     var body: some View {
-        if #available(iOS 17.0, *) {
-            SubscriptionStoreView(groupID: "21774114") {
-                VStack(spacing: 20) {
-                    Image(systemName: "crown.fill")
-                        .font(.system(size: 60))
-                        .foregroundStyle(.orange.gradient)
-                        .symbolEffect(.bounce, value: true)
+        SubscriptionStoreView(groupID: "21774114") {
+            VStack {
+                Image(.icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 150, height: 150)
+                
+                VStack {
+                    Text("Facts Pro")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
                     
-                    VStack(spacing: 8) {
-                        Text("Facts Pro")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .multilineTextAlignment(.center)
-                        
-                        Text("Desbloquea el acceso completo a la app")
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                    }
-                    
-                    VStack(spacing: 16) {
-                        ProFeatureRow(icon: "newspaper.fill", text: "Resúmenes neutrales ilimitados")
-                        ProFeatureRow(icon: "bookmark.fill", text: "Guardar noticias")
-                        ProFeatureRow(icon: "arrow.down.circle.fill", text: "Modo offline")
-                        ProFeatureRow(icon: "heart.fill", text: "Apoya una app independiente")
-                    }
-                    .padding(.top, 8)
+                    Text("Acceso completo a la app")
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.top, 20)
+                .multilineTextAlignment(.center)
+                
+                VStack(spacing: 16) {
+                    ProFeatureRow(icon: "calendar", text: "Lee noticias de los últimos 7 días")
+                    ProFeatureRow(icon: "bookmark.fill", text: "Guarda noticias")
+                    ProFeatureRow(icon: "heart.fill", text: "Apoya una app independiente")
+                }
+                .padding(.vertical, 16)
             }
-            .backgroundStyle(.clear)
-            .subscriptionStoreButtonLabel(.automatic)
-            .subscriptionStorePickerItemBackground(.regularMaterial)
-            .subscriptionStoreControlStyle(.pagedProminentPicker)
-            .onInAppPurchaseCompletion { product, result in
-                if case .success(.success(_)) = result {
-                    isPresented = false
-                }
+        }
+        .scrollIndicators(.hidden)
+        .subscriptionStoreButtonLabel(.automatic)
+        .subscriptionStorePickerItemBackground(.regularMaterial)
+        .subscriptionStoreControlStyle(.pagedProminentPicker)
+        .onInAppPurchaseCompletion { product, result in
+            if case .success(.success(_)) = result {
+                isPresented = false
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Ahora no") {
-                        isPresented = false
-                    }
-                    .font(.body)
-                    .foregroundStyle(.blue)
-                }
-            }
-        } else {
-            // Fallback para iOS 16 y anteriores
-            StoreView(ids: ["monthly_subscription", "yearly_subscription"])
-                .productViewStyle(.compact)
-                .onInAppPurchaseCompletion { product, result in
-                    if case .success(.success(_)) = result {
-                        isPresented = false
-                    }
-                }
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Ahora no") {
-                            isPresented = false
-                        }
-                        .font(.body)
-                        .foregroundStyle(.blue)
-                    }
-                }
         }
     }
 }
@@ -89,7 +57,7 @@ struct ProFeatureRow: View {
         HStack(spacing: 16) {
             Image(systemName: icon)
                 .font(.title3)
-                .foregroundStyle(.orange)
+                .foregroundStyle(.accent)
                 .frame(width: 24, height: 24)
             
             Text(text)
