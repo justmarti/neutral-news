@@ -23,7 +23,12 @@ final class CacheService {
     
     private init() {
         do {
-            modelContainer = try ModelContainer(for: CachedNeutralNews.self, CachedNews.self)
+            let configuration = ModelConfiguration(
+                schema: Schema([CachedNeutralNews.self, CachedNews.self]),
+                url: URL.documentsDirectory.appending(path: "LocalCache.store"),
+                cloudKitDatabase: .none
+            )
+            modelContainer = try ModelContainer(for: Schema([CachedNeutralNews.self, CachedNews.self]), configurations: [configuration])
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

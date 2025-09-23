@@ -30,6 +30,17 @@ struct News: Codable, Identifiable, Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
+
+    func toDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(self)
+        let json = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let dictionary = json as? [String: Any] else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return dictionary
+    }
     
     static let mock = News(
         id: "mock-id",

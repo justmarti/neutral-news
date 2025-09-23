@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import SwiftData
+import CoreData
 
 @Observable
 final class NewsListViewModel {
@@ -28,6 +30,13 @@ final class NewsListViewModel {
     // MARK: - Dependencies
     private let newsDataManager = NewsDataManager.shared
     private let filterViewModel = NewsFilterViewModel.shared
+    private let savedNewsService = SavedNewsService.shared
+
+    // Model context for SwiftData (cache) - will be injected
+    var modelContext: ModelContext?
+
+    // Core Data context for saved news - will be injected
+    var coreDataContext: NSManagedObjectContext?
     
     // MARK: - UI State
     var daySelected: DayInfo = .today {
@@ -41,6 +50,22 @@ final class NewsListViewModel {
     }
     
     var isLoadingNeutralNews = false
+
+    // MARK: - Saved News State
+    var isShowingSavedNews = false {
+        didSet {
+            if isShowingSavedNews != oldValue {
+                print("🔄 isShowingSavedNews changed to: \(isShowingSavedNews)")
+                if isShowingSavedNews {
+                    Task {
+                        await loadSavedNews()
+                    }
+                }
+            }
+        }
+    }
+    var savedNews: [NeutralNews] = []
+    var isLoadingSavedNews = false
     
     // MARK: - Computed Properties
     var lastSevenDays: [DayInfo] {
@@ -48,7 +73,9 @@ final class NewsListViewModel {
     }
     
     var newsToShow: [NeutralNews] {
-        if isShowingAllDays {
+        if isShowingSavedNews {
+            return filterViewModel.applyFilters(to: savedNews)
+        } else if isShowingAllDays {
             return paginationManager.paginatedItems
         } else {
             let dayNews = newsDataManager.getNewsArrayForDay(daySelected)
@@ -111,7 +138,7 @@ final class NewsListViewModel {
         daySelected = dayInfo
         searchScope = .daySelected
     }
-    
+
     func changeToAllDays() {
         isShowingAllDays = true
         searchScope = .lastSevenDays
@@ -272,4 +299,68 @@ final class NewsListViewModel {
               !newsDataManager.neutralNews.isEmpty else { return }
         processDeepLink(pendingDeepLink)
     }
+
+    // MARK: - Saved News Methods
+
+    func toggleSavedNewsMode() {
+        isShowingSavedNews.toggle()
+
+        // Clear filters when entering saved news mode
+        if isShowingSavedNews {
+            filterViewModel.clearFilters()
+        }
+    }
+
+    func loadSavedNews() async {
+        guard let context = coreDataContext else {
+            print("❌ No Core Data context available")
+            return
+        }
+
+        print("🔄 Loading saved news from Core Data")
+
+        await MainActor.run {
+            isLoadingSavedNews = true
+        }
+
+        defer {
+            Task { @MainActor in
+                isLoadingSavedNews = false
+            }
+        }
+
+        do {
+            let savedNewsItems = try savedNewsService.getSavedNews(context: context)
+            print("📰 Found \(savedNewsItems.count) saved news items")
+
+            // Convert saved news back to NeutralNews objects
+            let neutralNewsList = savedNewsItems.compactMap { savedNews -> NeutralNews? in
+                guard savedNews.newsType == SavedNewsType.neutralNews.rawValue else {
+                    print("⚠️ Skipping non-neutral news: \(savedNews.newsType ?? "unknown")")
+                    return nil
+                }
+
+                // Create NeutralNews from saved data
+                return savedNews.toNeutralNews()
+            }
+
+            print("✅ Successfully parsed \(neutralNewsList.count) neutral news items")
+
+            await MainActor.run {
+                savedNews = neutralNewsList.sorted { $0.date > $1.date }
+                print("🎯 savedNews updated with \(savedNews.count) items")
+            }
+        } catch {
+            print("❌ Error loading saved news: \(error)")
+            await MainActor.run {
+                savedNews = []
+            }
+        }
+    }
+
+
+    func removeFromSavedNews(_ newsId: String) {
+        savedNews.removeAll { $0.id == newsId }
+    }
+
 }

@@ -6,26 +6,46 @@
 //
 
 import SwiftUI
+import SwiftData
+import CoreData
 import FirebaseCore
 import RevenueCat
-import RevenueCatUI
 
 @main
 struct NeutralNewsApp: App {
     @StateObject private var config = AppConfig()
-    
+
+    // Local cache container (no iCloud)
+    let cacheContainer: ModelContainer = {
+        do {
+            let configuration = ModelConfiguration(
+                schema: Schema([CachedNeutralNews.self, CachedNews.self]),
+                url: URL.documentsDirectory.appending(path: "Cache.store"),
+                cloudKitDatabase: .none
+            )
+            return try ModelContainer(for: Schema([CachedNeutralNews.self, CachedNews.self]), configurations: [configuration])
+        } catch {
+            print("❌ Failed to create cache ModelContainer: \(error)")
+            fatalError("Failed to create cache ModelContainer: \(error)")
+        }
+    }()
+
+
     init() {
         FirebaseApp.configure()
-        
+
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
             Purchases.configure(with: .init(withAPIKey: apiKey))
         }
     }
-    
+
+
     var body: some Scene {
         WindowGroup {
             HomeView(config: config)
                 .onAppear {
+                    // Inject Core Data context
+                    NewsListViewModel.shared.coreDataContext = CoreDataManager.shared.viewContext
                     config.startFetching()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
@@ -39,7 +59,7 @@ struct NeutralNewsApp: App {
                         NewsListViewModel.shared.handleDeepLink(deepLinkData)
                     }
                 }
-                .presentPaywallIfNeeded(requiredEntitlementIdentifier: "pro")
         }
+        .modelContainer(cacheContainer)
     }
 }
