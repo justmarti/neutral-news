@@ -92,7 +92,26 @@ final class NewsFilterViewModel {
         // Apply sorting
         return sortNews(filteredNews)
     }
-    
+
+//    func applyFilters(to news: [NeutralNews], searchOnly: Bool) -> [NeutralNews] {
+//        // Early return for empty input
+//        guard !news.isEmpty else { return [] }
+//
+//        var filteredNews = news
+//
+//        // For saved news, only apply search filter
+//        if !searchText.isEmpty {
+//            let normalizedQuery = searchText.normalizedSearchString()
+//            filteredNews = filteredNews.filter { newsItem in
+//                newsItem.neutralTitle.normalizedSearchString().contains(normalizedQuery) ||
+//                newsItem.neutralDescription.normalizedSearchString().contains(normalizedQuery)
+//            }
+//        }
+//
+//        // Apply sorting
+//        return sortNews(filteredNews)
+//    }
+
     func filterByCategory(_ category: Category) {
         if categoryFilter.contains(category) {
             categoryFilter.remove(category)
