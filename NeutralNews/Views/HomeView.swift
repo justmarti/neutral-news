@@ -214,23 +214,20 @@ struct HomeView: View {
             showingPaywall.toggle()
         } label: {
             HStack {
-                Image(systemName: "star.fill")
-                    .font(.title2)
+                Image(systemName: "star")
+                    .font(.title)
                     .foregroundStyle(.accent)
                 
                 VStack(alignment: .leading) {
-                    Text("Top 5 resultados")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                    Text("Mejores 5 resultados")
+                        .font(.headline)
                     
-                    HStack {
-                        Text("Desbloquea acceso completo con Facts Pro")
-                        Spacer()
-                        Image(systemName: "arrow.up.right")
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    Text("Desbloquea acceso completo con Facts Pro")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
+                
+                Spacer()
             }
             .padding()
             .background(.thinMaterial, in: .rect(cornerRadius: 16))
