@@ -75,7 +75,7 @@ final class NewsListViewModel {
     var newsToShow: [NeutralNews] {
         if isShowingSavedNews {
             return filterViewModel.applyFilters(to: savedNews)
-        } else if isShowingAllDays {
+        } else if isShowingAllDays || searchScope == .lastSevenDays {
             return paginationManager.paginatedItems
         } else {
             let dayNews = newsDataManager.getNewsArrayForDay(daySelected)
@@ -235,18 +235,23 @@ final class NewsListViewModel {
     }
     
     func shouldLoadMore(currentItem: NeutralNews) -> Bool {
-        guard isShowingAllDays else { return false }
+        guard isShowingAllDays || searchScope == .lastSevenDays else { return false }
         return paginationManager.shouldLoadMore(for: currentItem)
     }
     
     private func refreshPaginationIfNeeded() {
-        guard isShowingAllDays else { return }
+        guard isShowingAllDays || searchScope == .lastSevenDays else { return }
         let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
         paginationManager.reconfigure(with: filteredNews)
     }
     
     private func handleFilterChanges() {
-        refreshPaginationIfNeeded()
+        if searchScope == .lastSevenDays && !isShowingAllDays {
+            let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
+            paginationManager.configure(with: filteredNews)
+        } else {
+            refreshPaginationIfNeeded()
+        }
     }
     
     private func findNews(group: Int, date: Date) -> NeutralNews? {
@@ -257,11 +262,9 @@ final class NewsListViewModel {
     }
     
     func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
-        // Si hay datos, procesar inmediatamente
         if !newsDataManager.neutralNews.isEmpty {
             processDeepLink(deepLinkData)
         } else {
-            // Si no hay datos, guardar para procesar cuando lleguen
             pendingDeepLink = deepLinkData
         }
     }
@@ -271,14 +274,11 @@ final class NewsListViewModel {
         print("🔄 Processing deep link in ViewModel - group: \(deepLinkData.group)")
 #endif
         
-        // Cambiar al día correcto
         let dayInfo = DayInfo(date: deepLinkData.date)
         changeDay(to: dayInfo)
         
-        // Esperar a que la vista se actualice después del cambio de día
         Task {
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-            // Buscar y marcar la noticia objetivo
             if let news = self.findNews(group: deepLinkData.group, date: deepLinkData.date) {
 #if DEBUG
                 print("✅ News found: \(news.neutralTitle)")
