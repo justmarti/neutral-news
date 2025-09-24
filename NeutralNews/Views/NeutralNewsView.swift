@@ -27,7 +27,7 @@ struct NeutralNewsView: View {
                                 Text(news.date.formatted(
                                     Date.FormatStyle.dateTime
                                         .day()
-                                        .month(.wide)
+                                        .month()
                                         .hour()
                                         .minute()
                                         .locale(Locale(identifier: "es_ES"))
@@ -38,7 +38,7 @@ struct NeutralNewsView: View {
                             .foregroundStyle(.secondary)
                             
                             Text(news.neutralTitle)
-                                .font(.title)
+                                .font(.title2)
                                 .fontWeight(.semibold)
                                 .fontDesign(.serif)
                             
