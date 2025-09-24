@@ -50,14 +50,16 @@ struct HomeToolbar {
     
     private var settingsMenu: some View {
         Menu {
-            Button {
-                showingPaywall.toggle()
-            } label: {
-                Label("Facts Pro", systemImage: "rosette")
+            if !premiumManager.isPremium {
+                Button {
+                    showingPaywall.toggle()
+                } label: {
+                    Label("Mejorar a Facts Pro", systemImage: "rosette")
+                }
+
+                Divider()
             }
-            
-            Divider()
-            
+
             Button {
                 if premiumManager.canSaveNews {
                     withAnimation {
