@@ -56,6 +56,12 @@ final class SavedNewsService {
         print("💾 Saving context...")
         try context.save()
         print("✅ Context saved successfully")
+
+        // Track positive interaction for rating
+        Task { @MainActor in
+            RatingManager.shared.incrementSavedNewsCount()
+            RatingManager.shared.requestRatingAfterPositiveInteraction()
+        }
     }
 
     func unsaveNews(newsId: String, context: NSManagedObjectContext) throws {

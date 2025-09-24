@@ -37,6 +37,8 @@ struct NeutralNewsApp: App {
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
             Purchases.configure(with: .init(withAPIKey: apiKey))
         }
+
+        RatingManager.shared.incrementLaunchCount()
     }
 
 

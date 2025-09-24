@@ -40,7 +40,7 @@ struct HomeView: View {
             } else {
                 NavigationStack {
                     newsContentView
-                        .navigationTitle(vm.isShowingSavedNews ? "Guardadas" : (vm.isShowingAllDays ? "Noticias" : vm.daySelected.dayName))
+                        .navigationTitle(vm.isShowingSavedNews ? "Guardadas" : (vm.isShowingAllDays ? "Todas las noticias" : vm.daySelected.dayName))
                         // TODO: Mirar que opción es mejor para el title
 //                        .toolbarTitleDisplayMode(.inlineLarge)
                         .myNavigationSubtitle(vm.isShowingSavedNews ? "\(vm.savedNews.count) noticias" : (vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort))
@@ -59,11 +59,20 @@ struct HomeView: View {
                         .navigationDestination(item: $targetNews) { news in
                             NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
                                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                                .onAppear {
+                                    RatingManager.shared.incrementNewsReadCount()
+                                    RatingManager.shared.requestRatingAfterPositiveInteraction()
+                                }
                         }
                         .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
                 }
                 .fullScreenCover(isPresented: $showOnboarding) {
                     hasSeenOnboarding = true
+                    // User completed onboarding - good moment for rating
+                    Task {
+                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds delay
+                        RatingManager.shared.requestRatingIfAppropriate()
+                    }
                 } content: {
                     OnboardingView(isPresented: $showOnboarding)
                 }
@@ -136,6 +145,10 @@ struct HomeView: View {
                     NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
+                        .onAppear {
+                            RatingManager.shared.incrementNewsReadCount()
+                            RatingManager.shared.requestRatingAfterPositiveInteraction()
+                        }
                 } label: {
                     NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
                         .padding(.vertical, 4)
