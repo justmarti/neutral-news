@@ -8,23 +8,25 @@
 import Foundation
 import FirebaseRemoteConfig
 
+@Observable
 @MainActor
-final class AppConfig: ObservableObject {
-    @Published var isInMaintenance: Bool = false
+final class AppConfig {
+    var isInMaintenance: Bool = false
     
-    private let remoteConfig: RemoteConfig?
-    
+    private var remoteConfig: RemoteConfig?
+    private let isTestMode: Bool
+
     init(isTestMode: Bool = false) {
-        if isTestMode {
-            self.remoteConfig = nil
-            self.isInMaintenance = false
-        } else {
-            self.remoteConfig = RemoteConfig.remoteConfig()
-            self.remoteConfig?.setDefaults(["maintenance_mode": false as NSObject])
-        }
+        self.isTestMode = isTestMode
+        self.isInMaintenance = false
     }
     
     func startFetching() {
+        if !isTestMode && remoteConfig == nil {
+            remoteConfig = RemoteConfig.remoteConfig()
+            remoteConfig?.setDefaults(["maintenance_mode": false as NSObject])
+        }
+
         guard let remoteConfig else { return }
         
         Task {

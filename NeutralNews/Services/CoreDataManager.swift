@@ -8,10 +8,13 @@
 import Foundation
 import CoreData
 
-class CoreDataManager: ObservableObject {
+@Observable
+class CoreDataManager {
     static let shared = CoreDataManager()
 
-    lazy var persistentContainer: NSPersistentCloudKitContainer = {
+    private var _persistentContainer: NSPersistentCloudKitContainer?
+
+    private func createPersistentContainer() -> NSPersistentCloudKitContainer {
         let container = NSPersistentCloudKitContainer(name: "SavedNews")
 
         // Configure CloudKit options BEFORE loading stores
@@ -45,7 +48,14 @@ class CoreDataManager: ObservableObject {
         }
 
         return container
-    }()
+    }
+
+    var persistentContainer: NSPersistentCloudKitContainer {
+        if _persistentContainer == nil {
+            _persistentContainer = createPersistentContainer()
+        }
+        return _persistentContainer!
+    }
 
     var viewContext: NSManagedObjectContext {
         return persistentContainer.viewContext

@@ -13,7 +13,7 @@ import RevenueCat
 
 @main
 struct NeutralNewsApp: App {
-    @StateObject private var config = AppConfig()
+    @State private var config = AppConfig()
 
     // Local cache container (no iCloud)
     let cacheContainer: ModelContainer = {
