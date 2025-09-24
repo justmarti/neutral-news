@@ -90,7 +90,16 @@ final class NewsFilterViewModel {
         }
         
         // Apply sorting
-        return sortNews(filteredNews)
+        let sortedNews = sortNews(filteredNews)
+
+        // Apply premium limitations for search scope
+        if searchScope == .lastSevenDays && !PremiumManager.shared.isPremium {
+            // For free users: show 5 most relevant results as premium teaser
+            let relevanceSorted = filteredNews.sorted { $0.relevance > $1.relevance }
+            return Array(relevanceSorted.prefix(5))
+        }
+
+        return sortedNews
     }
 
 //    func applyFilters(to news: [NeutralNews], searchOnly: Bool) -> [NeutralNews] {

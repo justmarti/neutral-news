@@ -21,9 +21,18 @@ struct HomeView: View {
     @Namespace private var animationNamespace
     var config: AppConfig
 
+    // Premium manager for UI state
+    private let premiumManager = PremiumManager.shared
+
     // Access to saved news container
     @State private var savedNewsContext: ModelContext?
-    
+
+    // MARK: - Computed Properties
+
+    private var shouldShowPremiumBanner: Bool {
+        vm.searchScope == .lastSevenDays && !premiumManager.isPremium
+    }
+
     var body: some View {
         Group {
             if config.isInMaintenance {
@@ -117,6 +126,11 @@ struct HomeView: View {
     
     private var newsListView: some View {
         LazyVStack {
+            // Premium search results banner
+            if shouldShowPremiumBanner {
+                premiumSearchBanner
+            }
+
             ForEach(vm.newsToShow) { neutralNews in
                 NavigationLink {
                     NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
@@ -193,6 +207,35 @@ struct HomeView: View {
                 newsListView
             }
         }
+    }
+
+    private var premiumSearchBanner: some View {
+        Button {
+            showingPaywall.toggle()
+        } label: {
+            HStack {
+                Image(systemName: "star.fill")
+                    .font(.title2)
+                    .foregroundStyle(.accent)
+                
+                VStack(alignment: .leading) {
+                    Text("Top 5 resultados")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    HStack {
+                        Text("Desbloquea acceso completo con Facts Pro")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .padding()
+            .background(.thinMaterial, in: .rect(cornerRadius: 16))
+        }
+        .buttonStyle(.plain)
     }
 }
 

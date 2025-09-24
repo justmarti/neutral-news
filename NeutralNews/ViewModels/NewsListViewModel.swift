@@ -86,6 +86,10 @@ final class NewsListViewModel {
     var isLoadingMore: Bool {
         paginationManager.isLoading
     }
+
+    var isShowingLimitedSearchResults: Bool {
+        searchScope == .lastSevenDays && !PremiumManager.shared.isPremium
+    }
     
     private var allAvailableNews: [NeutralNews] {
         let currentNews = newsDataManager.neutralNews
@@ -127,6 +131,7 @@ final class NewsListViewModel {
     var isShowingAllDays = false
     
     // MARK: - Pagination
+    
     private let paginationManager = PaginationManager<NeutralNews>()
     private var cachedAllNews: [NeutralNews] = []
     private var lastNewsDataHash: Int = 0
