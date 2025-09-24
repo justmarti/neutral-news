@@ -11,8 +11,8 @@ struct NeutralNewsView: View {
     let news: NeutralNews
     let relatedNews: [News]
     var namespace: Namespace.ID
-    
-    @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
+    @Environment(\.isBackgroundColorEnabled) private var isBackgroundColorEnabled
+
     @State private var isShowingReportProblemSheet = false
     
     var body: some View {
@@ -82,6 +82,7 @@ struct NeutralNewsView: View {
                                 ForEach(relatedNews) { new in
                                     NavigationLink {
                                         NewsView(news: new, relatedNews: relatedNews, namespace: namespace)
+                                            .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                                             .navigationTransition(.zoom(sourceID: new.id, in: namespace))
                                     } label: {
                                         MediaHeadlineView(news: new)
@@ -108,7 +109,6 @@ struct NeutralNewsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NeutralNewsOptionsMenu(
                         news: news,
-                        isBackgroundColorEnabled: $isBackgroundColorEnabled,
                         isShowingReportProblemSheet: $isShowingReportProblemSheet
                     )
                 }
@@ -120,4 +120,5 @@ struct NeutralNewsView: View {
 #Preview {
     let namespace = Namespace().wrappedValue
     return NeutralNewsView(news: .mock, relatedNews: [.mock, .mock, .mock], namespace: namespace)
+        .environment(\.isBackgroundColorEnabled, true)
 }

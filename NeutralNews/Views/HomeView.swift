@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  HomeView.swift
 //  NeutralNews
 //
 //  Created by Martí Espinosa Farran on 12/17/24.
@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var showOnboarding = false
     @State private var targetNews: NeutralNews?
     
@@ -37,10 +38,12 @@ struct HomeView: View {
                         .toolbar {
                             HomeToolbar(vm: vm).content
                         }
+                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                        .animation(.default, value: vm.isShowingSavedNews)
                         .navigationDestination(item: $targetNews) { news in
                             NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
                         }
-                        .accentGradientBackground
+                        .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
                 }
                 .fullScreenCover(isPresented: $showOnboarding) {
                     hasSeenOnboarding = true
@@ -97,6 +100,7 @@ struct HomeView: View {
             ForEach(vm.newsToShow) { neutralNews in
                 NavigationLink {
                     NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
+                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
                 } label: {
                     NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
@@ -150,27 +154,26 @@ struct HomeView: View {
 // MARK: - View Extensions
 
 extension View {
-    var accentGradientBackground: some View {
-        background {
-            Color("nn-background")
-                .ignoresSafeArea()
-            
-            RadialGradient(
-                gradient: Gradient(colors: [
-                    Color.accentColor.opacity(0.5),
-                    Color.clear
-                ]),
-                center: .top,
-                startRadius: -300,
-                endRadius: 500
-            )
-            .ignoresSafeArea()
-        }
+    func accentGradientBackground(isEnabled: Bool) -> some View {
+        modifier(AccentGradientBackground(isEnabled: isEnabled))
     }
-    
+
     @ViewBuilder
     func myNavigationSubtitle(_ subtitle: String) -> some View {
         if #available(iOS 26.0, *) { self.navigationSubtitle(subtitle) } else { self }
+    }
+}
+
+// MARK: - Environment Keys
+
+private struct BackgroundColorEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var isBackgroundColorEnabled: Bool {
+        get { self[BackgroundColorEnabledKey.self] }
+        set { self[BackgroundColorEnabledKey.self] = newValue }
     }
 }
 

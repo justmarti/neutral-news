@@ -11,6 +11,7 @@ struct NewsView: View {
     let news: News
     let relatedNews: [News]
     var namespace: Namespace.ID
+    @Environment(\.isBackgroundColorEnabled) private var isBackgroundColorEnabled
 
     @State private var showSafari = false
     
@@ -74,7 +75,7 @@ struct NewsView: View {
                     .frame(minHeight: geometry.size.height)
                 }
             }
-            .dominantColorBackground(from: news.imageUrl)
+            .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
         }
@@ -85,4 +86,5 @@ struct NewsView: View {
 #Preview {
     let namespace = Namespace().wrappedValue
     return NewsView(news: .mock, relatedNews: [.mock, .mock, .mock], namespace: namespace)
+        .environment(\.isBackgroundColorEnabled, true)
 }
