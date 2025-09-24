@@ -6,16 +6,23 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
+    @Environment(\.modelContext) private var cacheContext
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var showOnboarding = false
     @State private var targetNews: NeutralNews?
-    
+    @State private var showingSettingsSheet = false
+    @State private var showingPaywall = false
+
     @Namespace private var animationNamespace
-    @ObservedObject var config: AppConfig
+    var config: AppConfig
+
+    // Access to saved news container
+    @State private var savedNewsContext: ModelContext?
     
     var body: some View {
         Group {
@@ -24,24 +31,25 @@ struct HomeView: View {
             } else {
                 NavigationStack {
                     newsContentView
-                        .navigationTitle(vm.isShowingAllDays ? "Noticias" : vm.daySelected.dayName)
+                        .navigationTitle(vm.isShowingSavedNews ? "Guardadas" : (vm.isShowingAllDays ? "Noticias" : vm.daySelected.dayName))
                         // TODO: Mirar que opción es mejor para el title
-                        .toolbarTitleDisplayMode(.inlineLarge)
-                        .myNavigationSubtitle(vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort)
+//                        .toolbarTitleDisplayMode(.inlineLarge)
+                        .myNavigationSubtitle(vm.isShowingSavedNews ? "\(vm.savedNews.count) noticias" : (vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort))
                         .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
-                        .searchScopes(vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope, activation: .onSearchPresentation) {
-                            if !vm.isShowingAllDays {
+                        .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
+                            if !vm.isShowingAllDays && !vm.isShowingSavedNews {
                                 Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
                                 Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
                             }
                         }
                         .toolbar {
-                            HomeToolbar(vm: vm).content
+                            HomeToolbar(vm: vm, showingPaywall: $showingPaywall).content
                         }
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .animation(.default, value: vm.isShowingSavedNews)
                         .navigationDestination(item: $targetNews) { news in
                             NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
+                                .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         }
                         .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
                 }
@@ -73,6 +81,12 @@ struct HomeView: View {
                         await vm.refreshNews()
                     }
                 }
+                .onReceive(NotificationCenter.default.publisher(for: .showPaywall)) { _ in
+                    showingPaywall = true
+                }
+                .sheet(isPresented: $showingPaywall) {
+                    PaywallView(isPresented: $showingPaywall)
+                }
             }
         }
         .animation(.default, value: config.isInMaintenance)
@@ -82,7 +96,9 @@ struct HomeView: View {
     
     private var newsContentView: some View {
         ScrollView {
-            if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+            if vm.isShowingSavedNews {
+                savedNewsContentView
+            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
                 noResultsView
             } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
                 noNewsYetView
@@ -91,7 +107,11 @@ struct HomeView: View {
             }
         }
         .refreshable {
-            await vm.refreshNews()
+            if vm.isShowingSavedNews {
+                await vm.loadSavedNews()
+            } else {
+                await vm.refreshNews()
+            }
         }
     }
     
@@ -148,6 +168,31 @@ struct HomeView: View {
             description: Text("Prueba en unos minutos o selecciona otro día.")
         )
         .containerRelativeFrame([.horizontal, .vertical])
+    }
+
+    private var savedNewsContentView: some View {
+        Group {
+            if vm.isLoadingSavedNews {
+                ProgressView("Cargando noticias guardadas...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty {
+                ContentUnavailableView(
+                    "No se encontraron resultados para \"\(vm.searchText)\"",
+                    systemImage: "magnifyingglass",
+                    description: Text("Prueba con otra búsqueda en tus noticias guardadas.")
+                )
+                .containerRelativeFrame([.horizontal, .vertical])
+            } else if vm.savedNews.isEmpty {
+                ContentUnavailableView(
+                    "No tienes noticias guardadas",
+                    systemImage: "bookmark.slash",
+                    description: Text("Guarda noticias que te interesen para leerlas más tarde.")
+                )
+                .containerRelativeFrame([.horizontal, .vertical])
+            } else {
+                newsListView
+            }
+        }
     }
 }
 
