@@ -259,10 +259,9 @@ final class NewsListViewModel {
         }
     }
     
-    private func findNews(group: Int, date: Date) -> NeutralNews? {
-        let calendar = Calendar.current
+    private func findNews(newsId: String) -> NeutralNews? {
         return newsDataManager.neutralNews.first { news in
-            news.group == group && calendar.isDate(news.date, inSameDayAs: date)
+            news.id == newsId
         }
     }
     
@@ -276,27 +275,53 @@ final class NewsListViewModel {
     
     private func processDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
 #if DEBUG
-        print("🔄 Processing deep link in ViewModel - group: \(deepLinkData.group)")
+        print("🔄 Processing deep link in ViewModel - newsId: \(deepLinkData.newsId)")
 #endif
-        
-        let dayInfo = DayInfo(date: deepLinkData.date)
-        changeDay(to: dayInfo)
-        
+
+        // Try to find the news immediately
+        if let news = findNews(newsId: deepLinkData.newsId) {
+#if DEBUG
+            print("✅ News found immediately: \(news.neutralTitle)")
+#endif
+            deepLinkTargetNews = news
+            pendingDeepLink = nil
+            return
+        }
+
+        // If not found, wait for news to load
+#if DEBUG
+        print("⏳ News not loaded yet, waiting for data...")
+#endif
+
         Task {
-            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3s
-            if let news = self.findNews(group: deepLinkData.group, date: deepLinkData.date) {
+            // Wait for news data to be available with timeout
+            let maxAttempts = 10
+            let delayPerAttempt: UInt64 = 500_000_000 // 0.5s
+
+            for attempt in 1...maxAttempts {
+                if let news = self.findNews(newsId: deepLinkData.newsId) {
 #if DEBUG
-                print("✅ News found: \(news.neutralTitle)")
+                    print("✅ News found after \(attempt) attempts: \(news.neutralTitle)")
 #endif
-                self.deepLinkTargetNews = news
-            } else {
+                    await MainActor.run {
+                        self.deepLinkTargetNews = news
+                        self.pendingDeepLink = nil
+                    }
+                    return
+                }
+
+                if attempt < maxAttempts {
+                    try? await Task.sleep(nanoseconds: delayPerAttempt)
+                }
+            }
+
 #if DEBUG
-                print("❌ News not found - group: \(deepLinkData.group), total news: \(self.newsDataManager.neutralNews.count)")
+            print("❌ News not found after \(maxAttempts) attempts - newsId: \(deepLinkData.newsId)")
 #endif
+            await MainActor.run {
+                self.pendingDeepLink = nil
             }
         }
-        
-        pendingDeepLink = nil
     }
     
     func checkPendingDeepLink() {
