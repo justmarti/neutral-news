@@ -16,6 +16,8 @@ final class PremiumManager {
     private(set) var isPremium = false
     private(set) var isLoading = false
 
+    private var pendingAction: (() -> Void)?
+
     private init() {
          checkPremiumStatus()
          setupSubscriptionStatusListener()
@@ -78,8 +80,9 @@ final class PremiumManager {
 
     // MARK: - Premium Actions
 
-    func requirePremium(for feature: String = "") {
+    func requirePremium(for feature: String = "", onPurchaseComplete: (() -> Void)? = nil) {
         if !isPremium {
+            pendingAction = onPurchaseComplete
             NotificationCenter.default.post(name: .showPaywall, object: feature)
         }
     }
@@ -113,6 +116,12 @@ final class PremiumManager {
                         } else {
                             self.isPremium = !(customerInfo?.entitlements.active.isEmpty ?? true)
                             print("✅ Subscription status checked. Premium: \(self.isPremium)")
+
+                            // Execute pending action if user became premium
+                            if self.isPremium, let action = self.pendingAction {
+                                self.pendingAction = nil
+                                action()
+                            }
                         }
 
                         continuation.resume()
@@ -128,6 +137,12 @@ final class PremiumManager {
         await MainActor.run {
             self.isPremium = !customerInfo.entitlements.active.isEmpty
             print("✅ Premium status force updated: \(self.isPremium)")
+
+            // Execute pending action if user became premium
+            if self.isPremium, let action = self.pendingAction {
+                self.pendingAction = nil
+                action()
+            }
         }
     }
 

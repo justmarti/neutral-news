@@ -66,7 +66,11 @@ struct HomeToolbar {
                         vm.toggleSavedNewsMode()
                     }
                 } else {
-                    premiumManager.requirePremium(for: "view_saved_news")
+                    premiumManager.requirePremium(for: "view_saved_news") {
+                        withAnimation {
+                            vm.toggleSavedNewsMode()
+                        }
+                    }
                 }
             } label: {
                 Label("Noticias guardadas", systemImage: vm.isShowingSavedNews ? "bookmark.fill" : "bookmark")
@@ -90,7 +94,9 @@ struct HomeToolbar {
                 if premiumManager.canViewAllDays {
                     vm.changeToAllDays()
                 } else {
-                    premiumManager.requirePremium(for: "view_all_news")
+                    premiumManager.requirePremium(for: "view_all_news") {
+                        vm.changeToAllDays()
+                    }
                 }
             } label: {
                 Label("Todas las noticias", systemImage: vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack")
@@ -104,7 +110,9 @@ struct HomeToolbar {
                     if premiumManager.canViewDay(day) {
                         vm.changeDay(to: day)
                     } else {
-                        premiumManager.requirePremium(for: "view_week_news")
+                        premiumManager.requirePremium(for: "view_week_news") {
+                            vm.changeDay(to: day)
+                        }
                     }
                 } label: {
                     // TODO: Usar number.calendar ?

@@ -23,7 +23,11 @@ struct NeutralNewsOptionsMenu: View {
                         await handleSaveArticle()
                     }
                 } else {
-                    premiumManager.requirePremium(for: "save_news")
+                    premiumManager.requirePremium(for: "save_news") {
+                        Task {
+                            await handleSaveArticle()
+                        }
+                    }
                 }
             } label: {
                 Label(
