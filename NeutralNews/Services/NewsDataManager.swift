@@ -66,34 +66,9 @@ final class NewsDataManager {
     // MARK: - Computed Properties
     var lastSevenDays: [DayInfo] {
         let calendar = Calendar.current
-        let dayFormatter = DateFormatter()
-        let monthFormatter = DateFormatter()
-        
-        dayFormatter.locale = Locale(identifier: "es_ES")
-        dayFormatter.dateFormat = "EEEE"
-        
-        monthFormatter.locale = Locale(identifier: "es_ES")
-        monthFormatter.dateFormat = "MMMM"
-        
         return (0..<7).compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -offset, to: .now) else { return nil }
-            
-            let dayNumber = calendar.component(.day, from: date)
-            let monthName = monthFormatter.string(from: date)
-            
-            let dayName: String
-            switch offset {
-            case 0: dayName = "Hoy"
-            case 1: dayName = "Ayer"
-            default: dayName = dayFormatter.string(from: date).capitalized
-            }
-            
-            return DayInfo(
-                dayName: dayName,
-                dayNumber: dayNumber,
-                monthName: monthName,
-                date: date
-            )
+            return DayInfo(date: date)
         }
     }
     
@@ -339,7 +314,7 @@ final class NewsDataManager {
             // Skip if already loaded in memory
             if isDateLoaded(startOfDay) { continue }
             
-            let dayInfo = createDayInfo(for: dayDate)
+            let dayInfo = DayInfo(date: dayDate)
             
             // Check cache validity first - if valid, load immediately without delay
             if cacheService.isCacheValid(for: dayInfo) {
@@ -362,30 +337,6 @@ final class NewsDataManager {
             await loadNews(for: dayInfo)
         }
     }
-    
-    private func createDayInfo(for date: Date) -> DayInfo {
-        let calendar = Calendar.current
-        let dayFormatter = DateFormatter()
-        let monthFormatter = DateFormatter()
-        
-        dayFormatter.locale = Locale(identifier: "es_ES")
-        dayFormatter.dateFormat = "EEEE"
-        
-        monthFormatter.locale = Locale(identifier: "es_ES")
-        monthFormatter.dateFormat = "MMMM"
-        
-        let dayNumber = calendar.component(.day, from: date)
-        let monthName = monthFormatter.string(from: date)
-        let dayName = dayFormatter.string(from: date).capitalized
-        
-        return DayInfo(
-            dayName: dayName,
-            dayNumber: dayNumber,
-            monthName: monthName,
-            date: date
-        )
-    }
-    
     
     private func cleanOldMemoryDataIfNeeded() {
         let calendar = Calendar.current
