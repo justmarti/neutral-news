@@ -20,18 +20,15 @@ struct HomeToolbar {
             settingsMenu
         }
         
-        if !vm.isShowingSavedNews {
-            ToolbarItemGroup(placement: .topBarTrailing) {
-//                orderMenu
-                filterMenu
-            }
+        ToolbarItem(placement: .topBarTrailing) {
+            filterMenu
         }
 
         if #available(iOS 26.0, *) {
             ToolbarSpacer(.fixed, placement: .topBarTrailing)
         }
         
-        ToolbarItemGroup(placement: .topBarTrailing) {
+        ToolbarItem(placement: .topBarTrailing) {
             if vm.isShowingSavedNews {
                 Button {
                     withAnimation {

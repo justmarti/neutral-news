@@ -43,7 +43,7 @@ struct HomeView: View {
                         .navigationTitle(vm.isShowingSavedNews ? "Guardadas" : (vm.isShowingAllDays ? "Todas las noticias" : vm.daySelected.dayName))
                         // TODO: Mirar que opción es mejor para el title
 //                        .toolbarTitleDisplayMode(.inlineLarge)
-                        .myNavigationSubtitle(vm.isShowingSavedNews ? "\(vm.savedNews.count) noticias" : (vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort))
+                        .myNavigationSubtitle(vm.isShowingSavedNews ? vm.savedNewsSubtitle : (vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort))
                         .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
                         .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
                             if !vm.isShowingAllDays && !vm.isShowingSavedNews {

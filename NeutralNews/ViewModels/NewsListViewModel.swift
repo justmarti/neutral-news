@@ -129,6 +129,17 @@ final class NewsListViewModel {
     }
     
     var isShowingAllDays = false
+
+    var savedNewsSubtitle: String {
+        let filteredCount = newsToShow.count
+        let totalCount = savedNews.count
+
+        if isAnyFilterEnabled && filteredCount != totalCount {
+            return "\(filteredCount) de \(totalCount) noticias"
+        } else {
+            return "\(totalCount) noticias"
+        }
+    }
     
     // MARK: - Pagination
     
@@ -156,9 +167,16 @@ final class NewsListViewModel {
     }
     
     func getCategoriesOfTheDay() -> [Category] {
-        let newsToFilter = isShowingAllDays 
-            ? allAvailableNews
-            : newsDataManager.getNewsArrayForDay(daySelected)
+        let newsToFilter: [NeutralNews]
+
+        if isShowingSavedNews {
+            newsToFilter = savedNews
+        } else if isShowingAllDays {
+            newsToFilter = allAvailableNews
+        } else {
+            newsToFilter = newsDataManager.getNewsArrayForDay(daySelected)
+        }
+
         let categoriesSet = Set(newsToFilter.compactMap { Category(rawValue: $0.category) })
         return Category.allCases.filter { categoriesSet.contains($0) }
     }
@@ -346,11 +364,7 @@ final class NewsListViewModel {
 
     func toggleSavedNewsMode() {
         isShowingSavedNews.toggle()
-
-        // Clear filters when entering saved news mode
-        if isShowingSavedNews {
-            filterViewModel.clearFilters()
-        }
+        filterViewModel.clearFilters()
     }
 
     func loadSavedNews() async {
