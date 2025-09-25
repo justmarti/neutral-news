@@ -116,6 +116,8 @@ struct HomeView: View {
         ScrollView {
             if vm.isShowingSavedNews {
                 savedNewsContentView
+            } else if vm.isLoadingNeutralNews && vm.newsToShow.isEmpty {
+                loadingView
             } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
                 noResultsView
             } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
@@ -194,6 +196,17 @@ struct HomeView: View {
             systemImage: "newspaper",
             description: Text("Prueba en unos minutos o selecciona otro día.")
         )
+        .containerRelativeFrame([.horizontal, .vertical])
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+            Text("Cargando noticias...")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+        }
         .containerRelativeFrame([.horizontal, .vertical])
     }
 

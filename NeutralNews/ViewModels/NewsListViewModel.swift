@@ -164,15 +164,27 @@ final class NewsListViewModel {
     }
     
     func refreshNews() async {
-        isLoadingNeutralNews = true
+        await MainActor.run {
+            isLoadingNeutralNews = true
+        }
+
         await newsDataManager.refreshNews(for: daySelected)
-        isLoadingNeutralNews = false
+
+        await MainActor.run {
+            isLoadingNeutralNews = false
+        }
     }
     
     func forceLoadNews() async {
-        isLoadingNeutralNews = true
+        await MainActor.run {
+            isLoadingNeutralNews = true
+        }
+
         await newsDataManager.loadNews(for: daySelected, forceRefresh: true)
-        isLoadingNeutralNews = false
+
+        await MainActor.run {
+            isLoadingNeutralNews = false
+        }
     }
     
     func filterByCategory(_ category: Category) {
