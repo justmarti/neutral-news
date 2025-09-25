@@ -183,18 +183,26 @@ struct HomeView: View {
     
     private var noResultsView: some View {
         ContentUnavailableView(
-            "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
+            vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "No hay resultados para \"\(vm.searchText)\""
+                : "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
             systemImage: "magnifyingglass",
-            description: Text("Prueba con otra búsqueda o selecciona otro día.")
+            description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "Intenta con otro término de búsqueda."
+                : "Intenta con otro término o selecciona un día distinto.")
         )
         .containerRelativeFrame([.horizontal, .vertical])
     }
     
     private var noNewsYetView: some View {
         ContentUnavailableView(
-            "No hay noticias de \(vm.daySelected.dayName) aún",
+            vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "Aún no hay noticias"
+                : "Aún no hay noticias de \(vm.daySelected.dayName)",
             systemImage: "newspaper",
-            description: Text("Prueba en unos minutos o selecciona otro día.")
+            description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "Vuelve a intentarlo en unos minutos."
+                : "Vuelve a intentarlo más tarde o elige otro día.")
         )
         .containerRelativeFrame([.horizontal, .vertical])
     }
