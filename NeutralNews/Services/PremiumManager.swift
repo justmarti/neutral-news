@@ -58,7 +58,7 @@ final class PremiumManager {
                     return
                 }
 
-                self?.isPremium = info?.entitlements.active.isEmpty == false
+                self?.isPremium = !(info?.entitlements.active.isEmpty ?? true)
                 print("✅ Premium status: \(self?.isPremium ?? false)")
             }
         }
@@ -70,9 +70,11 @@ final class PremiumManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            print("📱 RevenueCat purchaser info changed")
             self?.checkPremiumStatus()
         }
     }
+
 
     // MARK: - Premium Actions
 
@@ -85,11 +87,50 @@ final class PremiumManager {
     // MARK: - Purchase Actions
 
     func restorePurchases() async throws {
+        print("🔄 Restoring purchases...")
         let customerInfo = try await Purchases.shared.restorePurchases()
         await MainActor.run {
             self.isPremium = !customerInfo.entitlements.active.isEmpty
+            print("✅ Purchases restored. Premium: \(self.isPremium)")
         }
     }
+
+    // MARK: - Subscription Management
+
+    func checkSubscriptionStatus() async {
+        await MainActor.run {
+            self.isLoading = true
+        }
+
+        await withCheckedContinuation { continuation in
+            Purchases.shared.getCustomerInfo { customerInfo, error in
+                Task {
+                    await MainActor.run {
+                        self.isLoading = false
+
+                        if let error = error {
+                            print("❌ Error checking subscription status: \(error)")
+                        } else {
+                            self.isPremium = !(customerInfo?.entitlements.active.isEmpty ?? true)
+                            print("✅ Subscription status checked. Premium: \(self.isPremium)")
+                        }
+
+                        continuation.resume()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Internal Methods
+
+    func updatePremiumStatus(_ customerInfo: CustomerInfo) async {
+        await MainActor.run {
+            self.isPremium = !customerInfo.entitlements.active.isEmpty
+            print("✅ Premium status force updated: \(self.isPremium)")
+        }
+    }
+
 }
 
 // MARK: - Notification Extensions

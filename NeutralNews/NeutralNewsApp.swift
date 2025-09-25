@@ -35,7 +35,19 @@ struct NeutralNewsApp: App {
         FirebaseApp.configure()
 
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
-            Purchases.configure(with: .init(withAPIKey: apiKey))
+            let configuration = Configuration.Builder(withAPIKey: apiKey)
+                .with(storeKitVersion: .storeKit2)
+                .build()
+            Purchases.configure(with: configuration)
+
+            // Configure logging for debugging
+            #if DEBUG
+            Purchases.logLevel = .debug
+            #endif
+
+            print("✅ RevenueCat configured with StoreKit 2 support")
+        } else {
+            print("❌ RevenueCat API Key not found in Info.plist")
         }
 
         RatingManager.shared.incrementLaunchCount()
