@@ -64,7 +64,9 @@ struct PaywallView: View {
         .onInAppPurchaseCompletion { product, result in
             switch result {
             case .success(.success(let transaction)):
+#if DEBUG
                 print("✅ Purchase successful: \(product.displayName) - \(transaction.unsafePayloadValue.id)")
+#endif
 
                 isProcessingPurchase = true
 
@@ -72,7 +74,9 @@ struct PaywallView: View {
                     do {
                         // Sync with RevenueCat and force premium status update
                         let customerInfo = try await Purchases.shared.syncPurchases()
+#if DEBUG
                         print("✅ Purchase synced with RevenueCat")
+#endif
 
                         // Force immediate premium status update
                         await PremiumManager.shared.updatePremiumStatus(customerInfo)
@@ -89,13 +93,19 @@ struct PaywallView: View {
                     }
                 }
             case .success(.userCancelled):
+#if DEBUG
                 print("🚫 Purchase cancelled by user")
+#endif
             case .success(.pending):
+#if DEBUG
                 print("⏳ Purchase pending approval")
+#endif
             case .failure(let error):
                 print("❌ Purchase failed: \(error.localizedDescription)")
             @unknown default:
+#if DEBUG
                 print("⚠️ Unknown purchase result")
+#endif
             }
         }
     }

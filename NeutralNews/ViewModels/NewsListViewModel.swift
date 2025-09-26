@@ -55,7 +55,9 @@ final class NewsListViewModel {
     var isShowingSavedNews = false {
         didSet {
             if isShowingSavedNews != oldValue {
+#if DEBUG
                 print("🔄 isShowingSavedNews changed to: \(isShowingSavedNews)")
+#endif
                 if isShowingSavedNews {
                     Task {
                         await loadSavedNews()
@@ -373,7 +375,9 @@ final class NewsListViewModel {
             return
         }
 
+#if DEBUG
         print("🔄 Loading saved news from Core Data")
+#endif
 
         await MainActor.run {
             isLoadingSavedNews = true
@@ -387,12 +391,16 @@ final class NewsListViewModel {
 
         do {
             let savedNewsItems = try savedNewsService.getSavedNews(context: context)
+#if DEBUG
             print("📰 Found \(savedNewsItems.count) saved news items")
+#endif
 
             // Convert saved news back to NeutralNews objects
             let neutralNewsList = savedNewsItems.compactMap { savedNews -> NeutralNews? in
                 guard savedNews.newsType == SavedNewsType.neutralNews.rawValue else {
+#if DEBUG
                     print("⚠️ Skipping non-neutral news: \(savedNews.newsType ?? "unknown")")
+#endif
                     return nil
                 }
 
@@ -400,11 +408,15 @@ final class NewsListViewModel {
                 return savedNews.toNeutralNews()
             }
 
+#if DEBUG
             print("✅ Successfully parsed \(neutralNewsList.count) neutral news items")
+#endif
 
             await MainActor.run {
                 savedNews = neutralNewsList.sorted { $0.date > $1.date }
+#if DEBUG
                 print("🎯 savedNews updated with \(savedNews.count) items")
+#endif
             }
         } catch {
             print("❌ Error loading saved news: \(error)")

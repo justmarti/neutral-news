@@ -86,9 +86,7 @@ final class ReportProblemViewModel {
             }
             
         } catch {
-#if DEBUG
             print("❌ Error submitting report: \(error)")
-#endif
             
             isSubmitting = false
             reportError = ReportError.from(error)

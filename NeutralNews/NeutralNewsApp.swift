@@ -45,7 +45,9 @@ struct NeutralNewsApp: App {
             Purchases.logLevel = .debug
             #endif
 
+#if DEBUG
             print("✅ RevenueCat configured with StoreKit 2 support")
+#endif
         } else {
             print("❌ RevenueCat API Key not found in Info.plist")
         }

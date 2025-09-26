@@ -15,15 +15,21 @@ final class SavedNewsService {
     private init() {}
 
     func saveNews(_ news: Any, context: NSManagedObjectContext) throws {
+#if DEBUG
         print("🔄 SavedNewsService.saveNews called")
+#endif
 
         let newsId: String
 
         if let neutralNews = news as? NeutralNews {
+#if DEBUG
             print("📰 Preparing to save NeutralNews: \(neutralNews.id)")
+#endif
             newsId = neutralNews.id
         } else if let regularNews = news as? News {
+#if DEBUG
             print("📰 Preparing to save News: \(regularNews.id)")
+#endif
             newsId = regularNews.id
         } else {
             print("❌ Invalid news type: \(type(of: news))")
@@ -36,26 +42,38 @@ final class SavedNewsService {
 
         let existingResults = try context.fetch(fetchRequest)
         if !existingResults.isEmpty {
+#if DEBUG
             print("⚠️ News already saved: \(newsId)")
+#endif
             return // Already saved, no need to save again
         }
 
+#if DEBUG
         print("✅ News not found in saved list, proceeding to save: \(newsId)")
+#endif
 
         // Create the object ONLY if not already saved
         if let neutralNews = news as? NeutralNews {
             _ = SavedNews(from: neutralNews, context: context)
+#if DEBUG
             print("📰 Created SavedNews from NeutralNews: \(neutralNews.id)")
+#endif
         } else if let regularNews = news as? News {
             _ = SavedNews(from: regularNews, context: context)
+#if DEBUG
             print("📰 Created SavedNews from News: \(regularNews.id)")
+#endif
         } else {
             throw SavedNewsError.invalidNewsType
         }
 
+#if DEBUG
         print("💾 Saving context...")
+#endif
         try context.save()
+#if DEBUG
         print("✅ Context saved successfully")
+#endif
 
         // Track positive interaction for rating
         Task { @MainActor in
@@ -80,7 +98,9 @@ final class SavedNewsService {
 
         let results = try? context.fetch(fetchRequest)
         let isSaved = results?.first != nil
+#if DEBUG
         print("🔍 Checking if news \(newsId) is saved: \(isSaved) (found \(results?.count ?? 0) results)")
+#endif
         return isSaved
     }
 

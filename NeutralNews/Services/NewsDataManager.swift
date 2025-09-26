@@ -145,9 +145,7 @@ final class NewsDataManager {
                 self.cacheService.cacheNews(fetchedNews, for: day)
             }
         } catch {
-#if DEBUG
             print("❌ Error loading news for \(day.dayName): \(error.localizedDescription)")
-#endif
             
             // Fallback: try to load from cache even if potentially stale
             let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)

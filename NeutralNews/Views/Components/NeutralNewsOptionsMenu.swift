@@ -61,22 +61,32 @@ struct NeutralNewsOptionsMenu: View {
 
     private func handleSaveArticle() async {
         guard let context = NewsListViewModel.shared.coreDataContext else { return }
+#if DEBUG
         print("🔄 Attempting to save article: \(news.id)")
+#endif
         do {
             if isArticleSaved {
+#if DEBUG
                 print("🗑️ Unsaving article...")
+#endif
                 try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
                 isArticleSaved = false
+#if DEBUG
                 print("✅ Article unsaved successfully")
+#endif
                 // Remove from saved news list if currently viewing saved news
                 await MainActor.run {
                     NewsListViewModel.shared.removeFromSavedNews(news.id)
                 }
             } else {
+#if DEBUG
                 print("💾 Saving article...")
+#endif
                 try SavedNewsService.shared.saveNews(news, context: context)
                 isArticleSaved = true
+#if DEBUG
                 print("✅ Article saved successfully")
+#endif
             }
         } catch {
             print("❌ Error saving/unsaving article: \(error)")

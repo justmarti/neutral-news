@@ -61,7 +61,9 @@ final class PremiumManager {
                 }
 
                 self?.isPremium = !(info?.entitlements.active.isEmpty ?? true)
+#if DEBUG
                 print("✅ Premium status: \(self?.isPremium ?? false)")
+#endif
             }
         }
     }
@@ -72,7 +74,9 @@ final class PremiumManager {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+#if DEBUG
             print("📱 RevenueCat purchaser info changed")
+#endif
             self?.checkPremiumStatus()
         }
     }
@@ -90,11 +94,15 @@ final class PremiumManager {
     // MARK: - Purchase Actions
 
     func restorePurchases() async throws {
+#if DEBUG
         print("🔄 Restoring purchases...")
+#endif
         let customerInfo = try await Purchases.shared.restorePurchases()
         await MainActor.run {
             self.isPremium = !customerInfo.entitlements.active.isEmpty
+#if DEBUG
             print("✅ Purchases restored. Premium: \(self.isPremium)")
+#endif
         }
     }
 
@@ -115,7 +123,9 @@ final class PremiumManager {
                             print("❌ Error checking subscription status: \(error)")
                         } else {
                             self.isPremium = !(customerInfo?.entitlements.active.isEmpty ?? true)
+#if DEBUG
                             print("✅ Subscription status checked. Premium: \(self.isPremium)")
+#endif
 
                             // Execute pending action if user became premium
                             if self.isPremium, let action = self.pendingAction {
@@ -136,7 +146,9 @@ final class PremiumManager {
     func updatePremiumStatus(_ customerInfo: CustomerInfo) async {
         await MainActor.run {
             self.isPremium = !customerInfo.entitlements.active.isEmpty
+#if DEBUG
             print("✅ Premium status force updated: \(self.isPremium)")
+#endif
 
             // Execute pending action if user became premium
             if self.isPremium, let action = self.pendingAction {
