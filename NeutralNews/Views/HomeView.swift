@@ -74,7 +74,9 @@ struct HomeView: View {
                         RatingManager.shared.requestRatingIfAppropriate()
                     }
                 } content: {
-                    OnboardingView(isPresented: $showOnboarding)
+                    OnboardingView(isPresented: $showOnboarding) {
+                        showingPaywall = true
+                    }
                 }
                 .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
                     if let news = newValue {
