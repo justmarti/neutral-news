@@ -10,6 +10,8 @@ import SwiftUI
 struct HomeToolbar {
     let vm: NewsListViewModel
     @Binding var showingPaywall: Bool
+    @Binding var showingSafari: Bool
+    @Binding var safariURL: URL?
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
 
     private let premiumManager = PremiumManager.shared
@@ -79,6 +81,22 @@ struct HomeToolbar {
                 }
             } label: {
                 Label("Color de fondo", systemImage: isBackgroundColorEnabled ? "paintbrush.fill" : "paintbrush")
+            }
+
+            Divider()
+
+            Button {
+                safariURL = URL(string: "https://getfacts.app/privacy-policy")
+                showingSafari = true
+            } label: {
+                Label("Política de Privacidad", systemImage: "hand.raised")
+            }
+
+            Button {
+                safariURL = URL(string: "https://getfacts.app/terms-of-use")
+                showingSafari = true
+            } label: {
+                Label("Términos de Uso", systemImage: "doc.text")
             }
         } label: {
             Label("Ajustes", systemImage: "gearshape")

@@ -17,6 +17,8 @@ struct HomeView: View {
     @State private var targetNews: NeutralNews?
     @State private var showingSettingsSheet = false
     @State private var showingPaywall = false
+    @State private var showingSafari = false
+    @State private var safariURL: URL?
 
     @Namespace private var animationNamespace
     var config: AppConfig
@@ -52,7 +54,7 @@ struct HomeView: View {
                             }
                         }
                         .toolbar {
-                            HomeToolbar(vm: vm, showingPaywall: $showingPaywall).content
+                            HomeToolbar(vm: vm, showingPaywall: $showingPaywall, showingSafari: $showingSafari, safariURL: $safariURL).content
                         }
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .animation(.default, value: vm.isShowingSavedNews)
@@ -107,6 +109,7 @@ struct HomeView: View {
                 .sheet(isPresented: $showingPaywall) {
                     PaywallView(isPresented: $showingPaywall)
                 }
+                .safariSheet(url: safariURL, isPresented: $showingSafari)
             }
         }
         .animation(.default, value: config.isInMaintenance)
