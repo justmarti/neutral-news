@@ -13,7 +13,6 @@ struct HomeView: View {
     @Environment(\.modelContext) private var cacheContext
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
-    @State private var showOnboarding = false
     @State private var targetNews: NeutralNews?
     @State private var showingSettingsSheet = false
     @State private var showingPaywall = false
@@ -68,15 +67,9 @@ struct HomeView: View {
                         }
                         .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
                 }
-                .fullScreenCover(isPresented: $showOnboarding) {
-                    hasSeenOnboarding = true
-                    // User completed onboarding - good moment for rating
-                    Task {
-                        try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds delay
-                        RatingManager.shared.requestRatingIfAppropriate()
-                    }
-                } content: {
-                    OnboardingView(isPresented: $showOnboarding) {
+                .fullScreenCover(isPresented: .constant(!hasSeenOnboarding)) {
+                    OnboardingView(isPresented: .constant(true)) {
+                        hasSeenOnboarding = true
                         showingPaywall = true
                     }
                 }
@@ -95,7 +88,6 @@ struct HomeView: View {
                     }
                 }
                 .onAppear {
-                    showOnboarding = !hasSeenOnboarding
                     vm.checkPendingDeepLink()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in

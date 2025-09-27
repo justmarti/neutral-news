@@ -5,11 +5,9 @@
 //  Created by Martí Espinosa Farran on 25/09/25.
 //
 
-import SwiftUI
+import Foundation
 import StoreKit
 
-@Observable
-@MainActor
 final class RatingManager {
     static let shared = RatingManager()
 
@@ -69,7 +67,7 @@ final class RatingManager {
     func requestRatingIfAppropriate() {
         guard shouldRequestRating else { return }
 
-        Task {
+        Task { @MainActor in
             try? await Task.sleep(nanoseconds: 1_000_000_000)
 
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
