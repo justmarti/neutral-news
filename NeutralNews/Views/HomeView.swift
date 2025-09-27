@@ -250,10 +250,10 @@ struct HomeView: View {
                     .foregroundStyle(.accent)
                 
                 VStack(alignment: .leading) {
-                    Text("Mejores 5 resultados")
+                    Text("Mejores resultados")
                         .font(.headline)
                     
-                    Text("Desbloquea acceso completo con Facts Pro")
+                    Text("Accede a todos los resultados con Facts Pro")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
