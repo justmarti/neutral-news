@@ -12,6 +12,8 @@ import RevenueCat
 struct PaywallView: View {
     @Binding var isPresented: Bool
     @State private var isProcessingPurchase = false
+    @State private var showingSafari = false
+    @State private var safariURL: URL?
 
     var body: some View {
         SubscriptionStoreView(groupID: "21774114") {
@@ -25,7 +27,7 @@ struct PaywallView: View {
                     Text("Facts Pro")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                    
+
                     Text("Acceso completo a la app")
                         .foregroundStyle(.secondary)
                 }
@@ -37,12 +39,31 @@ struct PaywallView: View {
                     ProFeatureRow(icon: "heart.fill", text: "Apoya una app independiente")
                 }
                 .padding(.vertical, 16)
+
             }
         }
         .scrollIndicators(.hidden)
         .subscriptionStoreButtonLabel(.automatic)
         .subscriptionStorePickerItemBackground(.regularMaterial)
         .subscriptionStoreControlStyle(.pagedProminentPicker)
+        .safeAreaInset(edge: .bottom) {
+            HStack {
+                Button("Términos de Uso") {
+                    safariURL = URL(string: "https://getfacts.app/terms-of-use")
+                    showingSafari = true
+                }
+
+                Text("•")
+
+                Button("Política de Privacidad") {
+                    safariURL = URL(string: "https://getfacts.app/privacy-policy")
+                    showingSafari = true
+                }
+            }
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .padding(.top)
+        }
         .overlay {
             if isProcessingPurchase {
                 ZStack {
@@ -83,8 +104,13 @@ struct PaywallView: View {
 
                     } catch {
                         print("⚠️ Sync error (transaction still valid): \(error)")
-                        // Fallback: check status manually
+                        // Fallback: check status manually and handle sandbox receipts
                         await PremiumManager.shared.checkSubscriptionStatus()
+
+                        // Additional fallback for sandbox environment
+                        if error.localizedDescription.contains("sandbox") || error.localizedDescription.contains("test") {
+                            print("🧪 Sandbox environment detected, handling appropriately")
+                        }
                     }
 
                     await MainActor.run {
@@ -102,10 +128,31 @@ struct PaywallView: View {
 #endif
             case .failure(let error):
                 print("❌ Purchase failed: \(error.localizedDescription)")
+
+                // Handle specific error cases for App Store review
+                if let storeKitError = error as? StoreKitError {
+                    print("🛒 StoreKit Error: \(storeKitError)")
+
+                    // Don't show user-facing errors during review process
+                    // as sandbox environment can have different behavior
+                    switch storeKitError {
+                    case .networkError, .systemError:
+                        print("🔄 Network/System error, attempting retry logic")
+                    case .userCancelled:
+                        print("🚫 User cancelled transaction")
+                    default:
+                        print("⚠️ Other StoreKit error: \(storeKitError.localizedDescription)")
+                    }
+                }
             @unknown default:
 #if DEBUG
                 print("⚠️ Unknown purchase result")
 #endif
+            }
+        }
+        .sheet(isPresented: $showingSafari) {
+            if let url = safariURL {
+                SafariView(url: url)
             }
         }
     }

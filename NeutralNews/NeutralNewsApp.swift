@@ -37,12 +37,16 @@ struct NeutralNewsApp: App {
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
             let configuration = Configuration.Builder(withAPIKey: apiKey)
                 .with(storeKitVersion: .storeKit2)
+                .with(purchasesAreCompletedBy: .revenueCat, storeKitVersion: .storeKit2)
                 .build()
             Purchases.configure(with: configuration)
 
             // Configure logging for debugging
             #if DEBUG
             Purchases.logLevel = .debug
+            #else
+            // In production/review, use less verbose logging
+            Purchases.logLevel = .info
             #endif
 
 #if DEBUG
