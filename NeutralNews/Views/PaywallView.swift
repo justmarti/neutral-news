@@ -150,11 +150,7 @@ struct PaywallView: View {
 #endif
             }
         }
-        .sheet(isPresented: $showingSafari) {
-            if let url = safariURL {
-                SafariView(url: url)
-            }
-        }
+        .safariSheet(url: safariURL, isPresented: $showingSafari)
     }
 }
 
