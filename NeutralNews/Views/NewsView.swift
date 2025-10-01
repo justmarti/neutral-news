@@ -26,7 +26,7 @@ struct NewsView: View {
                             .foregroundStyle(.secondary)
                         
                         Text(news.title)
-                            .font(.title)
+                            .font(.title2)
                             .fontWeight(.semibold)
                             .fontDesign(.serif)
 //                            .lineHeight(.tight)
