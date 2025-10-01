@@ -12,6 +12,7 @@ import RevenueCat
 struct PaywallView: View {
     @Binding var isPresented: Bool
     @State private var isProcessingPurchase = false
+    @State private var isRestoringPurchases = false
     @State private var showingSafari = false
     @State private var safariURL: URL?
 
@@ -47,21 +48,43 @@ struct PaywallView: View {
         .subscriptionStorePickerItemBackground(.regularMaterial)
         .subscriptionStoreControlStyle(.pagedProminentPicker)
         .safeAreaInset(edge: .bottom) {
-            HStack {
-                Button("Términos de Uso") {
-                    safariURL = URL(string: "https://getfacts.app/terms-of-use")
-                    showingSafari = true
-                }
+            VStack(spacing: 8) {
+                // Restore Purchases Button
+                Button {
+                    isRestoringPurchases = true
+                    Task {
+                        await PremiumManager.shared.restorePurchases()
+                        isRestoringPurchases = false
 
-                Text("•")
-
-                Button("Política de Privacidad") {
-                    safariURL = URL(string: "https://getfacts.app/privacy-policy")
-                    showingSafari = true
+                        // Close paywall if restore was successful
+                        if PremiumManager.shared.isPremium {
+                            isPresented = false
+                        }
+                    }
+                } label: {
+                    Text(isRestoringPurchases ? "Restaurando..." : "Restaurar Compras")
                 }
+                .disabled(isRestoringPurchases)
+                .font(.caption)
+                .foregroundColor(.accentColor)
+
+                // Terms and Privacy Links
+                HStack {
+                    Button("Términos de Uso") {
+                        safariURL = URL(string: "https://getfacts.app/terms-of-use")
+                        showingSafari = true
+                    }
+
+                    Text("•")
+
+                    Button("Política de Privacidad") {
+                        safariURL = URL(string: "https://getfacts.app/privacy-policy")
+                        showingSafari = true
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
-            .font(.caption)
-            .foregroundColor(.secondary)
             .padding(.top)
         }
         .overlay {

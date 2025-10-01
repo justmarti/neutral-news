@@ -93,16 +93,20 @@ final class PremiumManager {
 
     // MARK: - Purchase Actions
 
-    func restorePurchases() async throws {
+    func restorePurchases() async {
 #if DEBUG
         print("🔄 Restoring purchases...")
 #endif
-        let customerInfo = try await Purchases.shared.restorePurchases()
-        await MainActor.run {
-            self.isPremium = !customerInfo.entitlements.active.isEmpty
+        do {
+            let customerInfo = try await Purchases.shared.restorePurchases()
+            await MainActor.run {
+                self.isPremium = !customerInfo.entitlements.active.isEmpty
 #if DEBUG
-            print("✅ Purchases restored. Premium: \(self.isPremium)")
+                print("✅ Purchases restored. Premium: \(self.isPremium)")
 #endif
+            }
+        } catch {
+            print("❌ Error restoring purchases: \(error)")
         }
     }
 
