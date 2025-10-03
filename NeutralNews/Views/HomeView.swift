@@ -1,173 +1,317 @@
 //
-//  ContentView.swift
+//  HomeView.swift
 //  NeutralNews
 //
 //  Created by Martí Espinosa Farran on 12/17/24.
 //
 
 import SwiftUI
+import SwiftData
 
 struct HomeView: View {
-    @State private var vm = ViewModel()
-    @State private var date: Date = Date.now
-    
+    @State private var vm = NewsListViewModel.shared
+    @Environment(\.modelContext) private var cacheContext
+    @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
+    @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
+    @State private var targetNews: NeutralNews?
+    @State private var showingSettingsSheet = false
+    @State private var showingPaywall = false
+    @State private var showingSafari = false
+    @State private var safariURL: URL?
+
     @Namespace private var animationNamespace
-    
+    var config: AppConfig
+
+    // Premium manager for UI state
+    private let premiumManager = PremiumManager.shared
+
+    // Access to saved news container
+    @State private var savedNewsContext: ModelContext?
+
+    // MARK: - Computed Properties
+
+    private var shouldShowPremiumBanner: Bool {
+        vm.searchScope == .lastSevenDays && !premiumManager.isPremium
+    }
+
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                    noResultsView
-                } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                    noNewsYetView
-                } else {
-                    LazyVStack {
-                        ForEach(vm.newsToShow) { neutralNews in
-                            NavigationLink {
-                                NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
-                                    .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
-                            } label: {
-                                NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
-                                    .padding(.vertical, 4)
-                                    .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
+        Group {
+            if config.isInMaintenance {
+                MaintenanceView(config: config)
+            } else {
+                NavigationStack {
+                    newsContentView
+                        .navigationTitle(vm.isShowingSavedNews ? "Guardadas" : (vm.isShowingAllDays ? "Todas las noticias" : vm.daySelected.dayName))
+                        // TODO: Mirar que opción es mejor para el title
+//                        .toolbarTitleDisplayMode(.inlineLarge)
+                        .myNavigationSubtitle(vm.isShowingSavedNews ? vm.savedNewsSubtitle : (vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort))
+                        .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
+                        .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
+                            if !vm.isShowingAllDays && !vm.isShowingSavedNews {
+                                Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
+                                Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
                             }
-                            .buttonStyle(.plain)
+                        }
+                        .toolbar {
+                            HomeToolbar(vm: vm, showingPaywall: $showingPaywall, showingSafari: $showingSafari, safariURL: $safariURL).content
+                        }
+                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                        .animation(.default, value: vm.isShowingSavedNews)
+                        .navigationDestination(item: $targetNews) { news in
+                            NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
+                                .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                                .onAppear {
+                                    RatingManager.shared.incrementNewsReadCount()
+                                    RatingManager.shared.requestRatingAfterPositiveInteraction()
+                                }
+                        }
+                        .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
+                }
+                .fullScreenCover(isPresented: .constant(!hasSeenOnboarding)) {
+                    OnboardingView(isPresented: .constant(true)) {
+                        hasSeenOnboarding = true
+                        showingPaywall = true
+                    }
+                }
+                .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
+                    if let news = newValue {
+#if DEBUG
+                        print("🎯 View received target news: \(news.neutralTitle)")
+#endif
+                        targetNews = news
+                        
+                        // Retrasar limpieza para asegurar navegación
+                        Task {
+                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
+                            vm.deepLinkTargetNews = nil
                         }
                     }
-                    .padding(.horizontal)
+                }
+                .onAppear {
+                    vm.checkPendingDeepLink()
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                    Task {
+                        await vm.refreshNews()
+                    }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: .showPaywall)) { _ in
+                    showingPaywall = true
+                }
+                .sheet(isPresented: $showingPaywall) {
+                    PaywallView(isPresented: $showingPaywall)
+                }
+                .safariSheet(url: safariURL, isPresented: $showingSafari)
+            }
+        }
+        .animation(.default, value: config.isInMaintenance)
+    }
+    
+    // MARK: - Content Views
+    
+    private var newsContentView: some View {
+        ScrollView {
+            if vm.isShowingSavedNews {
+                savedNewsContentView
+            } else if vm.isLoadingNeutralNews && vm.newsToShow.isEmpty {
+                loadingView
+            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+                noResultsView
+            } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+                noNewsYetView
+            } else {
+                newsListView
+            }
+        }
+        .refreshable {
+            if vm.isShowingSavedNews {
+                await vm.loadSavedNews()
+            } else {
+                await vm.refreshNews()
+            }
+        }
+    }
+    
+    private var newsListView: some View {
+        LazyVStack {
+            // Premium search results banner
+            if shouldShowPremiumBanner {
+                premiumSearchBanner
+            }
+
+            ForEach(vm.newsToShow) { neutralNews in
+                NavigationLink {
+                    NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
+                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                        .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
+                        .onAppear {
+                            RatingManager.shared.incrementNewsReadCount()
+                            RatingManager.shared.requestRatingAfterPositiveInteraction()
+                        }
+                } label: {
+                    NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
+                        .padding(.vertical, 4)
+                        .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
+                }
+                .buttonStyle(.plain)
+                .onAppear {
+                    if vm.shouldLoadMore(currentItem: neutralNews) {
+                        vm.loadNextPage()
+                    }
+                }
+            }
+            .animation(.default, value: vm.newsToShow)
+            
+            // Loading indicator for pagination
+            if vm.isLoadingMore {
+                HStack {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Cargando más noticias...")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    private var noResultsView: some View {
+        ContentUnavailableView(
+            vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "No hay resultados para \"\(vm.searchText)\""
+                : "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
+            systemImage: "magnifyingglass",
+            description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "Intenta con otro término de búsqueda."
+                : "Intenta con otro término o selecciona un día distinto.")
+        )
+        .containerRelativeFrame([.horizontal, .vertical])
+    }
+    
+    private var noNewsYetView: some View {
+        ContentUnavailableView(
+            vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "Aún no hay noticias"
+                : "Aún no hay noticias de \(vm.daySelected.dayName)",
+            systemImage: "newspaper",
+            description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
+                ? "Vuelve a intentarlo en unos minutos."
+                : "Vuelve a intentarlo más tarde o elige otro día.")
+        )
+        .containerRelativeFrame([.horizontal, .vertical])
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView()
+                .scaleEffect(1.2)
+            Text("Cargando noticias...")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+        }
+        .containerRelativeFrame([.horizontal, .vertical])
+    }
+
+    private var savedNewsContentView: some View {
+        Group {
+            if vm.isLoadingSavedNews {
+                ProgressView("Cargando noticias guardadas...")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty {
+                ContentUnavailableView(
+                    "No se encontraron resultados para \"\(vm.searchText)\"",
+                    systemImage: "magnifyingglass",
+                    description: Text("Prueba con otra búsqueda en tus noticias guardadas.")
+                )
+                .containerRelativeFrame([.horizontal, .vertical])
+            } else if vm.savedNews.isEmpty {
+                ContentUnavailableView(
+                    "No tienes noticias guardadas",
+                    systemImage: "bookmark.slash",
+                    description: Text("Guarda noticias que te interesen para leerlas más tarde.")
+                )
+                .containerRelativeFrame([.horizontal, .vertical])
+            } else {
+                newsListView
+            }
+        }
+    }
+
+    private var premiumSearchBanner: some View {
+        Button {
+            showingPaywall.toggle()
+        } label: {
+            HStack {
+                Image(systemName: "star")
+                    .font(.title)
+                    .foregroundStyle(.accent)
+                
+                VStack(alignment: .leading) {
+                    Text("Mejores resultados")
+                        .font(.headline)
+                    
+                    Text("Accede a todos los resultados con Facts Pro")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
                 
-                if vm.isLoadingNeutralNews {
-                    VStack {
-                        Spacer()
-                        ProgressView()
-                            .controlSize(.large)
-                        Spacer()
-                    }
-                    .frame(minHeight: UIScreen.main.bounds.height - 250)
-                }
+                Spacer()
             }
-            .scrollBounceBehavior(.basedOnSize)
-            .refreshable {
-                // TODO: Fix refreshable, it duplicate news!
-//                vm.fetchNews(from: vm.daySelected)
-            }
-            .searchable(text: $vm.searchText, prompt: "Buscar")
-            .navigationTitle(vm.daySelected.dayName)
-            .myNavigationSubtitle(vm.daySelected.formattedDateShort)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) { dayMenu }
-                ToolbarItem(placement: .topBarTrailing) { orderMenu }
-                ToolbarItem(placement: .topBarTrailing) { filterMenu }
-//                ToolbarItem(placement: .topBarTrailing) { options }
-            }
+            .padding()
+            .background(.thinMaterial, in: .rect(cornerRadius: 16))
         }
-    }
-    
-    var dayMenu: some View {
-        Menu {
-            ForEach(vm.lastSevenDays) { day in
-                Button {
-                    vm.changeDay(to: day)
-                } label: {
-                    Label(day.dayName, systemImage: day == vm.daySelected ? "\(day.dayNumber).square.fill" : "\(day.dayNumber).square")
-                }
-            }
-        } label: {
-            Label("Cambiar día", systemImage: "calendar")
-        }
-    }
-    
-    // TODO: Implementar este menu?
-//    var options: some View {
-//        Menu {
-//            orderMenu
-//            filterMenu
-//        } label: {
-//            Label("Opciones", systemImage: "ellipsis.circle")
-//        }
-//    }
-    
-    var orderMenu: some View {
-        Menu {
-            Button {
-                vm.orderBy = .hour
-            } label: { Label("Hora", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock") }
-            Button {
-                vm.orderBy = .relevance
-            } label: { Label("Relevancia", systemImage: vm.orderBy == .relevance ? "bolt.fill" : "bolt") }
-            Button {
-                vm.orderBy = .popularity
-            } label: { Label("Popularidad", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame") }
-        } label: {
-            Label("Ordenar", systemImage: "arrow.up.arrow.down.circle")
-        }
-    }
-    
-    var filterMenu: some View {
-        Menu {
-            ForEach(vm.getCategoriesOfTheDay(), id: \.self) { category in
-                Button {
-                    vm.filterByCategory(category)
-                } label: {
-                    Label {
-                        Label(category.rawValue, systemImage: category.systemImageName)
-                    } icon: {
-                        if vm.categoryFilter.contains(category) {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-            
-            if vm.isAnyFilterEnabled {
-                Section {
-                    Button(role: .destructive) {
-                        vm.clearFilters()
-                    } label: {
-                        Label("Borrar filtros", systemImage: "trash")
-                    }
-                }
-            }
-        } label: {
-            Label("Filtrar", systemImage: vm.isAnyFilterEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-        }
-    }
-    
-    var noResultsView: some View {
-        VStack {
-            Spacer()
-            ContentUnavailableView(
-                "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
-                systemImage: "magnifyingglass",
-                description: Text("Prueba con otra búsqueda o selecciona otro día.")
-            )
-            Spacer()
-        }
-        .frame(minHeight: UIScreen.main.bounds.height - 200)
-    }
-    
-    var noNewsYetView: some View {
-        VStack {
-            Spacer()
-            ContentUnavailableView(
-                "No hay noticias de \(vm.daySelected.dayName) aún",
-                systemImage: "newspaper",
-                description: Text("Prueba en unos minutos o selecciona otro día.")
-            )
-            Spacer()
-        }
-        .frame(minHeight: UIScreen.main.bounds.height - 300)
+        .buttonStyle(.plain)
     }
 }
 
+// MARK: - View Extensions
+
 extension View {
+    func accentGradientBackground(isEnabled: Bool) -> some View {
+        modifier(AccentGradientBackground(isEnabled: isEnabled))
+    }
+
     @ViewBuilder
     func myNavigationSubtitle(_ subtitle: String) -> some View {
         if #available(iOS 26.0, *) { self.navigationSubtitle(subtitle) } else { self }
     }
 }
 
+// MARK: - Environment Keys
+
+private struct BackgroundColorEnabledKey: EnvironmentKey {
+    static let defaultValue = true
+}
+
+extension EnvironmentValues {
+    var isBackgroundColorEnabled: Bool {
+        get { self[BackgroundColorEnabledKey.self] }
+        set { self[BackgroundColorEnabledKey.self] = newValue }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func mySearchToolbarMinimize() -> some View {
+        if #available(iOS 26.0, *) { self.searchToolbarBehavior(.minimize) } else { self }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func myToolbar() -> some View {
+        if #available(iOS 26.0, *) {
+            self.toolbar {
+                ToolbarSpacer(.flexible, placement: .bottomBar)
+                DefaultToolbarItem(kind: .search, placement: .bottomBar)
+            }
+        } else { self }
+    }
+}
+
 #Preview {
-    HomeView()
+    HomeView(config: AppConfig(isTestMode: true))
 }

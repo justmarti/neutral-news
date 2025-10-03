@@ -6,37 +6,32 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct NewsView: View {
     let news: News
     let relatedNews: [News]
     var namespace: Namespace.ID
-    
-    @State private var dominantColor: Color = .gray
+    @Environment(\.isBackgroundColorEnabled) private var isBackgroundColorEnabled
+
+    @State private var showSafari = false
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-//                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.3), .clear], startPoint: .top, endPoint: .bottom)
-//                    .ignoresSafeArea()
-                
-                LinearGradient(colors: [dominantColor, dominantColor.opacity(0.1)], startPoint: .top, endPoint: .bottom)
-                    .ignoresSafeArea()
-                
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         Text(news.sourceMedium.pressMedia.name)
                             .font(.title)
                             .fontWidth(.expanded)
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                         
                         Text(news.title)
-                            .font(.title)
+                            .font(.title2)
                             .fontWeight(.semibold)
-//                            .fontDesign(.serif)
+                            .fontDesign(.serif)
+//                            .lineHeight(.tight)
                         
-                        AsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
+                        CachedAsyncImage(url: URL(string: news.imageUrl ?? "")) { phase in
                             switch phase {
                             case .empty:
                                 ShimmerView()
@@ -58,8 +53,16 @@ struct NewsView: View {
 //                            .fontDesign(.serif)
                         
                         if let link = URL(string: news.link) {
-                            Link("Leer más en la fuente", destination: link)
-//                                .fontDesign(.serif)
+                            Button {
+                                showSafari = true
+                            } label: {
+                                HStack {
+                                    Text("Leer en la fuente")
+                                    Image(systemName: "arrow.up.right")
+                                }
+                                .fontWeight(.semibold)
+                            }
+                            .safariSheet(url: link, isPresented: $showSafari)
                         }
                         
                         Spacer()
@@ -70,18 +73,18 @@ struct NewsView: View {
                     }
                     .padding()
                     .frame(minHeight: geometry.size.height)
-                    .task {
-                        dominantColor = await getDominantColor(from: news.imageUrl)
-                    }
                 }
             }
+            .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
         }
     }
+    
 }
 
 #Preview {
     let namespace = Namespace().wrappedValue
     return NewsView(news: .mock, relatedNews: [.mock, .mock, .mock], namespace: namespace)
+        .environment(\.isBackgroundColorEnabled, true)
 }

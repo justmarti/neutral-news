@@ -9,10 +9,43 @@ import Foundation
 
 struct DayInfo: Identifiable, Hashable {
     let id = UUID()
-    let dayName: String
     let dayNumber: Int
     let monthName: String
     let date: Date
+
+    var dayName: String {
+        let calendar = Calendar.current
+        let dayFormatter = DateFormatter()
+
+        dayFormatter.locale = Locale(identifier: "es_ES")
+        dayFormatter.dateFormat = "EEEE"
+
+        if calendar.isDateInToday(date) {
+            return "Hoy"
+        } else if calendar.isDateInYesterday(date) {
+            return "Ayer"
+        } else {
+            return dayFormatter.string(from: date).capitalized
+        }
+    }
+    
+    init(dayNumber: Int, monthName: String, date: Date) {
+        self.dayNumber = dayNumber
+        self.monthName = monthName
+        self.date = date
+    }
+
+    init(date: Date) {
+        let calendar = Calendar.current
+        let monthFormatter = DateFormatter()
+
+        monthFormatter.locale = Locale(identifier: "es_ES")
+        monthFormatter.dateFormat = "LLLL"
+
+        self.dayNumber = calendar.component(.day, from: date)
+        self.monthName = monthFormatter.string(from: date)
+        self.date = date
+    }
     
     var formattedDateLong: String {
         "\(dayName), \(dayNumber) de \(monthName)"
@@ -38,18 +71,7 @@ struct DayInfo: Identifiable, Hashable {
         Calendar.current.isDate(lhs.date, inSameDayAs: rhs.date)
     }
     
-    static let today: DayInfo = {
-        let calendar = Calendar.current
-        let dayFormatter = DateFormatter()
-        let monthFormatter = DateFormatter()
-        monthFormatter.locale = Locale(identifier: "es_ES")
-        monthFormatter.dateFormat = "LLLL"
-        
-        return DayInfo(
-            dayName: "Hoy",
-            dayNumber: calendar.component(.day, from: .now),
-            monthName: monthFormatter.string(from: .now),
-            date: .now
-        )
-    }()
+    static var today: DayInfo {
+        DayInfo(date: Date())
+    }
 }

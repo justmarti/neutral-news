@@ -8,7 +8,7 @@
 import Foundation
 
 struct News: Codable, Identifiable, Hashable {
-    var id = UUID().uuidString
+    let id: String
     let title: String
     let description: String
     let scrappedDescription: String?
@@ -19,20 +19,31 @@ struct News: Codable, Identifiable, Hashable {
     let createdAt: Date
     let updatedAt: Date
     let sourceMedium: Media
-    var neutralScore: Int
-    var group: Int
-    var embedding: [Double]
+    let neutralScore: Int
+    let group: Int
+    let embedding: [Double]
     
     static func == (lhs: News, rhs: News) -> Bool {
-        lhs.link == rhs.link && lhs.group == rhs.group
+        lhs.id == rhs.id
     }
     
     func hash(into hasher: inout Hasher) {
-        hasher.combine(link)
-        hasher.combine(group)
+        hasher.combine(id)
+    }
+
+    func toDictionary() throws -> [String: Any] {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(self)
+        let json = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let dictionary = json as? [String: Any] else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+        return dictionary
     }
     
     static let mock = News(
+        id: "mock-id",
         title: "Lorem ipsum dolor sit amet",
         description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         scrappedDescription: nil,

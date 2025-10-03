@@ -10,6 +10,7 @@ import SwiftUI
 struct NewsRowView: View {
     let news: NeutralNews
     let imageUrl: String?
+    let dominantColor: Color
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -45,7 +46,7 @@ struct NewsRowView: View {
 }
 
 #Preview {
-    NewsRowView(news: NeutralNews.mock, imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg")
+    NewsRowView(news: NeutralNews.mock, imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg", dominantColor: .blue)
 }
 
 struct NewsImageView: View {
@@ -55,7 +56,7 @@ struct NewsImageView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                AsyncImage(url: URL(string: imageUrl ?? "")) { phase in
+                CachedAsyncImage(url: URL(string: imageUrl ?? "")) { phase in
                     if let image = phase.image {
                         image
                             .resizable()
@@ -70,6 +71,7 @@ struct NewsImageView: View {
                 
                 Rectangle()
                     .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
                     .frame(height: 180)
                     .mask(
                         LinearGradient(
@@ -91,7 +93,6 @@ struct NewsImageView: View {
                     .font(.system(size: 22, design: .serif))
 //                    .font(.title2)
                     .fontWeight(.semibold)
-//                    .foregroundStyle(.nnForeground)
                     .foregroundStyle(.white)
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)

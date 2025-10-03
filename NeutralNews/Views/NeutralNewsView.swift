@@ -6,21 +6,18 @@
 //
 
 import SwiftUI
-import UIKit
 
 struct NeutralNewsView: View {
     let news: NeutralNews
     let relatedNews: [News]
     var namespace: Namespace.ID
-    
-    @State private var dominantColor: Color = .gray
+    @Environment(\.isBackgroundColorEnabled) private var isBackgroundColorEnabled
+
+    @State private var isShowingReportProblemSheet = false
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                dominantColor
-                    .ignoresSafeArea()
-                
                 ScrollView {
                     VStack {
                         VStack(alignment: .leading, spacing: 16) {
@@ -30,7 +27,7 @@ struct NeutralNewsView: View {
                                 Text(news.date.formatted(
                                     Date.FormatStyle.dateTime
                                         .day()
-                                        .month(.wide)
+                                        .month()
                                         .hour()
                                         .minute()
                                         .locale(Locale(identifier: "es_ES"))
@@ -41,11 +38,11 @@ struct NeutralNewsView: View {
                             .foregroundStyle(.secondary)
                             
                             Text(news.neutralTitle)
-                                .font(.title)
+                                .font(.title2)
                                 .fontWeight(.semibold)
-//                                .fontDesign(.serif)
+                                .fontDesign(.serif)
                             
-                            AsyncImage(url: URL(string: news.imageUrl)) { phase in
+                            CachedAsyncImage(url: URL(string: news.imageUrl)) { phase in
                                 VStack(alignment: .leading, spacing: 4) {
                                     switch phase {
                                     case .empty:
@@ -62,7 +59,7 @@ struct NeutralNewsView: View {
                                             // TODO: Si el medio es El Mundo o Expansión, no hay su noticia abajo, arreglar
                                             Text("Imagen extraída de \(Media.from(news.imageMedium)?.pressMedia.name ?? ""), ver su noticia al final de la página.")
                                                     .font(.footnote)
-                                                    .foregroundColor(.secondary)
+                                                    .foregroundStyle(.secondary)
                                         }
                                     case .failure:
                                         EmptyView()
@@ -85,6 +82,7 @@ struct NeutralNewsView: View {
                                 ForEach(relatedNews) { new in
                                     NavigationLink {
                                         NewsView(news: new, relatedNews: relatedNews, namespace: namespace)
+                                            .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                                             .navigationTransition(.zoom(sourceID: new.id, in: namespace))
                                     } label: {
                                         MediaHeadlineView(news: new)
@@ -96,22 +94,25 @@ struct NeutralNewsView: View {
                             .padding(.horizontal, 16)
                         }
                     }
+                    // TODO: Esto es necesario?
                     .frame(minHeight: geometry.size.height)
-                    .task {
-                        dominantColor = await getDominantColor(from: news.imageUrl)
-                    }
                 }
             }
             .scrollBounceBehavior(.basedOnSize)
             .scrollIndicators(.hidden)
-//            .toolbar {
-//                ToolbarItem(placement: .navigationBarTrailing) {
-//                    // TODO: Cambiar el link a Neutral News
-//                    ShareLink(item: URL(string: "https://www.apple.com")!) {
-//                        Label("Compartir", systemImage: "square.and.arrow.up")
-//                    }
-//                }
-//            }
+            .sheet(isPresented: $isShowingReportProblemSheet) {
+                ReportProblemView(news: news)
+                    .presentationDetents([.height(200), .large])
+            }
+            .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NeutralNewsOptionsMenu(
+                        news: news,
+                        isShowingReportProblemSheet: $isShowingReportProblemSheet
+                    )
+                }
+            }
         }
     }
 }
@@ -119,4 +120,5 @@ struct NeutralNewsView: View {
 #Preview {
     let namespace = Namespace().wrappedValue
     return NeutralNewsView(news: .mock, relatedNews: [.mock, .mock, .mock], namespace: namespace)
+        .environment(\.isBackgroundColorEnabled, true)
 }

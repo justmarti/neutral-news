@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4111E2762D8761DE0057CA98 /* FirebaseAuth */; };
+		4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C42E7C7B1000E94D76 /* RevenueCat */; };
+		4130E0C72E7C7B1000E94D76 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C62E7C7B1000E94D76 /* RevenueCatUI */; };
+		416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 416D20D32E4371690070F565 /* FirebaseRemoteConfig */; };
 		41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736212D820C8F00E08EA1 /* FirebaseFirestore */; };
 		41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736232D820C8F00E08EA1 /* FirebaseFunctions */; };
 /* End PBXBuildFile section */
@@ -27,6 +30,16 @@
 		419D2FB72D11C96500D95E22 /* NeutralNews.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeutralNews.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		417E18D52E3168F7005A5812 /* Exceptions for "NeutralNews" folder in "NeutralNews" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 419D2FB62D11C96500D95E22 /* NeutralNews */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		413546172D9C1FA0006569EA /* NeutralNewsTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -35,6 +48,9 @@
 		};
 		419D2FB92D11C96500D95E22 /* NeutralNews */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				417E18D52E3168F7005A5812 /* Exceptions for "NeutralNews" folder in "NeutralNews" target */,
+			);
 			path = NeutralNews;
 			sourceTree = "<group>";
 		};
@@ -54,7 +70,10 @@
 			files = (
 				41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */,
 				4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */,
+				4130E0C72E7C7B1000E94D76 /* RevenueCatUI in Frameworks */,
+				4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */,
 				41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */,
+				416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +144,9 @@
 				41A736212D820C8F00E08EA1 /* FirebaseFirestore */,
 				41A736232D820C8F00E08EA1 /* FirebaseFunctions */,
 				4111E2762D8761DE0057CA98 /* FirebaseAuth */,
+				416D20D32E4371690070F565 /* FirebaseRemoteConfig */,
+				4130E0C42E7C7B1000E94D76 /* RevenueCat */,
+				4130E0C62E7C7B1000E94D76 /* RevenueCatUI */,
 			);
 			productName = NeutralNews;
 			productReference = 419D2FB72D11C96500D95E22 /* NeutralNews.app */;
@@ -160,6 +182,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				4130E0C32E7C7B1000E94D76 /* XCRemoteSwiftPackageReference "purchases-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 419D2FB82D11C96500D95E22 /* Products */;
@@ -378,65 +401,85 @@
 		};
 		419D2FC62D11C96600D95E22 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 419D2FB92D11C96500D95E22 /* NeutralNews */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNews.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
 				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Neutral News";
+				INFOPLIST_FILE = NeutralNews/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Facts;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.news";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.espinosa.marti.NeutralNews;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
 		419D2FC72D11C96600D95E22 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 419D2FB92D11C96500D95E22 /* NeutralNews */;
+			baseConfigurationReferenceRelativePath = Config.xcconfig;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNewsRelease.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
 				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "Neutral News";
+				INFOPLIST_FILE = NeutralNews/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Facts;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.news";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.espinosa.marti.NeutralNews;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -473,6 +516,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		4130E0C32E7C7B1000E94D76 /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/revenuecat/purchases-ios";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.39.1;
+			};
+		};
 		41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -488,6 +539,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		4130E0C42E7C7B1000E94D76 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4130E0C32E7C7B1000E94D76 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
+		};
+		4130E0C62E7C7B1000E94D76 /* RevenueCatUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4130E0C32E7C7B1000E94D76 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCatUI;
+		};
+		416D20D32E4371690070F565 /* FirebaseRemoteConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseRemoteConfig;
 		};
 		41A736212D820C8F00E08EA1 /* FirebaseFirestore */ = {
 			isa = XCSwiftPackageProductDependency;
