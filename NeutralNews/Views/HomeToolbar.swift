@@ -72,7 +72,7 @@ struct HomeToolbar {
                     }
                 }
             } label: {
-                Label("Noticias guardadas", systemImage: vm.isShowingSavedNews ? "bookmark.fill" : "bookmark")
+                Label("Noticias guardadas", systemImage: !premiumManager.canSaveNews ? "lock.fill" : (vm.isShowingSavedNews ? "bookmark.fill" : "bookmark"))
             }
 
             Button {
@@ -114,7 +114,7 @@ struct HomeToolbar {
                     }
                 }
             } label: {
-                Label("Todas las noticias", systemImage: vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack")
+                Label("Todas las noticias", systemImage: !premiumManager.canViewAllDays ? "lock.fill" : (vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack"))
                 Text("Últimos 7 días")
             }
             
@@ -130,7 +130,7 @@ struct HomeToolbar {
                         }
                     }
                 } label: {
-                    Label(day.dayName, systemImage: !vm.isShowingAllDays && day == vm.daySelected ? "checkmark" : "\(day.dayNumber).calendar")
+                    Label(day.dayName, systemImage: !premiumManager.canViewDay(day) ? "lock.fill" : ((!vm.isShowingAllDays && day == vm.daySelected) ? "checkmark" : "\(day.dayNumber).calendar"))
                 }
             }
         } label: {
