@@ -130,8 +130,7 @@ struct HomeToolbar {
                         }
                     }
                 } label: {
-                    // TODO: Usar number.calendar ?
-                    Label(day.dayName, systemImage: (!vm.isShowingAllDays && day == vm.daySelected) ? "\(day.dayNumber).square.fill" : "\(day.dayNumber).square")
+                    Label(day.dayName, systemImage: !vm.isShowingAllDays && day == vm.daySelected ? "checkmark" : "\(day.dayNumber).calendar")
                 }
             }
         } label: {
