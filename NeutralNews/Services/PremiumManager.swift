@@ -104,6 +104,12 @@ final class PremiumManager {
 #if DEBUG
                 print("✅ Purchases restored. Premium: \(self.isPremium)")
 #endif
+
+                // Execute pending action if user became premium
+                if self.isPremium, let action = self.pendingAction {
+                    self.pendingAction = nil
+                    action()
+                }
             }
         } catch {
             print("❌ Error restoring purchases: \(error)")

@@ -239,16 +239,28 @@ final class NewsListViewModel {
     }
     
     private func findNearestDayWithNewsOnLaunch() {
-        // Always fetch today's news first before deciding
         Task {
             await newsDataManager.loadNews(for: .today)
-            
+
             let todayNews = newsDataManager.getNewsArrayForDay(.today)
             if !todayNews.isEmpty {
-                return // Today has news after fetch, keep it selected
+                // Today has news, check for pending deep link
+                checkPendingDeepLink()
+                return
             }
-            
-            // Today is empty after fetch, find another day with news
+
+            // Today is empty - handle differently based on deep link
+            if pendingDeepLink != nil {
+                // Load previous days to find the deep link target
+                for day in lastSevenDays.dropFirst() { // Skip today (index 0)
+                    await newsDataManager.loadNews(for: day)
+                    checkPendingDeepLink()
+                    if pendingDeepLink == nil { break } // Deep link was processed
+                }
+                return
+            }
+
+            // No deep link - normal behavior: find day with news and select it
             for day in lastSevenDays.dropFirst() { // Skip today (index 0)
                 await newsDataManager.loadNews(for: day)
                 let dayNews = newsDataManager.getNewsArrayForDay(day)

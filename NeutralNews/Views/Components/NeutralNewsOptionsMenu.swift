@@ -32,7 +32,7 @@ struct NeutralNewsOptionsMenu: View {
             } label: {
                 Label(
                     isArticleSaved ? "Quitar de guardadas" : "Guardar",
-                    systemImage: isArticleSaved ? "bookmark.fill" : "bookmark"
+                    systemImage: !premiumManager.canSaveNews ? "lock.fill" : (isArticleSaved ? "bookmark.fill" : "bookmark")
                 )
             }
 

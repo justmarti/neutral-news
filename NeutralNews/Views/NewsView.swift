@@ -67,7 +67,7 @@ struct NewsView: View {
                         
                         Spacer()
                         
-                        Text("Neutral News es independiente, no está asociado a \(news.sourceMedium.pressMedia.name) ni a ningún otro medio de comunicación.")
+                        Text("Facts es independiente, no está asociado a \(news.sourceMedium.pressMedia.name) ni a ningún otro medio de comunicación.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
