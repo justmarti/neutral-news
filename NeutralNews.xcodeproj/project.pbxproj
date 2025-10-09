@@ -172,11 +172,11 @@
 				};
 			};
 			buildConfigurationList = 419D2FB22D11C96500D95E22 /* Build configuration list for PBXProject "NeutralNews" */;
-			developmentRegion = en;
+			developmentRegion = es;
 			hasScannedForEncodings = 0;
 			knownRegions = (
-				en,
 				Base,
+				es,
 			);
 			mainGroup = 419D2FAE2D11C96500D95E22;
 			minimizedProjectReferenceProxies = 1;
