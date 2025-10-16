@@ -114,7 +114,7 @@ final class FirestoreService {
     
     private func parseNews(from data: [String: Any], documentID: String) -> News? {
         guard let title = data["title"] as? String,
-              let description = data["description"] as? String,
+              let description = data["description_short"] as? String,
               let group = data["group"] as? Int,
               let category = data["category"] as? String,
               let link = data["link"] as? String,
