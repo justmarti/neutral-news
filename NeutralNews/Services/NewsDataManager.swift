@@ -299,9 +299,10 @@ final class NewsDataManager {
     private func loadRemainingDays() async {
         let calendar = Calendar.current
         let today = Date()
-        
-        // Smart loading: prioritize recent days and check cache first
-        let priorityOrder = [1, 2, 3, 4, 5, 6] // días hacia atrás
+
+        // Smart loading: only load days accessible to user
+        let maxDaysToLoad = PremiumManager.shared.isPremium ? 6 : 1
+        let priorityOrder = Array(1...maxDaysToLoad)
         
         for dayOffset in priorityOrder {
             if Task.isCancelled { return }
