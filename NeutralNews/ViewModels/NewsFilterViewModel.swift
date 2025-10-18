@@ -26,9 +26,6 @@ final class NewsFilterViewModel {
     // MARK: - Properties
     var searchText: String = "" {
         didSet {
-            if searchText.isEmpty {
-                searchScope = .daySelected
-            }
             debounceFilterChange()
         }
     }

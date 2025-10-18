@@ -11,7 +11,6 @@ import SwiftData
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
     @Environment(\.modelContext) private var cacheContext
-    @Environment(\.isSearching) private var isSearching
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var targetNews: NeutralNews?
@@ -91,14 +90,6 @@ struct HomeView: View {
                 .onAppear {
                     vm.checkPendingDeepLink()
                 }
-                .onChange(of: isSearching) { oldValue, newValue in
-                    // When user exits search AND text is empty, reset to day scope
-                    // This handles: Cancel button, dismissing search, losing focus
-                    // But preserves scope when navigating with active search text
-                    if oldValue && !newValue && vm.searchText.isEmpty && vm.searchScope == .lastSevenDays {
-                        vm.searchScope = .daySelected
-                    }
-                }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     Task {
                         await vm.refreshNews()
@@ -124,7 +115,7 @@ struct HomeView: View {
                 savedNewsContentView
             } else if vm.isLoadingNeutralNews && vm.newsToShow.isEmpty {
                 loadingView
-            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews && !vm.isLoadingForSearch {
                 noResultsView
             } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
                 noNewsYetView
@@ -138,6 +129,10 @@ struct HomeView: View {
             } else {
                 await vm.refreshNews()
             }
+        }
+        .overlay {
+            // Hidden child view to access isSearching environment
+            SearchableContentView(vm: vm)
         }
     }
     

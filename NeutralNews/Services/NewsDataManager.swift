@@ -72,10 +72,6 @@ final class NewsDataManager {
         }
     }
     
-    private init() {
-        startProgressiveLoading()
-    }
-    
     deinit {
         backgroundLoadingTask?.cancel()
     }
@@ -208,7 +204,13 @@ final class NewsDataManager {
             await loadNews(for: today)
         }
     }
-    
+
+    func startBackgroundLoadingIfNeeded() {
+        // Only start if not already running
+        guard backgroundLoadingTask == nil else { return }
+        startProgressiveLoading()
+    }
+
     // MARK: - Private Methods
     
     private func addNewNewsForDay(

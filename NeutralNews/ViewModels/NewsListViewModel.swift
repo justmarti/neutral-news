@@ -24,6 +24,12 @@ final class NewsListViewModel {
         
         Task {
             await newsDataManager.preloadCache()
+
+            // Wait for premium status to be ready before starting background loading
+            await PremiumManager.shared.checkSubscriptionStatus()
+
+            // Now start background loading with correct premium status
+            newsDataManager.startBackgroundLoadingIfNeeded()
         }
     }
     
@@ -297,14 +303,17 @@ final class NewsListViewModel {
     
     private func handleFilterChanges() {
         if searchScope == .lastSevenDays && !isShowingAllDays {
-            // For free users: load all days when switching to 7-day search
-            if !PremiumManager.shared.isPremium {
-                Task {
-                    await loadAllDaysForSearch()
+            // Load all days for both free and premium users
+            // Premium users might have background loading still in progress
+            // loadNews() will skip already-loaded days automatically
+            Task {
+                await loadAllDaysForSearch()
+                // Configure pagination AFTER loading completes
+                await MainActor.run {
+                    let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
+                    paginationManager.configure(with: filteredNews)
                 }
             }
-            let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
-            paginationManager.configure(with: filteredNews)
         } else {
             refreshPaginationIfNeeded()
         }
