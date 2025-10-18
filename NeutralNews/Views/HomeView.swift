@@ -139,6 +139,13 @@ struct HomeView: View {
                 premiumSearchBanner
             }
 
+            // Loading indicator for search across 7 days (free users)
+            if vm.isLoadingForSearch {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .padding(.vertical)
+            }
+
             ForEach(vm.newsToShow) { neutralNews in
                 NavigationLink {
                     NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)

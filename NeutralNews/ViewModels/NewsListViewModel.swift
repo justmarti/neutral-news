@@ -50,6 +50,7 @@ final class NewsListViewModel {
     }
     
     var isLoadingNeutralNews = false
+    var isLoadingForSearch = false
 
     // MARK: - Saved News State
     var isShowingSavedNews = false {
@@ -296,10 +297,35 @@ final class NewsListViewModel {
     
     private func handleFilterChanges() {
         if searchScope == .lastSevenDays && !isShowingAllDays {
+            // For free users: load all days when switching to 7-day search
+            if !PremiumManager.shared.isPremium {
+                Task {
+                    await loadAllDaysForSearch()
+                }
+            }
             let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
             paginationManager.configure(with: filteredNews)
         } else {
             refreshPaginationIfNeeded()
+        }
+    }
+
+    private func loadAllDaysForSearch() async {
+        await MainActor.run {
+            isLoadingForSearch = true
+        }
+
+        // Load all 7 days in parallel
+        await withTaskGroup(of: Void.self) { group in
+            for day in lastSevenDays {
+                group.addTask {
+                    await self.newsDataManager.loadNews(for: day)
+                }
+            }
+        }
+
+        await MainActor.run {
+            isLoadingForSearch = false
         }
     }
     
