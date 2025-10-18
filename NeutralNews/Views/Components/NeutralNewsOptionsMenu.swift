@@ -13,7 +13,7 @@ struct NeutralNewsOptionsMenu: View {
     @Binding var isShowingReportProblemSheet: Bool
 
     private let premiumManager = PremiumManager.shared
-    @State private var isArticleSaved = false
+    @State private var isArticleSaved: Bool?
 
     var body: some View {
         Menu {
@@ -31,8 +31,8 @@ struct NeutralNewsOptionsMenu: View {
                 }
             } label: {
                 Label(
-                    isArticleSaved ? "Quitar de guardadas" : "Guardar",
-                    systemImage: !premiumManager.canSaveNews ? "lock.fill" : (isArticleSaved ? "bookmark.fill" : "bookmark")
+                    (isArticleSaved ?? false) ? "Guardada" : "Guardar",
+                    systemImage: !premiumManager.canSaveNews ? "lock.fill" : ((isArticleSaved ?? false) ? "bookmark.fill" : "bookmark")
                 )
             }
 
@@ -48,6 +48,10 @@ struct NeutralNewsOptionsMenu: View {
 
         } label: {
             Label("Opciones", systemImage: "ellipsis")
+        }
+        .sensoryFeedback(trigger: isArticleSaved) { oldValue, newValue in
+            // Only trigger if we had a previous value (not initial load from nil)
+            oldValue != nil ? .success : nil
         }
         .task {
             await checkIfArticleIsSaved()
@@ -65,12 +69,14 @@ struct NeutralNewsOptionsMenu: View {
         print("🔄 Attempting to save article: \(news.id)")
 #endif
         do {
-            if isArticleSaved {
+            if isArticleSaved == true {
 #if DEBUG
                 print("🗑️ Unsaving article...")
 #endif
                 try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
-                isArticleSaved = false
+                await MainActor.run {
+                    isArticleSaved = false
+                }
 #if DEBUG
                 print("✅ Article unsaved successfully")
 #endif
@@ -83,7 +89,9 @@ struct NeutralNewsOptionsMenu: View {
                 print("💾 Saving article...")
 #endif
                 try SavedNewsService.shared.saveNews(news, context: context)
-                isArticleSaved = true
+                await MainActor.run {
+                    isArticleSaved = true
+                }
 #if DEBUG
                 print("✅ Article saved successfully")
 #endif
