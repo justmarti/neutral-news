@@ -113,6 +113,9 @@ struct HomeView: View {
         ScrollView {
             if vm.isShowingSavedNews {
                 savedNewsContentView
+            } else if vm.pendingDeepLink != nil {
+                // Show loading while processing deep link
+                loadingView
             } else if vm.isLoadingNeutralNews && vm.newsToShow.isEmpty {
                 loadingView
             } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews && !vm.isLoadingForSearch {

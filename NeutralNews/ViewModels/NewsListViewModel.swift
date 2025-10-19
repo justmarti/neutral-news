@@ -247,23 +247,42 @@ final class NewsListViewModel {
     
     private func findNearestDayWithNewsOnLaunch() {
         Task {
+            // Show loading if we have a pending deep link
+            if pendingDeepLink != nil {
+                await MainActor.run {
+                    isLoadingNeutralNews = true
+                }
+            }
+
             await newsDataManager.loadNews(for: .today)
 
             let todayNews = newsDataManager.getNewsArrayForDay(.today)
             if !todayNews.isEmpty {
                 // Today has news, check for pending deep link
                 checkPendingDeepLink()
+                // Don't set isLoadingNeutralNews = false here if there's a deep link
+                // processDeepLink will handle it
+                if pendingDeepLink == nil {
+                    await MainActor.run {
+                        isLoadingNeutralNews = false
+                    }
+                }
                 return
             }
 
             // Today is empty - handle differently based on deep link
             if pendingDeepLink != nil {
-                // Load previous days to find the deep link target
-                for day in lastSevenDays.dropFirst() { // Skip today (index 0)
-                    await newsDataManager.loadNews(for: day)
-                    checkPendingDeepLink()
-                    if pendingDeepLink == nil { break } // Deep link was processed
+                // Load all days in parallel to find the deep link target quickly
+                await withTaskGroup(of: Void.self) { group in
+                    for day in lastSevenDays.dropFirst() { // Skip today (already loaded)
+                        group.addTask {
+                            await self.newsDataManager.loadNews(for: day)
+                        }
+                    }
                 }
+                checkPendingDeepLink()
+                // Don't set isLoadingNeutralNews = false here
+                // processDeepLink will handle it when news is found
                 return
             }
 
@@ -281,7 +300,7 @@ final class NewsListViewModel {
         }
     }
     
-    private var pendingDeepLink: DeepLinkService.DeepLinkData?
+    var pendingDeepLink: DeepLinkService.DeepLinkData?
     var deepLinkTargetNews: NeutralNews?
     
     // MARK: - Pagination Methods
@@ -345,6 +364,8 @@ final class NewsListViewModel {
     }
     
     func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
+        isLoadingNeutralNews = true
+
         if !newsDataManager.neutralNews.isEmpty {
             processDeepLink(deepLinkData)
         } else {
@@ -364,6 +385,7 @@ final class NewsListViewModel {
 #endif
             deepLinkTargetNews = news
             pendingDeepLink = nil
+            isLoadingNeutralNews = false
             return
         }
 
@@ -385,6 +407,7 @@ final class NewsListViewModel {
                     await MainActor.run {
                         self.deepLinkTargetNews = news
                         self.pendingDeepLink = nil
+                        self.isLoadingNeutralNews = false
                     }
                     return
                 }
@@ -399,6 +422,7 @@ final class NewsListViewModel {
 #endif
             await MainActor.run {
                 self.pendingDeepLink = nil
+                self.isLoadingNeutralNews = false
             }
         }
     }

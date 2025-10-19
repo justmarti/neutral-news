@@ -75,7 +75,10 @@ struct NeutralNewsApp: App {
 #if DEBUG
                     print("🔗 Deep link received: \(url)")
 #endif
+                    // Only set loading if it's a valid deep link
                     if let deepLinkData = DeepLinkService.parseDeepLink(url) {
+                        // Activate loading IMMEDIATELY to prevent showing empty state
+                        NewsListViewModel.shared.isLoadingNeutralNews = true
                         NewsListViewModel.shared.handleDeepLink(deepLinkData)
                     }
                 }
