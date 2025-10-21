@@ -113,9 +113,12 @@ struct HomeView: View {
         ScrollView {
             if vm.isShowingSavedNews {
                 savedNewsContentView
+            } else if vm.pendingDeepLink != nil {
+                // Show loading while processing deep link
+                loadingView
             } else if vm.isLoadingNeutralNews && vm.newsToShow.isEmpty {
                 loadingView
-            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
+            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews && !vm.isLoadingForSearch {
                 noResultsView
             } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
                 noNewsYetView
@@ -130,6 +133,10 @@ struct HomeView: View {
                 await vm.refreshNews()
             }
         }
+        .overlay {
+            // Hidden child view to access isSearching environment
+            SearchableContentView(vm: vm)
+        }
     }
     
     private var newsListView: some View {
@@ -137,6 +144,13 @@ struct HomeView: View {
             // Premium search results banner
             if shouldShowPremiumBanner {
                 premiumSearchBanner
+            }
+
+            // Loading indicator for search across 7 days (free users)
+            if vm.isLoadingForSearch {
+                ProgressView()
+                    .scaleEffect(1.2)
+                    .padding(.vertical)
             }
 
             ForEach(vm.newsToShow) { neutralNews in

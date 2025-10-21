@@ -17,7 +17,11 @@ struct PaywallView: View {
     @State private var safariURL: URL?
 
     var body: some View {
-        SubscriptionStoreView(groupID: "21774114") {
+        SubscriptionStoreView(productIDs: [
+            "dev.itram.news.pro.weekly",
+            "dev.itram.news.pro.monthly",
+            "dev.itram.news.pro.annual"
+        ]) {
             VStack {
                 Image(.icon)
                     .resizable()
