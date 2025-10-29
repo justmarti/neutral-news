@@ -53,7 +53,13 @@ final class CacheService {
         }
     }
 
-    /// Performs cache cleanup if needed (checks time since last cleanup across app sessions)
+    /// Performs cache cleanup if needed based on time interval (6 hours).
+    ///
+    /// Checks time since last cleanup across app sessions using UserDefaults persistence.
+    /// If enough time has passed, triggers background cleanup of expired cache items.
+    ///
+    /// - Note: Cleanup runs in background with `.utility` priority to avoid blocking UI
+    /// - Important: Cleanup interval is 6 hours. Skips if last cleanup was within this window.
     func cleanExpiredCacheIfNeeded() {
         let now = Date()
 
@@ -87,7 +93,17 @@ final class CacheService {
     }
     
     // MARK: - Cache Check Methods
-    
+
+    /// Checks if cached data for a specific day is still valid based on TTL (Time To Live).
+    ///
+    /// TTL varies by day:
+    /// - Today: 45 minutes
+    /// - Yesterday: 4 hours
+    /// - Older: 24 hours
+    ///
+    /// - Parameter day: The day to check cache validity for
+    /// - Returns: `true` if valid cached data exists, `false` otherwise
+    /// - Note: Triggers cache cleanup check as a side effect
     func isCacheValid(for day: DayInfo) -> Bool {
         cleanExpiredCacheIfNeeded()
         let context = createContext()
@@ -111,7 +127,12 @@ final class CacheService {
     }
     
     // MARK: - Neutral News Cache Methods
-    
+
+    /// Retrieves cached neutral news for a specific day if within TTL window.
+    ///
+    /// - Parameter day: The day to retrieve cached news for
+    /// - Returns: Array of `NeutralNews` items sorted by date (newest first). Returns empty array if cache miss or expired.
+    /// - Note: Triggers cache cleanup check as a side effect
     func getCachedNeutralNews(for day: DayInfo) -> [NeutralNews] {
         cleanExpiredCacheIfNeeded()
         let context = createContext()
@@ -135,6 +156,14 @@ final class CacheService {
         }
     }
     
+    /// Stores neutral news in SwiftData cache for a specific day.
+    ///
+    /// Replaces any existing cache for the day with fresh data.
+    ///
+    /// - Parameters:
+    ///   - news: Array of `NeutralNews` items to cache
+    ///   - day: The day these news items belong to
+    /// - Note: Does nothing if news array is empty
     func cacheNeutralNews(_ news: [NeutralNews], for day: DayInfo) {
         guard !news.isEmpty else { return }
         
@@ -174,7 +203,12 @@ final class CacheService {
     }
     
     // MARK: - Regular News Cache Methods
-    
+
+    /// Retrieves cached regular news (from media sources) for a specific day if within TTL window.
+    ///
+    /// - Parameter day: The day to retrieve cached news for
+    /// - Returns: Array of `News` items sorted by publication date (newest first). Returns empty array if cache miss or expired.
+    /// - Note: Triggers cache cleanup check as a side effect
     func getCachedNews(for day: DayInfo) -> [News] {
         cleanExpiredCacheIfNeeded()
         let context = createContext()
@@ -198,6 +232,14 @@ final class CacheService {
         }
     }
     
+    /// Stores regular news in SwiftData cache for a specific day.
+    ///
+    /// Replaces any existing cache for the day with fresh data.
+    ///
+    /// - Parameters:
+    ///   - news: Array of `News` items to cache
+    ///   - day: The day these news items belong to
+    /// - Note: Does nothing if news array is empty
     func cacheNews(_ news: [News], for day: DayInfo) {
         guard !news.isEmpty else { return }
         
@@ -238,6 +280,14 @@ final class CacheService {
     
     // MARK: - Cache Management
 
+    /// Performs comprehensive cache cleanup in the background.
+    ///
+    /// This method executes three cleanup operations:
+    /// 1. Removes neutral news older than 7 days
+    /// 2. Removes regular news older than 7 days
+    /// 3. Removes TTL-expired items for the last 7 days
+    ///
+    /// - Note: This is an async operation that should be called from background tasks
     func cleanExpiredCache() async {
         await cleanExpiredNeutralNews()
         await cleanExpiredNews()
@@ -377,7 +427,12 @@ final class CacheService {
     }
     
     // MARK: - Debug Methods
-    
+
+    /// Retrieves cache statistics for monitoring and debugging.
+    ///
+    /// - Returns: A tuple containing counts of cached items:
+    ///   - `neutralNews`: Number of cached neutral news items in SwiftData
+    ///   - `news`: Number of cached regular news items in SwiftData
     func getCacheStats() -> (neutralNews: Int, news: Int) {
         let context = createContext()
         do {
@@ -390,6 +445,12 @@ final class CacheService {
         }
     }
     
+    /// Clears all cached data from SwiftData storage.
+    ///
+    /// Use this for debugging or when implementing a "clear cache" feature.
+    ///
+    /// - Warning: This permanently deletes all cached news data. Use with caution.
+    /// - Note: This is an async operation
     func clearAllCache() async {
         let context = createContext()
         do {

@@ -157,13 +157,21 @@ final class NewsListViewModel {
     private var lastNewsDataHash: Int = 0
     
     // MARK: - Public Methods
-    
+
+    /// Changes the selected day and switches to single-day view mode.
+    ///
+    /// - Parameter dayInfo: The day to display news for
+    /// - Note: Automatically resets search scope to `.daySelected` and disables "all days" mode.
     func changeDay(to dayInfo: DayInfo) {
         isShowingAllDays = false
         daySelected = dayInfo
         searchScope = .daySelected
     }
 
+    /// Switches to "all days" view mode showing news from the last 7 days.
+    ///
+    /// - Note: Automatically updates search scope to `.lastSevenDays` and configures pagination.
+    /// - Important: Premium users can access this feature without restrictions. Free users have limited access.
     func changeToAllDays() {
         isShowingAllDays = true
         searchScope = .lastSevenDays
@@ -171,10 +179,20 @@ final class NewsListViewModel {
         paginationManager.configure(with: filteredNews)
     }
     
+    /// Retrieves all related news articles from different media sources for a neutral news item.
+    ///
+    /// - Parameter neutralNews: The neutral news item to find related articles for
+    /// - Returns: Array of `News` items from various media outlets referenced in the neutral news
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
         newsDataManager.getRelatedNews(from: neutralNews)
     }
     
+    /// Retrieves all news categories available for the current view context.
+    ///
+    /// Returns categories present in the currently displayed news set (saved news, all days, or selected day).
+    /// Categories are returned in the order defined by `Category.allCases`.
+    ///
+    /// - Returns: Array of `Category` values that have at least one news item in the current context
     func getCategoriesOfTheDay() -> [Category] {
         let newsToFilter: [NeutralNews]
 
@@ -190,6 +208,12 @@ final class NewsListViewModel {
         return Category.allCases.filter { categoriesSet.contains($0) }
     }
     
+    /// Forces a refresh of news data for the currently selected day.
+    ///
+    /// Bypasses cache and fetches fresh data from Firebase. Updates UI loading state automatically.
+    /// Use this for pull-to-refresh functionality or when fresh data is explicitly required.
+    ///
+    /// - Note: This is an async operation that updates `isLoadingNeutralNews` state
     func refreshNews() async {
         await MainActor.run {
             isLoadingNeutralNews = true
@@ -202,6 +226,12 @@ final class NewsListViewModel {
         }
     }
     
+    /// Forces a complete reload of news data for the currently selected day.
+    ///
+    /// Similar to `refreshNews()` but uses the direct `loadNews(forceRefresh:)` method.
+    /// Updates UI loading state automatically.
+    ///
+    /// - Note: This is an async operation that updates `isLoadingNeutralNews` state
     func forceLoadNews() async {
         await MainActor.run {
             isLoadingNeutralNews = true
@@ -214,14 +244,21 @@ final class NewsListViewModel {
         }
     }
     
+    /// Toggles the filter for a specific news category.
+    ///
+    /// If the category is already filtered, it will be removed. If not, it will be added.
+    ///
+    /// - Parameter category: The category to toggle in the filter
     func filterByCategory(_ category: Category) {
         filterViewModel.filterByCategory(category)
     }
     
+    /// Clears all active filters (search text, categories, etc.) but preserves ordering.
     func clearFilters() {
         filterViewModel.clearFilters()
     }
     
+    /// Resets all filters and ordering to their default values.
     func resetToDefaults() {
         filterViewModel.resetToDefaults()
     }
@@ -305,10 +342,19 @@ final class NewsListViewModel {
     
     // MARK: - Pagination Methods
     
+    /// Loads the next page of news items when using pagination (all days view).
+    ///
+    /// - Note: Only applicable when `isShowingAllDays` is `true` or `searchScope == .lastSevenDays`
     func loadNextPage() {
         paginationManager.loadNextPage()
     }
     
+    /// Determines if more news items should be loaded when scrolling reaches a specific item.
+    ///
+    /// Used for infinite scroll functionality in the all days view.
+    ///
+    /// - Parameter currentItem: The news item currently being displayed
+    /// - Returns: `true` if more items should be loaded, `false` otherwise
     func shouldLoadMore(currentItem: NeutralNews) -> Bool {
         guard isShowingAllDays || searchScope == .lastSevenDays else { return false }
         return paginationManager.shouldLoadMore(for: currentItem)
@@ -388,6 +434,14 @@ final class NewsListViewModel {
         }
     }
 
+    /// Handles incoming deep link requests to navigate to a specific news article.
+    ///
+    /// If news data is already loaded, processes the deep link immediately. Otherwise, stores it
+    /// as pending and waits for news to load. Uses reactive AsyncStream for efficient waiting.
+    ///
+    /// - Parameter deepLinkData: The deep link data containing the target news ID
+    /// - Note: Sets `isLoadingNeutralNews` to `true` during processing
+    /// - Important: Automatically clears loading state once article is found or timeout occurs (10s)
     func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
         isLoadingNeutralNews = true
 
@@ -473,11 +527,24 @@ final class NewsListViewModel {
 
     // MARK: - Saved News Methods
 
+    /// Toggles between saved news view and regular news view.
+    ///
+    /// Automatically clears all active filters when switching modes to prevent confusion.
+    ///
+    /// - Note: When entering saved news mode, automatically triggers `loadSavedNews()`
+    /// - Important: Premium feature - requires `PremiumManager.canSaveNews` permission
     func toggleSavedNewsMode() {
         isShowingSavedNews.toggle()
         filterViewModel.clearFilters()
     }
 
+    /// Loads all saved news from Core Data persistent storage.
+    ///
+    /// Fetches saved news items from Core Data, converts them back to `NeutralNews` objects,
+    /// and updates the `savedNews` array sorted by date (newest first).
+    ///
+    /// - Important: Requires `coreDataContext` to be set. Will fail silently if not available.
+    /// - Note: This is an async operation that updates `isLoadingSavedNews` state
     func loadSavedNews() async {
         guard let context = coreDataContext else {
             print("❌ No Core Data context available")
@@ -536,6 +603,12 @@ final class NewsListViewModel {
     }
 
 
+    /// Removes a news item from the saved news array (UI state only).
+    ///
+    /// This only removes the item from the in-memory array. To permanently delete from Core Data,
+    /// use `SavedNewsService.deleteSavedNews()`.
+    ///
+    /// - Parameter newsId: The ID of the news item to remove from the array
     func removeFromSavedNews(_ newsId: String) {
         savedNews.removeAll { $0.id == newsId }
     }
