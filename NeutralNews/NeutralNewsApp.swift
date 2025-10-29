@@ -67,9 +67,15 @@ struct NeutralNewsApp: App {
                     // Inject Core Data context
                     NewsListViewModel.shared.coreDataContext = CoreDataManager.shared.viewContext
                     config.startFetching()
+
+                    // Perform cache cleanup if needed (runs in background)
+                    CacheService.shared.cleanExpiredCacheIfNeeded()
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     config.startFetching()
+
+                    // Also cleanup when app returns from background
+                    CacheService.shared.cleanExpiredCacheIfNeeded()
                 }
                 .onOpenURL { url in
 #if DEBUG

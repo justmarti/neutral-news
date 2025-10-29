@@ -10,17 +10,20 @@ import SwiftData
 
 final class CacheService {
     static let shared = CacheService()
-    
+
     private var modelContainer: ModelContainer
-    private var lastCleanupDate: Date?
-    
+    private static let lastCleanupKey = "CacheService.lastCleanupDate"
+
     // TTL Configuration (more aggressive for better performance)
     private enum TTL {
         static let today: TimeInterval = 45 * 60          // 45 minutes
         static let yesterday: TimeInterval = 4 * 60 * 60  // 4 hours
         static let older: TimeInterval = 24 * 60 * 60     // 24 hours
     }
-    
+
+    // Cleanup interval: 6 hours between cleanups
+    private static let cleanupInterval: TimeInterval = 6 * 60 * 60
+
     private init() {
         do {
             let configuration = ModelConfiguration(
@@ -39,16 +42,48 @@ final class CacheService {
     }
     
     // MARK: - Auto-Cleanup
-    
-    private func cleanExpiredCacheIfNeeded() {
-        let now = Date()
-        // Only clean if more than 6 hours have passed since last cleanup
-        if let lastClean = lastCleanupDate, now.timeIntervalSince(lastClean) < 6 * 3600 {
-            return
+
+    /// Last cleanup date persisted in UserDefaults (survives app restarts)
+    private var lastCleanupDate: Date? {
+        get {
+            UserDefaults.standard.object(forKey: Self.lastCleanupKey) as? Date
         }
-        
-        cleanExpiredCache()
-        lastCleanupDate = now
+        set {
+            UserDefaults.standard.set(newValue, forKey: Self.lastCleanupKey)
+        }
+    }
+
+    /// Performs cache cleanup if needed (checks time since last cleanup across app sessions)
+    func cleanExpiredCacheIfNeeded() {
+        let now = Date()
+
+        // Check if enough time has passed since last cleanup
+        if let lastClean = lastCleanupDate {
+            let timeSinceLastCleanup = now.timeIntervalSince(lastClean)
+            if timeSinceLastCleanup < Self.cleanupInterval {
+#if DEBUG
+                let hoursRemaining = (Self.cleanupInterval - timeSinceLastCleanup) / 3600
+                print("⏳ Skipping cleanup - \(String(format: "%.1f", hoursRemaining)) hours until next cleanup")
+#endif
+                return
+            }
+        }
+
+#if DEBUG
+        print("🧹 Starting cache cleanup...")
+#endif
+
+        // Perform cleanup in background to avoid blocking UI
+        Task.detached(priority: .utility) { [weak self] in
+            await self?.cleanExpiredCache()
+
+            await MainActor.run { [weak self] in
+                self?.lastCleanupDate = now
+#if DEBUG
+                print("✅ Cache cleanup completed")
+#endif
+            }
+        }
     }
     
     // MARK: - Cache Check Methods
@@ -202,108 +237,118 @@ final class CacheService {
     }
     
     // MARK: - Cache Management
-    
-    func cleanExpiredCache() {
-        cleanExpiredNeutralNews()
-        cleanExpiredNews()
-        cleanOldCache()
+
+    func cleanExpiredCache() async {
+        await cleanExpiredNeutralNews()
+        await cleanExpiredNews()
+        await cleanOldCache()
     }
     
-    private func cleanExpiredNeutralNews() {
+    private func cleanExpiredNeutralNews() async {
         let context = createContext()
         // Clean cache older than 7 days
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        
+
         let descriptor = FetchDescriptor<CachedNeutralNews>(
             predicate: #Predicate<CachedNeutralNews> { cached in
                 cached.dayDate < sevenDaysAgo
             }
         )
-        
+
         do {
             let expiredItems = try context.fetch(descriptor)
             for item in expiredItems {
                 context.delete(item)
             }
 #if DEBUG
-            print("Cleaned \(expiredItems.count) expired neutral news items")
+            print("🗑️ Cleaned \(expiredItems.count) expired neutral news items")
 #endif
             saveContext(context)
         } catch {
-            print("Error cleaning expired neutral news: \(error)")
+            print("❌ Error cleaning expired neutral news: \(error)")
         }
     }
-    
-    private func cleanExpiredNews() {
+
+    private func cleanExpiredNews() async {
         let context = createContext()
         // Clean cache older than 7 days
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-        
+
         let descriptor = FetchDescriptor<CachedNews>(
             predicate: #Predicate<CachedNews> { cached in
                 cached.dayDate < sevenDaysAgo
             }
         )
-        
+
         do {
             let expiredItems = try context.fetch(descriptor)
             for item in expiredItems {
                 context.delete(item)
             }
 #if DEBUG
-            print("Cleaned \(expiredItems.count) expired news items")
+            print("🗑️ Cleaned \(expiredItems.count) expired news items")
 #endif
             saveContext(context)
         } catch {
-            print("Error cleaning expired news: \(error)")
+            print("❌ Error cleaning expired news: \(error)")
         }
     }
-    
-    private func cleanOldCache() {
+
+    private func cleanOldCache() async {
         let context = createContext()
         // Also clean based on TTL for current days
         let calendar = Calendar.current
         let today = Date()
-        
+
+        var totalCleaned = 0
+
         for dayOffset in 0..<7 {
             guard let dayDate = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
-            let dayStartDate = calendar.startOfDay(for: dayDate) // Pre-calculate this
+            let dayStartDate = calendar.startOfDay(for: dayDate)
             let ttl = getTTL(for: dayDate)
             let cutoffDate = today.addingTimeInterval(-ttl)
-            
+
             // Clean expired neutral news for this day
             let neutralDescriptor = FetchDescriptor<CachedNeutralNews>(
                 predicate: #Predicate<CachedNeutralNews> { cached in
                     cached.dayDate == dayStartDate && cached.cacheDate < cutoffDate
                 }
             )
-            
+
             do {
                 let expiredNeutral = try context.fetch(neutralDescriptor)
                 for item in expiredNeutral {
                     context.delete(item)
                 }
+                totalCleaned += expiredNeutral.count
             } catch {
-                print("Error cleaning expired neutral news for day \(dayOffset): \(error)")
+                print("❌ Error cleaning expired neutral news for day \(dayOffset): \(error)")
             }
-            
+
             // Clean expired regular news for this day
             let newsDescriptor = FetchDescriptor<CachedNews>(
                 predicate: #Predicate<CachedNews> { cached in
                     cached.dayDate == dayStartDate && cached.cacheDate < cutoffDate
                 }
             )
-            
+
             do {
                 let expiredNews = try context.fetch(newsDescriptor)
                 for item in expiredNews {
                     context.delete(item)
                 }
+                totalCleaned += expiredNews.count
             } catch {
-                print("Error cleaning expired news for day \(dayOffset): \(error)")
+                print("❌ Error cleaning expired news for day \(dayOffset): \(error)")
             }
         }
-        
+
+#if DEBUG
+        if totalCleaned > 0 {
+            print("🗑️ Cleaned \(totalCleaned) TTL-expired cache items")
+        }
+#endif
+
         saveContext(context)
     }
     
@@ -345,17 +390,17 @@ final class CacheService {
         }
     }
     
-    func clearAllCache() {
+    func clearAllCache() async {
         let context = createContext()
         do {
             try context.delete(model: CachedNeutralNews.self)
             try context.delete(model: CachedNews.self)
             saveContext(context)
 #if DEBUG
-            print("All cache cleared")
+            print("🗑️ All cache cleared")
 #endif
         } catch {
-            print("Error clearing all cache: \(error)")
+            print("❌ Error clearing all cache: \(error)")
         }
     }
 }
