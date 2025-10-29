@@ -362,7 +362,32 @@ final class NewsListViewModel {
             news.id == newsId
         }
     }
-    
+
+    // MARK: - Reactive News Updates Stream
+
+    /// Creates an AsyncStream that emits whenever news data is updated
+    private var newsUpdatesStream: AsyncStream<[NeutralNews]> {
+        AsyncStream { continuation in
+            // Emit current value immediately
+            continuation.yield(newsDataManager.neutralNews)
+
+            // Observe future updates
+            let observer = NotificationCenter.default.addObserver(
+                forName: .newsDidUpdate,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self = self else { return }
+                continuation.yield(self.newsDataManager.neutralNews)
+            }
+
+            // Cleanup when stream terminates
+            continuation.onTermination = { _ in
+                NotificationCenter.default.removeObserver(observer)
+            }
+        }
+    }
+
     func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
         isLoadingNeutralNews = true
 
@@ -372,7 +397,7 @@ final class NewsListViewModel {
             pendingDeepLink = deepLinkData
         }
     }
-    
+
     private func processDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
 #if DEBUG
         print("🔄 Processing deep link in ViewModel - newsId: \(deepLinkData.newsId)")
@@ -389,40 +414,53 @@ final class NewsListViewModel {
             return
         }
 
-        // If not found, wait for news to load
+        // If not found, wait reactively for news to load
 #if DEBUG
-        print("⏳ News not loaded yet, waiting for data...")
+        print("⏳ News not loaded yet, listening for updates...")
 #endif
 
         Task {
-            // Wait for news data to be available with timeout
-            let maxAttempts = 10
-            let delayPerAttempt: UInt64 = 500_000_000 // 0.5s
-
-            for attempt in 1...maxAttempts {
-                if let news = self.findNews(newsId: deepLinkData.newsId) {
+            // Use reactive stream instead of polling with timeout
+            await withTaskGroup(of: Bool.self) { group in
+                // Task 1: Search for news reactively
+                group.addTask {
+                    for await newsArray in self.newsUpdatesStream {
+                        if let news = newsArray.first(where: { $0.id == deepLinkData.newsId }) {
 #if DEBUG
-                    print("✅ News found after \(attempt) attempts: \(news.neutralTitle)")
+                            print("✅ News found reactively: \(news.neutralTitle)")
+#endif
+                            await MainActor.run {
+                                self.deepLinkTargetNews = news
+                                self.pendingDeepLink = nil
+                                self.isLoadingNeutralNews = false
+                            }
+                            return true
+                        }
+                    }
+                    return false
+                }
+
+                // Task 2: Timeout after 10 seconds
+                group.addTask {
+                    try? await Task.sleep(for: .seconds(10))
+                    return false
+                }
+
+                // Wait for first task to complete (race condition)
+                if let found = await group.next(), found {
+                    // News found! Cancel the timeout
+                    group.cancelAll()
+                } else {
+                    // Timeout or not found
+#if DEBUG
+                    print("❌ News not found within timeout - newsId: \(deepLinkData.newsId)")
 #endif
                     await MainActor.run {
-                        self.deepLinkTargetNews = news
                         self.pendingDeepLink = nil
                         self.isLoadingNeutralNews = false
                     }
-                    return
+                    group.cancelAll()
                 }
-
-                if attempt < maxAttempts {
-                    try? await Task.sleep(nanoseconds: delayPerAttempt)
-                }
-            }
-
-#if DEBUG
-            print("❌ News not found after \(maxAttempts) attempts - newsId: \(deepLinkData.newsId)")
-#endif
-            await MainActor.run {
-                self.pendingDeepLink = nil
-                self.isLoadingNeutralNews = false
             }
         }
     }

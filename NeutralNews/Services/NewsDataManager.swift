@@ -7,17 +7,29 @@
 
 import Foundation
 
+extension Notification.Name {
+    static let newsDidUpdate = Notification.Name("NewsDidUpdate")
+}
+
 @Observable
 final class NewsDataManager {
     static let shared = NewsDataManager()
-    
+
     // MARK: - Dependencies
     private let cacheService = CacheService.shared
-    
+
     // MARK: - Data Collections
-    private(set) var allNews = [News]()
-    private(set) var neutralNews = [NeutralNews]()
-    
+    private(set) var allNews = [News]() {
+        didSet {
+            NotificationCenter.default.post(name: .newsDidUpdate, object: nil)
+        }
+    }
+    private(set) var neutralNews = [NeutralNews]() {
+        didSet {
+            NotificationCenter.default.post(name: .newsDidUpdate, object: nil)
+        }
+    }
+
     // MARK: - Optimized News by Day Storage
     private(set) var newsByDay: [Date: Set<NeutralNews>] = [:]
     
