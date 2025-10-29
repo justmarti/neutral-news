@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 import CoreData
 import FirebaseCore
+import FirebaseCrashlytics
 import RevenueCat
 
 @main
@@ -33,6 +34,14 @@ struct NeutralNewsApp: App {
 
     init() {
         FirebaseApp.configure()
+
+        // Configure Crashlytics
+        #if !DEBUG
+        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(true)
+        #else
+        // Disable Crashlytics in debug builds to avoid polluting crash reports
+        Crashlytics.crashlytics().setCrashlyticsCollectionEnabled(false)
+        #endif
 
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
             let configuration = Configuration.Builder(withAPIKey: apiKey)
