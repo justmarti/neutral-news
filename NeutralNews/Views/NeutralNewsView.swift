@@ -56,7 +56,6 @@ struct NeutralNewsView: View {
                                                 .scaledToFit()
                                                 .clipShape(.rect(cornerRadius: 16))
                                             
-                                            // TODO: Si el medio es El Mundo o Expansión, no hay su noticia abajo, arreglar
                                             Text("Imagen extraída de \(Media.from(news.imageMedium)?.pressMedia.name ?? ""), ver su noticia al final de la página.")
                                                     .font(.footnote)
                                                     .foregroundStyle(.secondary)

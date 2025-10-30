@@ -155,7 +155,7 @@ struct HomeToolbar {
             Button {
                 vm.orderBy = .popularity
             } label: {
-                Label("Popularidad", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
+                Label("Cobertura", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
                 Text("Las más comentadas")
             }
         } label: {
@@ -179,7 +179,7 @@ struct HomeToolbar {
                 Button {
                     vm.orderBy = .popularity
                 } label: {
-                    Label("Popularidad", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
+                    Label("Cobertura", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
                 }
             }
             

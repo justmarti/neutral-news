@@ -7,17 +7,29 @@
 
 import Foundation
 
+extension Notification.Name {
+    static let newsDidUpdate = Notification.Name("NewsDidUpdate")
+}
+
 @Observable
 final class NewsDataManager {
     static let shared = NewsDataManager()
-    
+
     // MARK: - Dependencies
     private let cacheService = CacheService.shared
-    
+
     // MARK: - Data Collections
-    private(set) var allNews = [News]()
-    private(set) var neutralNews = [NeutralNews]()
-    
+    private(set) var allNews = [News]() {
+        didSet {
+            NotificationCenter.default.post(name: .newsDidUpdate, object: nil)
+        }
+    }
+    private(set) var neutralNews = [NeutralNews]() {
+        didSet {
+            NotificationCenter.default.post(name: .newsDidUpdate, object: nil)
+        }
+    }
+
     // MARK: - Optimized News by Day Storage
     private(set) var newsByDay: [Date: Set<NeutralNews>] = [:]
     
@@ -77,7 +89,20 @@ final class NewsDataManager {
     }
     
     // MARK: - Public Methods
-    
+
+    /// Loads news for a specific day with intelligent caching strategy.
+    ///
+    /// This method implements a three-tier loading strategy:
+    /// 1. Check SwiftData cache (fastest)
+    /// 2. Fetch from Firebase if cache miss or expired
+    /// 3. Fall back to stale cache on network error
+    ///
+    /// - Parameters:
+    ///   - day: The day to load news for
+    ///   - forceRefresh: If `true`, bypasses cache and forces a fresh Firebase fetch. Default is `false`.
+    ///
+    /// - Note: This method is safe to call multiple times for the same day - it automatically skips if already loaded.
+    /// - Important: Runs on background thread and posts `newsDidUpdate` notification when complete.
     func loadNews(for day: DayInfo, forceRefresh: Bool = false) async {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day.date)
@@ -163,37 +188,69 @@ final class NewsDataManager {
         }
     }
     
+    /// Forces a refresh of news data for the specified day, bypassing the cache.
+    ///
+    /// Convenience method that calls `loadNews(for:forceRefresh:)` with `forceRefresh: true`.
+    /// Use this when you need to ensure the latest data from Firebase.
+    ///
+    /// - Parameter day: The day to refresh news for
     func refreshNews(for day: DayInfo) async {
         await loadNews(for: day, forceRefresh: true)
     }
-    
+
+    /// Retrieves cached news for a specific day from memory.
+    ///
+    /// - Parameter dayInfo: The day to retrieve news for
+    /// - Returns: A set of `NeutralNews` items for the specified day. Returns empty set if day not loaded.
+    /// - Note: This method automatically cleans old data (>7 days) from memory before returning.
     func getNewsForDay(_ dayInfo: DayInfo) -> Set<NeutralNews> {
         cleanOldMemoryDataIfNeeded()
         let startOfDay = Calendar.current.startOfDay(for: dayInfo.date)
         return getNewsSetForDate(startOfDay)
     }
     
+    /// Retrieves news for a specific day as a sorted array.
+    ///
+    /// - Parameter day: The day to retrieve news for
+    /// - Returns: An array of `NeutralNews` items sorted by date (newest first). Returns empty array if day not loaded.
     func getNewsArrayForDay(_ day: DayInfo) -> [NeutralNews] {
         let newsSet = getNewsForDay(day)
         return Array(newsSet).sorted { $0.date > $1.date }
     }
-    
+
+    /// Retrieves all related news articles from different media sources for a neutral news item.
+    ///
+    /// - Parameter neutralNews: The neutral news item to find related articles for
+    /// - Returns: Array of `News` items from various media outlets that are referenced in the neutral news.
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
         return allNews.filter { neutralNews.sourceIds.contains($0.id) }
     }
-    
+
+    /// Checks if news data for a specific day has been loaded into memory.
+    ///
+    /// - Parameter day: The day to check
+    /// - Returns: `true` if the day's news is loaded, `false` otherwise.
     func isDayLoaded(_ day: DayInfo) -> Bool {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day.date)
         return isDateLoaded(startOfDay)
     }
     
+    /// Retrieves cache statistics for debugging and monitoring.
+    ///
+    /// - Returns: A tuple containing:
+    ///   - `memory`: Number of days currently loaded in memory
+    ///   - `persistent`: Tuple with counts of cached neutral news and regular news in SwiftData
     func getCacheStats() -> (memory: Int, persistent: (neutralNews: Int, news: Int)) {
         let memoryCount = loadedDays.count
         let persistentStats = cacheService.getCacheStats()
         return (memory: memoryCount, persistent: persistentStats)
     }
-    
+
+    /// Pre-loads today's news into cache if not already cached.
+    ///
+    /// Call this method on app launch to ensure today's data is available immediately.
+    /// Skips loading if today's cache is already valid.
     func preloadCache() async {
         // Pre-load today in case it's not cached yet
         let today = DayInfo.today
@@ -205,6 +262,13 @@ final class NewsDataManager {
         }
     }
 
+    /// Starts progressive background loading of recent days' news.
+    ///
+    /// Loads the last 6 days (premium users) or 1 day (free users) in the background
+    /// with staggered delays to avoid network congestion. Uses cache-first strategy
+    /// for faster loading.
+    ///
+    /// - Note: This method is idempotent - calling it multiple times won't start duplicate tasks.
     func startBackgroundLoadingIfNeeded() {
         // Only start if not already running
         guard backgroundLoadingTask == nil else { return }

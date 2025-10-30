@@ -11,6 +11,7 @@
 		4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C42E7C7B1000E94D76 /* RevenueCat */; };
 		4130E0C72E7C7B1000E94D76 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C62E7C7B1000E94D76 /* RevenueCatUI */; };
 		416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 416D20D32E4371690070F565 /* FirebaseRemoteConfig */; };
+		4199F40F2EB2AF1100BFAF43 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 4199F40E2EB2AF1100BFAF43 /* FirebaseCrashlytics */; };
 		41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736212D820C8F00E08EA1 /* FirebaseFirestore */; };
 		41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736232D820C8F00E08EA1 /* FirebaseFunctions */; };
 /* End PBXBuildFile section */
@@ -71,6 +72,7 @@
 				41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */,
 				4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */,
 				4130E0C72E7C7B1000E94D76 /* RevenueCatUI in Frameworks */,
+				4199F40F2EB2AF1100BFAF43 /* FirebaseCrashlytics in Frameworks */,
 				4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */,
 				41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */,
 				416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */,
@@ -131,6 +133,7 @@
 				419D2FB32D11C96500D95E22 /* Sources */,
 				419D2FB42D11C96500D95E22 /* Frameworks */,
 				419D2FB52D11C96500D95E22 /* Resources */,
+				4199F4102EB2B08400BFAF43 /* ShellScript */,
 			);
 			buildRules = (
 			);
@@ -147,6 +150,7 @@
 				416D20D32E4371690070F565 /* FirebaseRemoteConfig */,
 				4130E0C42E7C7B1000E94D76 /* RevenueCat */,
 				4130E0C62E7C7B1000E94D76 /* RevenueCatUI */,
+				4199F40E2EB2AF1100BFAF43 /* FirebaseCrashlytics */,
 			);
 			productName = NeutralNews;
 			productReference = 419D2FB72D11C96500D95E22 /* NeutralNews.app */;
@@ -211,6 +215,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		4199F4102EB2B08400BFAF43 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 8;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/NeutralNews/GoogleService-Info.plist",
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 1;
+			shellPath = /bin/sh;
+			shellScript = "\"${BUILD_DIR%/Build/*}/SourcePackages/checkouts/firebase-ios-sdk/Crashlytics/run\"\n";
+			showEnvVarsInLog = 0;
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		413546122D9C1FA0006569EA /* Sources */ = {
@@ -413,10 +440,11 @@
 				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNews.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
 				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = NeutralNews/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Facts;
@@ -431,7 +459,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -455,10 +483,11 @@
 				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNewsRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
 				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = NeutralNews/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Facts;
@@ -473,7 +502,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.3;
+				MARKETING_VERSION = 1.0.4;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -558,6 +587,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseRemoteConfig;
+		};
+		4199F40E2EB2AF1100BFAF43 /* FirebaseCrashlytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCrashlytics;
 		};
 		41A736212D820C8F00E08EA1 /* FirebaseFirestore */ = {
 			isa = XCSwiftPackageProductDependency;
