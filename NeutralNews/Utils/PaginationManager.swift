@@ -11,7 +11,7 @@ import Foundation
 final class PaginationManager<Item: Identifiable> {
     
     // MARK: - Configuration
-    static var defaultPageSize: Int { 20 }
+    static var defaultPageSize: Int { 30 }
     
     // MARK: - State
     private(set) var paginatedItems: [Item] = []
