@@ -39,8 +39,8 @@ final class ImageService: @unchecked Sendable {
         
         do {
             let (data, _) = try await urlSession.data(from: url)
-            guard let image = UIImage(data: data), let cgImage = image.cgImage else { return .nnBackground }
-            
+            guard let image = data.downsampledImage(), let cgImage = image.cgImage else { return .nnBackground }
+
             let color = extractDominantColor(from: cgImage)
             await setCachedColor(color, for: urlString)
             return color
@@ -51,14 +51,14 @@ final class ImageService: @unchecked Sendable {
     
     private func extractColorFromCachedImage(urlString: String) async -> Color? {
         guard let url = URL(string: urlString) else { return nil }
-        
+
         let request = URLRequest(url: url)
         if let cachedResponse = CachedAsyncImageHelper.urlSession.configuration.urlCache?.cachedResponse(for: request),
-           let image = UIImage(data: cachedResponse.data),
+           let image = cachedResponse.data.downsampledImage(),
            let cgImage = image.cgImage {
             return extractDominantColor(from: cgImage)
         }
-        
+
         return nil
     }
     
