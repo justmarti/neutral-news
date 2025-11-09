@@ -84,6 +84,10 @@ final class NewsListViewModel {
     var newsToShow: [NeutralNews] {
         // Cache key includes all dependencies
         let dayNewsCount = newsDataManager.getNewsArrayForDay(daySelected).count
+
+        // Hash paginated items to detect content changes (not just count)
+        let paginatedItemsHash = paginationManager.paginatedItems.prefix(5).map(\.id).joined()
+
         let cacheKey = """
             \(isShowingSavedNews)-\
             \(savedNews.count)-\
@@ -91,7 +95,7 @@ final class NewsListViewModel {
             \(searchScope)-\
             \(daySelected.date.timeIntervalSince1970)-\
             \(dayNewsCount)-\
-            \(paginationManager.paginatedItems.count)-\
+            \(paginatedItemsHash)-\
             \(filterViewModel.searchText)-\
             \(filterViewModel.categoryFilter.hashValue)-\
             \(filterViewModel.orderBy)

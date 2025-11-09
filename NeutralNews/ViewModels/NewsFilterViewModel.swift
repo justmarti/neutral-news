@@ -38,13 +38,15 @@ final class NewsFilterViewModel {
     
     var categoryFilter: Set<Category> = [] {
         didSet {
-            debounceFilterChange()
+            // No debounce for category filter - user expects immediate response
+            onFiltersChanged?()
         }
     }
     
     var orderBy: OrderBy = .hour {
         didSet {
-            debounceFilterChange()
+            // No debounce for orderBy - user expects immediate response
+            onFiltersChanged?()
         }
     }
     
@@ -159,7 +161,7 @@ final class NewsFilterViewModel {
             guard orderBy == .popularity else { return [:] }
             var cache: [String: Int] = [:]
             for newsItem in news {
-                cache[newsItem.id] = newsDataManager.getRelatedNews(from: newsItem).count
+                cache[newsItem.id] = newsItem.sourceIds.count
             }
             return cache
         }()

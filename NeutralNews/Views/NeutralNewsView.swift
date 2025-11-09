@@ -93,7 +93,6 @@ struct NeutralNewsView: View {
                             .padding(.horizontal, 16)
                         }
                     }
-                    // TODO: Esto es necesario?
                     .frame(minHeight: geometry.size.height)
                 }
             }
