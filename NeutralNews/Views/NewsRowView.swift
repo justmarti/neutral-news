@@ -52,7 +52,20 @@ struct NewsRowView: View {
 struct NewsImageView: View {
     let news: NeutralNews
     let imageUrl: String?
-    
+
+    // Gradient is created once and shared by all instances
+    private static let overlayGradient = LinearGradient(
+        gradient: Gradient(colors: [
+            Color.black.opacity(0),
+            Color.black.opacity(0.2),
+            Color.black.opacity(0.8),
+            Color.black.opacity(0.9),
+            Color.black.opacity(1)
+        ]),
+        startPoint: .top,
+        endPoint: .bottom
+    )
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
@@ -73,19 +86,7 @@ struct NewsImageView: View {
                     .fill(.ultraThinMaterial)
                     .environment(\.colorScheme, .dark)
                     .frame(height: 180)
-                    .mask(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                Color.black.opacity(0),
-                                Color.black.opacity(0.2),
-                                Color.black.opacity(0.8),
-                                Color.black.opacity(0.9),
-                                Color.black.opacity(1)
-                            ]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
+                    .mask(Self.overlayGradient)
                 
                 Text(news.neutralTitle)
                     .padding(.horizontal, 12)
