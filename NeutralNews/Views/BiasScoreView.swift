@@ -9,13 +9,13 @@ import SwiftUI
 
 struct BiasScoreView: View {
     var biasScore: Int
-    let maxScore = 50
+    let maxScore = 10
     
     @State private var showInfo: Bool = false
     
     var body: some View {
         HStack {
-            Gauge(value: Double(biasScore), in: 0.0...Double(maxScore)) {
+            Gauge(value: Double(biasScore / 5), in: 0.0...Double(maxScore)) {
                 EmptyView()
             }
             .tint(Color.accent.gradient)
@@ -75,7 +75,7 @@ struct BiasScoreView: View {
     
     private var infoPopover : some View {
         HStack {
-            Image(systemName: "\(Int(biasScore)).circle")
+            Image(systemName: "\(Int(biasScore/5)).circle")
                 .font(.largeTitle)
                 .foregroundStyle(.accent, .secondary)
             
@@ -83,7 +83,7 @@ struct BiasScoreView: View {
                 Text("Nivel de neutralidad")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .foregroundStyle(.accent)
-                Text("Este valor indica cuán neutral es la noticia.\n0 es muy sesgada y 50 neutral.")
+                Text("Este valor indica cuán neutral es la noticia,\nsiendo 0 muy sesgada y 10 neutral.")
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(.secondary)
             }
@@ -94,6 +94,6 @@ struct BiasScoreView: View {
 }
 
 #Preview {
-    BiasScoreView(biasScore: 50)
+    BiasScoreView(biasScore: 40)
         .padding()
 }

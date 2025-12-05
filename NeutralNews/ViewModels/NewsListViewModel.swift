@@ -82,6 +82,35 @@ final class NewsListViewModel {
     }
     
     var newsToShow: [NeutralNews] {
+        // Cache key includes all dependencies
+        let dayNewsCount = newsDataManager.getNewsArrayForDay(daySelected).count
+
+        // Hash paginated items to detect content changes (not just count)
+        let paginatedItemsHash = paginationManager.paginatedItems.prefix(5).map(\.id).joined()
+
+        let cacheKey = """
+            \(isShowingSavedNews)-\
+            \(savedNews.count)-\
+            \(isShowingAllDays)-\
+            \(searchScope)-\
+            \(daySelected.date.timeIntervalSince1970)-\
+            \(dayNewsCount)-\
+            \(paginatedItemsHash)-\
+            \(filterViewModel.searchText)-\
+            \(filterViewModel.categoryFilter.hashValue)-\
+            \(filterViewModel.orderBy)
+            """
+
+        // Cache optimization: avoid recalculations
+        if cacheKey != lastNewsToShowCacheKey {
+            newsToShowCache = computeNewsToShow()
+            lastNewsToShowCacheKey = cacheKey
+        }
+
+        return newsToShowCache
+    }
+
+    private func computeNewsToShow() -> [NeutralNews] {
         if isShowingSavedNews {
             return filterViewModel.applyFilters(to: savedNews)
         } else if isShowingAllDays || searchScope == .lastSevenDays {
@@ -151,10 +180,15 @@ final class NewsListViewModel {
     }
     
     // MARK: - Pagination
-    
+
     private let paginationManager = PaginationManager<NeutralNews>()
     private var cachedAllNews: [NeutralNews] = []
     private var lastNewsDataHash: Int = 0
+
+    // MARK: - newsToShow Cache
+
+    private var newsToShowCache: [NeutralNews] = []
+    private var lastNewsToShowCacheKey: String = ""
     
     // MARK: - Public Methods
 

@@ -10,6 +10,7 @@
 		4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4111E2762D8761DE0057CA98 /* FirebaseAuth */; };
 		4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C42E7C7B1000E94D76 /* RevenueCat */; };
 		4130E0C72E7C7B1000E94D76 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C62E7C7B1000E94D76 /* RevenueCatUI */; };
+		414539F42EE2FB2F00541692 /* ASO.md in Resources */ = {isa = PBXBuildFile; fileRef = 414539F32EE2FB2F00541692 /* ASO.md */; };
 		416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 416D20D32E4371690070F565 /* FirebaseRemoteConfig */; };
 		4199F40F2EB2AF1100BFAF43 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 4199F40E2EB2AF1100BFAF43 /* FirebaseCrashlytics */; };
 		41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736212D820C8F00E08EA1 /* FirebaseFirestore */; };
@@ -28,6 +29,7 @@
 
 /* Begin PBXFileReference section */
 		413546162D9C1FA0006569EA /* NeutralNewsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NeutralNewsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		414539F32EE2FB2F00541692 /* ASO.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ASO.md; sourceTree = "<group>"; };
 		419D2FB72D11C96500D95E22 /* NeutralNews.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeutralNews.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -35,6 +37,7 @@
 		417E18D52E3168F7005A5812 /* Exceptions for "NeutralNews" folder in "NeutralNews" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Config.xcconfig,
 				Info.plist,
 			);
 			target = 419D2FB62D11C96500D95E22 /* NeutralNews */;
@@ -85,6 +88,7 @@
 		419D2FAE2D11C96500D95E22 = {
 			isa = PBXGroup;
 			children = (
+				414539F32EE2FB2F00541692 /* ASO.md */,
 				419D2FB92D11C96500D95E22 /* NeutralNews */,
 				413546172D9C1FA0006569EA /* NeutralNewsTests */,
 				419D2FB82D11C96500D95E22 /* Products */,
@@ -164,7 +168,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1630;
-				LastUpgradeCheck = 1610;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					413546152D9C1FA0006569EA = {
 						CreatedOnToolsVersion = 16.3;
@@ -211,6 +215,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				414539F42EE2FB2F00541692 /* ASO.md in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -271,7 +276,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z458PWZBW7;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
@@ -294,7 +298,6 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = Z458PWZBW7;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MARKETING_VERSION = 1.0;
@@ -346,6 +349,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -369,6 +373,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -409,6 +414,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -425,6 +431,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -440,9 +447,8 @@
 				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNews.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
-				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -459,7 +465,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.4;
+				MARKETING_VERSION = 1.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -483,9 +489,8 @@
 				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNewsRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 5;
+				CURRENT_PROJECT_VERSION = 6;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
-				DEVELOPMENT_TEAM = Z458PWZBW7;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -502,7 +507,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0.4;
+				MARKETING_VERSION = 1.0.5;
 				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

@@ -26,9 +26,9 @@ struct HomeToolbar {
             filterMenu
         }
 
-        if #available(iOS 26.0, *) {
-            ToolbarSpacer(.fixed, placement: .topBarTrailing)
-        }
+//        if #available(iOS 26.0, *) {
+//            ToolbarSpacer(.fixed, placement: .topBarTrailing)
+//        }
         
         ToolbarItem(placement: .topBarTrailing) {
             if vm.isShowingSavedNews {
@@ -99,7 +99,7 @@ struct HomeToolbar {
                 Label("Términos de Uso", systemImage: "doc.text")
             }
         } label: {
-            Label("Ajustes", systemImage: "gearshape")
+            Label("Opciones", systemImage: "ellipsis")
         }
     }
     

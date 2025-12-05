@@ -46,13 +46,13 @@ struct CachedAsyncImage<Content: View>: View {
             phase = .failure(URLError(.badURL))
             return
         }
-        
+
         phase = .empty
-        
+
         do {
             let (data, _) = try await CachedAsyncImageHelper.urlSession.data(from: url)
-            
-            if let uiImage = UIImage(data: data) {
+
+            if let uiImage = data.downsampledImage() {
                 phase = .success(Image(uiImage: uiImage))
             } else {
                 phase = .failure(URLError(.cannotDecodeContentData))

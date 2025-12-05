@@ -22,6 +22,11 @@ class CoreDataManager {
             fatalError("Failed to retrieve a persistent store description.")
         }
 
+        // Explicitly set CloudKit container identifier for cross-device sync
+        description.cloudKitContainerOptions = NSPersistentCloudKitContainerOptions(
+            containerIdentifier: "iCloud.dev.itram.news"
+        )
+
         description.setOption(true as NSNumber, forKey: NSPersistentHistoryTrackingKey)
         description.setOption(true as NSNumber, forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
 
@@ -32,25 +37,33 @@ class CoreDataManager {
             } else {
 #if DEBUG
                 print("✅ Core Data + CloudKit container loaded successfully")
-#endif
-#if DEBUG
                 print("📍 Store URL: \(storeDescription.url?.absoluteString ?? "unknown")")
-#endif
-#if DEBUG
-                print("🔄 CloudKit enabled: \(storeDescription.options[NSPersistentHistoryTrackingKey] != nil)")
+                print("🔄 CloudKit enabled: \(storeDescription.cloudKitContainerOptions != nil)")
+                print("📦 CloudKit container: \(storeDescription.cloudKitContainerOptions?.containerIdentifier ?? "none")")
 #endif
             }
         }
 
+        // Configure merge policy to handle sync conflicts properly
         container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        // Monitor CloudKit sync events for debugging
+        NotificationCenter.default.addObserver(
+            forName: NSPersistentCloudKitContainer.eventChangedNotification,
+            object: container,
+            queue: .main
+        ) { notification in
+            if let event = notification.userInfo?[NSPersistentCloudKitContainer.eventNotificationUserInfoKey] as? NSPersistentCloudKitContainer.Event {
+                self.handleCloudKitEvent(event)
+            }
+        }
 
         // Initialize CloudKit schema by triggering a save
         do {
             try container.viewContext.save()
 #if DEBUG
             print("🔄 CloudKit schema initialization save successful")
-#endif
-#if DEBUG
             print("📡 CloudKit is now ready - schema will be created on first save")
 #endif
         } catch {
@@ -58,6 +71,33 @@ class CoreDataManager {
         }
 
         return container
+    }
+
+    // Monitor CloudKit sync events for debugging
+    private func handleCloudKitEvent(_ event: NSPersistentCloudKitContainer.Event) {
+#if DEBUG
+        let eventType: String
+        switch event.type {
+        case .setup:
+            eventType = "Setup"
+        case .import:
+            eventType = "Import"
+        case .export:
+            eventType = "Export"
+        @unknown default:
+            eventType = "Unknown"
+        }
+
+        if event.endDate == nil {
+            print("☁️ CloudKit \(eventType) started")
+        } else {
+            if let error = event.error {
+                print("❌ CloudKit \(eventType) failed: \(error.localizedDescription)")
+            } else {
+                print("✅ CloudKit \(eventType) completed successfully")
+            }
+        }
+#endif
     }
 
     var persistentContainer: NSPersistentCloudKitContainer {
