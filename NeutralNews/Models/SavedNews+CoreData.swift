@@ -44,7 +44,7 @@ extension SavedNews {
         self.category = news.category
         self.relevance = Int32(news.neutralScore)
         self.imageUrl = news.imageUrl ?? ""
-        self.imageMedium = news.sourceMedium.rawValue
+        self.imageMedium = news.publisher
         self.originalDate = news.pubDate
         self.originalCreatedAt = news.createdAt
         self.originalUpdatedAt = news.updatedAt

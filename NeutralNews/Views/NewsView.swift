@@ -20,7 +20,7 @@ struct NewsView: View {
             ZStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text(news.sourceMedium.pressMedia.name)
+                        Text(news.publisher)
                             .font(.title)
                             .fontWidth(.expanded)
                             .foregroundStyle(.secondary)
@@ -67,7 +67,7 @@ struct NewsView: View {
                         
                         Spacer()
                         
-                        Text("Facts es independiente, no está asociado a \(news.sourceMedium.pressMedia.name) ni a ningún otro medio de comunicación.")
+                        Text("Facts es independiente, no está asociado a \(news.publisher) ni a ningún otro medio de comunicación.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

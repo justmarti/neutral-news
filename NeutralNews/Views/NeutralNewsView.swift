@@ -56,7 +56,7 @@ struct NeutralNewsView: View {
                                                 .scaledToFit()
                                                 .clipShape(.rect(cornerRadius: 16))
                                             
-                                            Text("Imagen extraída de \(Media.from(news.imageMedium)?.pressMedia.name ?? ""), ver su noticia al final de la página.")
+                                            Text("Imagen extraída de \(news.imageMedium), ver su noticia al final de la página.")
                                                     .font(.footnote)
                                                     .foregroundStyle(.secondary)
                                         }

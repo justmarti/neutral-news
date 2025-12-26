@@ -18,7 +18,7 @@ struct News: Codable, Identifiable, Hashable {
     let pubDate: Date
     let createdAt: Date
     let updatedAt: Date
-    let sourceMedium: Media
+    let publisher: String
     let neutralScore: Int
     let group: Int
     let embedding: [Double]
@@ -53,7 +53,7 @@ struct News: Codable, Identifiable, Hashable {
         pubDate: .now,
         createdAt: .now,
         updatedAt: .now,
-        sourceMedium: .abc,
+        publisher: "ABC",
         neutralScore: 50,
         group: 0,
         embedding: []

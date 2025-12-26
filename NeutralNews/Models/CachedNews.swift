@@ -97,7 +97,7 @@ final class CachedNews {
         self.pubDate = news.pubDate
         self.createdAt = news.createdAt
         self.updatedAt = news.updatedAt
-        self.sourceMediumRaw = news.sourceMedium.rawValue
+        self.sourceMediumRaw = news.publisher
         self.neutralScore = news.neutralScore
         self.group = news.group
         
@@ -107,10 +107,8 @@ final class CachedNews {
         self.cacheDate = Date()
         self.dayDate = Calendar.current.startOfDay(for: news.pubDate)
     }
-    
-    func toNews() -> News? {
-        guard let sourceMedium = Media(rawValue: sourceMediumRaw) else { return nil }
-        
+
+    func toNews() -> News {
         // Decode embedding
         let embeddingArray = (try? JSONDecoder().decode([Double].self, from: embedding)) ?? []
         
@@ -125,7 +123,7 @@ final class CachedNews {
             pubDate: pubDate,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            sourceMedium: sourceMedium,
+            publisher: sourceMediumRaw,
             neutralScore: neutralScore,
             group: group,
             embedding: embeddingArray
