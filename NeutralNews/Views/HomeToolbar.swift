@@ -60,19 +60,11 @@ struct HomeToolbar {
             }
 
             Button {
-                if premiumManager.canSaveNews {
-                    withAnimation {
-                        vm.toggleSavedNewsMode()
-                    }
-                } else {
-                    premiumManager.requirePremium(for: "view_saved_news") {
-                        withAnimation {
-                            vm.toggleSavedNewsMode()
-                        }
-                    }
+                withAnimation {
+                    vm.toggleSavedNewsMode()
                 }
             } label: {
-                Label("Noticias guardadas", systemImage: !premiumManager.canSaveNews ? "lock.fill" : (vm.isShowingSavedNews ? "bookmark.fill" : "bookmark"))
+                Label("Noticias guardadas", systemImage: vm.isShowingSavedNews ? "bookmark.fill" : "bookmark")
             }
 
             Button {
