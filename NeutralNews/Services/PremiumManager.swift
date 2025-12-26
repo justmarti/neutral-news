@@ -7,6 +7,7 @@
 
 import Foundation
 import RevenueCat
+import StoreKit
 import Observation
 
 @Observable
@@ -17,10 +18,15 @@ final class PremiumManager {
     private(set) var isLoading = false
 
     private var pendingAction: (() -> Void)?
+    private var customerInfoTask: Task<Void, Never>?
 
     private init() {
-         checkPremiumStatus()
-         setupSubscriptionStatusListener()
+        checkPremiumStatus()
+        setupCustomerInfoStream()
+    }
+
+    deinit {
+        customerInfoTask?.cancel()
     }
 
     // MARK: - Premium Features Access
@@ -68,16 +74,24 @@ final class PremiumManager {
         }
     }
 
-    private func setupSubscriptionStatusListener() {
-        NotificationCenter.default.addObserver(
-            forName: Notification.Name("RCPurchaserInfoDidChangeNotification"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
+    private func setupCustomerInfoStream() {
+        customerInfoTask = Task { [weak self] in
+            for await customerInfo in Purchases.shared.customerInfoStream {
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+
+                    self.isPremium = !customerInfo.entitlements.active.isEmpty
 #if DEBUG
-            print("📱 RevenueCat purchaser info changed")
+                    print("📱 CustomerInfo updated. Premium: \(self.isPremium)")
 #endif
-            self?.checkPremiumStatus()
+
+                    // Execute pending action if user became premium
+                    if self.isPremium, let action = self.pendingAction {
+                        self.pendingAction = nil
+                        action()
+                    }
+                }
+            }
         }
     }
 
@@ -114,6 +128,18 @@ final class PremiumManager {
         } catch {
             print("❌ Error restoring purchases: \(error)")
         }
+    }
+
+    @MainActor
+    func presentOfferCodeRedemption() async {
+#if DEBUG
+        print("🎟️ Presenting offer code redemption sheet")
+#endif
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene else {
+            return
+        }
+
+        try? await AppStore.presentOfferCodeRedeemSheet(in: scene)
     }
 
     // MARK: - Subscription Management
