@@ -33,9 +33,6 @@ struct NewsRowView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(5)
                 .padding(.top, 8)
-            
-//            MediaCircleView(media: news.sourceMedium)
-//                .padding(.top, 8)
         }
         .padding()
         .frame(maxWidth: .infinity)

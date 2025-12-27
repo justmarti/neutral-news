@@ -122,14 +122,13 @@ final class FirestoreService {
               let createdAt = data["created_at"] as? Timestamp,
               let updatedAt = data["updated_at"] as? Timestamp,
               let neutralScore = data["neutral_score"] as? Int,
-              let sourceMediumRaw = data["source_medium"] as? String,
-              let sourceMedium = Media(rawValue: sourceMediumRaw)
+              let publisher = data["publisher"] as? String
         else { return nil }
-        
+
         let scrappedDescription = data["scrapped_description"] as? String
         let imageUrl = data["image_url"] as? String
         let embedding = data["embedding"] as? [Double] ?? []
-        
+
         return News(
             id: documentID,
             title: title,
@@ -141,7 +140,7 @@ final class FirestoreService {
             pubDate: pubDate.dateValue(),
             createdAt: createdAt.dateValue(),
             updatedAt: updatedAt.dateValue(),
-            sourceMedium: sourceMedium,
+            publisher: publisher,
             neutralScore: neutralScore,
             group: group,
             embedding: embedding

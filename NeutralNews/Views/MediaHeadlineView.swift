@@ -12,7 +12,7 @@ struct MediaHeadlineView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(news.sourceMedium.pressMedia.name)
+            Text(news.publisher)
                 .font(.title2)
                 .fontWidth(.expanded)
                 .foregroundStyle(.secondary)
