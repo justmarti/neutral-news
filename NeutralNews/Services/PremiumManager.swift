@@ -109,14 +109,14 @@ final class PremiumManager {
 
     func restorePurchases() async {
 #if DEBUG
-        print("🔄 Restoring purchases...")
+        print("🔄 Syncing purchases...")
 #endif
         do {
-            let customerInfo = try await Purchases.shared.restorePurchases()
+            let customerInfo = try await Purchases.shared.syncPurchases()
             await MainActor.run {
                 self.isPremium = !customerInfo.entitlements.active.isEmpty
 #if DEBUG
-                print("✅ Purchases restored. Premium: \(self.isPremium)")
+                print("✅ Purchases synced. Premium: \(self.isPremium)")
 #endif
 
                 // Execute pending action if user became premium
@@ -126,7 +126,7 @@ final class PremiumManager {
                 }
             }
         } catch {
-            print("❌ Error restoring purchases: \(error)")
+            print("❌ Error syncing purchases: \(error)")
         }
     }
 

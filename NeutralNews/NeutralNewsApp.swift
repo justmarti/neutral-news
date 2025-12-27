@@ -85,6 +85,11 @@ struct NeutralNewsApp: App {
 
                     // Also cleanup when app returns from background
                     CacheService.shared.cleanExpiredCacheIfNeeded()
+
+                    // Sync purchases when returning to app (for promotional codes redeemed in App Store)
+                    Task {
+                        await PremiumManager.shared.restorePurchases()
+                    }
                 }
                 .onOpenURL { url in
 #if DEBUG

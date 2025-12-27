@@ -53,7 +53,7 @@ struct PaywallView: View {
         .subscriptionStoreControlStyle(.pagedProminentPicker)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
-                // Restore Purchases and Redeem Code Buttons
+                // Restore Purchases Button
                 HStack(spacing: 16) {
                     Button {
                         isRestoringPurchases = true
@@ -66,16 +66,17 @@ struct PaywallView: View {
                     }
                     .disabled(isRestoringPurchases)
 
-                    Text("•")
-                        .foregroundColor(.secondary)
-
-                    Button {
-                        Task {
-                            await PremiumManager.shared.presentOfferCodeRedemption()
-                        }
-                    } label: {
-                        Text("Canjear Código")
-                    }
+                    // Redeem Code button commented out - only works with Offer Codes, not Promotional Codes
+//                    Text("•")
+//                        .foregroundColor(.secondary)
+//
+//                    Button {
+//                        Task {
+//                            await PremiumManager.shared.presentOfferCodeRedemption()
+//                        }
+//                    } label: {
+//                        Text("Canjear Código")
+//                    }
                 }
                 .font(.caption)
                 .foregroundColor(.accentColor)
