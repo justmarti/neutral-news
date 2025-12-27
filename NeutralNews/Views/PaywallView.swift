@@ -53,22 +53,30 @@ struct PaywallView: View {
         .subscriptionStoreControlStyle(.pagedProminentPicker)
         .safeAreaInset(edge: .bottom) {
             VStack(spacing: 8) {
-                // Restore Purchases Button
-                Button {
-                    isRestoringPurchases = true
-                    Task {
-                        await PremiumManager.shared.restorePurchases()
-                        isRestoringPurchases = false
-
-                        // Close paywall if restore was successful
-                        if PremiumManager.shared.isPremium {
-                            isPresented = false
+                // Restore Purchases and Redeem Code Buttons
+                HStack(spacing: 16) {
+                    Button {
+                        isRestoringPurchases = true
+                        Task {
+                            await PremiumManager.shared.restorePurchases()
+                            isRestoringPurchases = false
                         }
+                    } label: {
+                        Text(isRestoringPurchases ? "Restaurando..." : "Restaurar Compras")
                     }
-                } label: {
-                    Text(isRestoringPurchases ? "Restaurando..." : "Restaurar Compras")
+                    .disabled(isRestoringPurchases)
+
+                    Text("•")
+                        .foregroundColor(.secondary)
+
+                    Button {
+                        Task {
+                            await PremiumManager.shared.presentOfferCodeRedemption()
+                        }
+                    } label: {
+                        Text("Canjear Código")
+                    }
                 }
-                .disabled(isRestoringPurchases)
                 .font(.caption)
                 .foregroundColor(.accentColor)
 
@@ -142,7 +150,6 @@ struct PaywallView: View {
 
                     await MainActor.run {
                         isProcessingPurchase = false
-                        isPresented = false
                     }
                 }
             case .success(.userCancelled):
@@ -178,6 +185,11 @@ struct PaywallView: View {
             }
         }
         .safariSheet(url: safariURL, isPresented: $showingSafari)
+        .onChange(of: PremiumManager.shared.isPremium) { _, isPremium in
+            if isPremium {
+                isPresented = false
+            }
+        }
     }
 }
 
