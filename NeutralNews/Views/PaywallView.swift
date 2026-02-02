@@ -84,14 +84,14 @@ struct PaywallView: View {
                 // Terms and Privacy Links
                 HStack {
                     Button("Términos de Uso") {
-                        safariURL = URL(string: "https://getfacts.app/terms-of-use")
+                        safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
                         showingSafari = true
                     }
 
                     Text("•")
 
                     Button("Política de Privacidad") {
-                        safariURL = URL(string: "https://getfacts.app/privacy-policy")
+                        safariURL = URL(string: "https://getfacts.app/privacy")
                         showingSafari = true
                     }
                 }

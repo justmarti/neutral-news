@@ -78,14 +78,14 @@ struct HomeToolbar {
             Divider()
 
             Button {
-                safariURL = URL(string: "https://getfacts.app/privacy-policy")
+                safariURL = URL(string: "https://getfacts.app/privacy")
                 showingSafari = true
             } label: {
                 Label("Política de Privacidad", systemImage: "hand.raised")
             }
 
             Button {
-                safariURL = URL(string: "https://getfacts.app/terms-of-use")
+                safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
                 showingSafari = true
             } label: {
                 Label("Términos de Uso", systemImage: "doc.text")

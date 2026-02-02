@@ -6,7 +6,7 @@
 	<string>development</string>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:getfacts.app</string>
+		<string>applinks:share.getfacts.app</string>
 	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>

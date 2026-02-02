@@ -38,7 +38,7 @@ struct DeepLinkService {
             // Custom scheme: neutralnews://abc123
             return url.host
         } else {
-            // Universal Link: https://getfacts.app/news/abc123
+            // Universal Link: https://share.getfacts.app/news/\(news.id)
             let path = url.path
             if path.hasPrefix("/news/") {
                 return path.replacingOccurrences(of: "/news/", with: "")
@@ -48,7 +48,7 @@ struct DeepLinkService {
     }
 
     static func generateShareURL(for news: NeutralNews) -> URL {
-        let shareURL = "https://getfacts.app/news/\(news.id)"
-        return URL(string: shareURL) ?? URL(string: "https://apps.apple.com/app/neutral-news/idXXXXXXXXX")!
+        let shareURL = "https://share.getfacts.app/news/\(news.id)"
+        return URL(string: shareURL) ?? URL(string: "https://apps.apple.com/app/id6748583935")!
     }
 }
