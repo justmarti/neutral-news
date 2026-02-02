@@ -207,13 +207,11 @@ struct HomeView: View {
     
     private var noNewsYetView: some View {
         ContentUnavailableView(
-            vm.isShowingAllDays || vm.searchScope == .lastSevenDays
-                ? "Aún no hay noticias"
-                : "Aún no hay noticias de \(vm.daySelected.dayName)",
+            "Aún no hay noticias",
             systemImage: "newspaper",
             description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
                 ? "Vuelve a intentarlo en unos minutos."
-                : "Vuelve a intentarlo más tarde o elige otro día.")
+                : "Vuelve a intentarlo más tarde o selecciona otro día.")
         )
         .containerRelativeFrame([.horizontal, .vertical])
     }
@@ -259,7 +257,7 @@ struct HomeView: View {
             showingPaywall.toggle()
         } label: {
             HStack {
-                Image(systemName: "star")
+                Image(systemName: "sparkles")
                     .font(.title)
                     .foregroundStyle(.accent)
                 
@@ -275,7 +273,11 @@ struct HomeView: View {
                 Spacer()
             }
             .padding()
-            .background(.thinMaterial, in: .rect(cornerRadius: 16))
+            .background(.accent.quinary.opacity(0.5), in: .rect(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(.accent.secondary, lineWidth: 2)
+            )
         }
         .buttonStyle(.plain)
     }
