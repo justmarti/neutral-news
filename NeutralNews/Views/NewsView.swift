@@ -72,6 +72,7 @@ struct NewsView: View {
                             .foregroundStyle(.secondary)
                     }
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .frame(minHeight: geometry.size.height)
                 }
             }
