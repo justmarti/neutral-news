@@ -25,3 +25,11 @@ Keywords: news,apple news,ia,summary,truth,common,neutral,media,españa,es,sourc
 Title: Facts: Noticias 24 horas
 Subtitle: Periódicos españoles
 Keywords: noticia,news,apple news,ia,summary,truth,common,neutral,media,españa,es,source,coverage,info,deporte
+
+
+
+# 1.0.8
+
+Title: Facts - Noticias Neutrales IA
+Subtitle: Lee resúmenes, compara fuentes
+Keywords: periodico,sesgo,medios,fuentes,resumen,actualidad,prensa,portada,titular,politica,guardar,24h,espana
