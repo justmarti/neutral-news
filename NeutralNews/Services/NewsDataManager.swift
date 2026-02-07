@@ -198,6 +198,19 @@ final class NewsDataManager {
         await loadNews(for: day, forceRefresh: true)
     }
 
+    /// Resets in-memory and cached data when the content region changes.
+    ///
+    /// Clears all cached news to avoid mixing regions.
+    func resetForRegionChange() async {
+        await cacheService.clearAllCache()
+        await MainActor.run {
+            allNews = []
+            neutralNews = []
+            newsByDay = [:]
+            loadedDays = Set<Date>()
+        }
+    }
+
     /// Retrieves cached news for a specific day from memory.
     ///
     /// - Parameter dayInfo: The day to retrieve news for

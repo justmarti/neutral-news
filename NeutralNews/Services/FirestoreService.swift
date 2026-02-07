@@ -11,28 +11,46 @@ import FirebaseFirestore
 final class FirestoreService {
     static let shared = FirestoreService()
     private let db = Firestore.firestore()
+    private let regionProvider: ContentRegionProviding
     
     private enum Collection {
         #if DEBUG
         static let reports = "reports_dev"
-        static let neutralNews = "neutral_news"
-        static let news = "news"
         #else
         static let reports = "reports"
-        static let neutralNews = "neutral_news"
-        static let news = "news"
         #endif
+        
+        static func neutralNews(for region: ContentRegion) -> String {
+            switch region {
+            case .us:
+                return "neutral_news_us"
+            case .es:
+                return "neutral_news"
+            }
+        }
+        
+        static func news(for region: ContentRegion) -> String {
+            switch region {
+            case .us:
+                return "news_us"
+            case .es:
+                return "news"
+            }
+        }
     }
     
-    private init() {}
+    private init(regionProvider: ContentRegionProviding = ContentRegionProvider()) {
+        self.regionProvider = regionProvider
+    }
     
     // MARK: - Neutral News Methods
     
     func fetchNeutralNews(for day: DayInfo) async throws -> [NeutralNews] {
         let start = Calendar.current.startOfDay(for: day.date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        let region = regionProvider.currentRegion
         
-        let snapshot = try await db.collection(Collection.neutralNews)
+        let snapshot = try await db.collection(Collection.neutralNews(for: region))
             .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: start))
             .whereField("date", isLessThan: Timestamp(date: end))
             .getDocuments()
@@ -68,8 +86,9 @@ final class FirestoreService {
     func fetchNews(for day: DayInfo) async throws -> [News] {
         let start = Calendar.current.startOfDay(for: day.date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
+        let region = regionProvider.currentRegion
         
-        let snapshot = try await db.collection(Collection.news)
+        let snapshot = try await db.collection(Collection.news(for: region))
             .whereField("pub_date", isGreaterThanOrEqualTo: Timestamp(date: start))
             .whereField("pub_date", isLessThan: Timestamp(date: end))
             .whereField("group", isGreaterThan: -1)
