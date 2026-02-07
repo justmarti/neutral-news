@@ -74,6 +74,9 @@ final class SavedNewsService {
 #if DEBUG
         print("✅ Context saved successfully")
 #endif
+        Task { @MainActor in
+            SavedNewsState.shared.setSaved(true, for: newsId)
+        }
 
         // Track positive interaction for rating
         Task { @MainActor in
@@ -89,6 +92,9 @@ final class SavedNewsService {
         if let savedNews = try context.fetch(fetchRequest).first {
             context.delete(savedNews)
             try context.save()
+            Task { @MainActor in
+                SavedNewsState.shared.setSaved(false, for: newsId)
+            }
         }
     }
 

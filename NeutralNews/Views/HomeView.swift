@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 import SwiftData
 
 struct HomeView: View {
@@ -16,8 +17,7 @@ struct HomeView: View {
     @State private var targetNews: NeutralNews?
     @State private var showingSettingsSheet = false
     @State private var showingPaywall = false
-    @State private var showingSafari = false
-    @State private var safariURL: URL?
+    @State private var savedNewsState = SavedNewsState.shared
 
     @Namespace private var animationNamespace
     var config: AppConfig
@@ -154,25 +154,15 @@ struct HomeView: View {
             }
 
             ForEach(vm.newsToShow) { neutralNews in
-                NavigationLink {
-                    NeutralNewsView(news: neutralNews, relatedNews: vm.getRelatedNews(from: neutralNews), namespace: animationNamespace)
-                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
-                        .navigationTransition(.zoom(sourceID: neutralNews.id, in: animationNamespace))
-                        .onAppear {
-                            RatingManager.shared.incrementNewsReadCount()
-                            RatingManager.shared.requestRatingAfterPositiveInteraction()
-                        }
-                } label: {
-                    NewsImageView(news: neutralNews, imageUrl: neutralNews.imageUrl)
-                        .padding(.vertical, 4)
-                        .matchedTransitionSource(id: neutralNews.id, in: animationNamespace)
-                }
-                .buttonStyle(.plain)
-                .onAppear {
-                    if vm.shouldLoadMore(currentItem: neutralNews) {
-                        vm.loadNextPage()
-                    }
-                }
+                HomeNewsCard(
+                    news: neutralNews,
+                    relatedNews: vm.getRelatedNews(from: neutralNews),
+                    namespace: animationNamespace,
+                    isBackgroundColorEnabled: isBackgroundColorEnabled,
+                    vm: vm,
+                    premiumManager: premiumManager,
+                    savedNewsState: savedNewsState
+                )
             }
             .animation(.default, value: vm.newsToShow)
             
@@ -191,7 +181,7 @@ struct HomeView: View {
         }
         .padding(.horizontal)
     }
-    
+
     private var noResultsView: some View {
         ContentUnavailableView(
             vm.isShowingAllDays || vm.searchScope == .lastSevenDays
@@ -330,4 +320,126 @@ extension View {
 
 #Preview {
     HomeView(config: AppConfig(isTestMode: true))
+}
+
+private struct HomeNewsCard: View {
+    let news: NeutralNews
+    let relatedNews: [News]
+    let namespace: Namespace.ID
+    let isBackgroundColorEnabled: Bool
+    @Bindable var vm: NewsListViewModel
+    let premiumManager: PremiumManager
+    @State private var savedNewsState: SavedNewsState
+    @State private var isArticleSaved: Bool?
+    @State private var copyHeadlineTrigger = false
+
+    init(
+        news: NeutralNews,
+        relatedNews: [News],
+        namespace: Namespace.ID,
+        isBackgroundColorEnabled: Bool,
+        vm: NewsListViewModel,
+        premiumManager: PremiumManager,
+        savedNewsState: SavedNewsState
+    ) {
+        self.news = news
+        self.relatedNews = relatedNews
+        self.namespace = namespace
+        self.isBackgroundColorEnabled = isBackgroundColorEnabled
+        self.vm = vm
+        self.premiumManager = premiumManager
+        _savedNewsState = State(initialValue: savedNewsState)
+    }
+
+    var body: some View {
+        NavigationLink {
+            NeutralNewsView(news: news, relatedNews: relatedNews, namespace: namespace)
+                .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                .navigationTransition(.zoom(sourceID: news.id, in: namespace))
+                .onAppear {
+                    RatingManager.shared.incrementNewsReadCount()
+                    RatingManager.shared.requestRatingAfterPositiveInteraction()
+                }
+        } label: {
+            NewsImageView(news: news, imageUrl: news.imageUrl)
+                .padding(.vertical, 4)
+                .matchedTransitionSource(id: news.id, in: namespace)
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            let saved = isArticleSaved ?? savedNewsState.isSaved(news.id)
+            Button {
+                handleSaveAction()
+            } label: {
+                Label(saved ? "Guardada" : "Guardar", systemImage: saved ? "bookmark.fill" : "bookmark")
+            }
+
+            ShareLink(item: DeepLinkService.generateShareURL(for: news)) {
+                Label("Compartir", systemImage: "square.and.arrow.up")
+            }
+
+            Button {
+                UIPasteboard.general.string = news.neutralTitle
+                copyHeadlineTrigger.toggle()
+            } label: {
+                Label("Copiar titular", systemImage: "doc.on.doc")
+            }
+        }
+        .sensoryFeedback(trigger: isArticleSaved) { oldValue, newValue in
+            oldValue != nil && newValue != oldValue ? .success : nil
+        }
+        .sensoryFeedback(.success, trigger: copyHeadlineTrigger)
+        .onAppear {
+            if vm.shouldLoadMore(currentItem: news) {
+                vm.loadNextPage()
+            }
+
+            if let context = vm.coreDataContext {
+                Task { @MainActor in
+                    savedNewsState.ensureCached(newsId: news.id, context: context)
+                    isArticleSaved = savedNewsState.isSaved(news.id)
+                }
+            }
+        }
+        .onChange(of: savedNewsState.isSaved(news.id)) { _, newValue in
+            isArticleSaved = newValue
+        }
+    }
+
+    private func handleSaveAction() {
+        if premiumManager.canSaveNews {
+            Task {
+                await toggleSave()
+            }
+        } else {
+            premiumManager.requirePremium(for: "save_news") {
+                Task {
+                    await toggleSave()
+                }
+            }
+        }
+    }
+
+    private func toggleSave() async {
+        guard let context = vm.coreDataContext else { return }
+        let currentlySaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+        do {
+            if currentlySaved {
+                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
+                await MainActor.run {
+                    vm.removeFromSavedNews(news.id)
+                    isArticleSaved = false
+                }
+            } else {
+                try SavedNewsService.shared.saveNews(news, context: context)
+                await MainActor.run {
+                    RatingManager.shared.incrementSavedNewsCount()
+                    RatingManager.shared.requestRatingAfterPositiveInteraction()
+                    isArticleSaved = true
+                }
+            }
+        } catch {
+            print("❌ Error saving/unsaving article: \(error)")
+        }
+    }
 }
