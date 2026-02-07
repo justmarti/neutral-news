@@ -25,9 +25,19 @@ This file defines how the AI should work in this repository. The goal is to keep
 - This is a production app; prioritize stability and avoid risky changes without approval.
 
 ## Official References (Use Latest)
-- Always consult the latest official Apple documentation for any APIs or frameworks used.
+- Always consult the most up-to-date official Apple documentation for any APIs or frameworks used. Prefer current (latest) docs over legacy or archived references.
 - For UI/UX decisions, follow Apple's Human Interface Guidelines.
+- For code structure and naming, follow Apple's Swift API Design Guidelines and official framework guidance.
+- For app architecture patterns, follow Apple's official architecture guidance.
+- For concurrency patterns, follow the latest Swift Concurrency documentation.
 - For third-party libraries, follow the library's official documentation and recommended usage.
+
+### Official Links (Latest)
+- Apple Human Interface Guidelines: https://developer.apple.com/design/human-interface-guidelines/
+- Swift API Design Guidelines (Swift.org): https://www.swift.org/documentation/api-design-guidelines/
+- SwiftUI Documentation (Apple): https://developer.apple.com/documentation/swiftui/
+- Swift Concurrency Migration (Apple): https://developer.apple.com/documentation/swift/updating_an_app_to_use_swift_concurrency
+- SwiftUI App Structure (Apple): https://developer.apple.com/tutorials/swiftui-concepts/exploring-the-structure-of-a-swiftui-app
 
 ## Swift & SwiftUI Guidelines
 - Formatting: standard Xcode formatting (4-space indentation).
@@ -39,6 +49,12 @@ This file defines how the AI should work in this repository. The goal is to keep
   - Small and composable.
   - Use `@State`, `@Binding`, `@StateObject`, `@ObservedObject`, and `@EnvironmentObject` appropriately.
   - Avoid heavy logic in `body`; move to view models or helper methods.
+- Prefer modern Apple APIs whenever possible:
+  - SwiftUI over UIKit
+  - SwiftData over Core Data
+  - Swift Testing over XCTest
+  - Structured Concurrency (`async/await`) over legacy async patterns
+- Only use legacy/older APIs when no modern alternative exists in the latest official documentation, or when the codebase already uses the legacy API for that specific area. In those cases, explain the reason and get approval before proceeding.
 - Concurrency:
   - Use structured concurrency (`async/await`) as the default.
   - Avoid Combine unless explicitly required.
