@@ -9,17 +9,14 @@ import SwiftUI
 
 struct HomeToolbar {
     let vm: NewsListViewModel
-    @Binding var showingPaywall: Bool
-    @Binding var showingSafari: Bool
-    @Binding var safariURL: URL?
-    @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
-
+    @Binding var showingSettings: Bool
+    let settingsTransitionNamespace: Namespace.ID
     private let premiumManager = PremiumManager.shared
     
     @ToolbarContentBuilder
     var content: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            settingsMenu
+            settingsButton
         }
         
         ToolbarItem(placement: .topBarTrailing) {
@@ -47,52 +44,14 @@ struct HomeToolbar {
     
     // MARK: - Menu Views
     
-    private var settingsMenu: some View {
-        Menu {
-            if !premiumManager.isPremium {
-                Button {
-                    showingPaywall.toggle()
-                } label: {
-                    Label("Mejorar a Facts Pro", systemImage: "rosette")
-                }
-
-                Divider()
-            }
-
-            Button {
-                withAnimation {
-                    vm.toggleSavedNewsMode()
-                }
-            } label: {
-                Label("Noticias guardadas", systemImage: vm.isShowingSavedNews ? "bookmark.fill" : "bookmark")
-            }
-
-            Button {
-                withAnimation {
-                    isBackgroundColorEnabled.toggle()
-                }
-            } label: {
-                Label("Color de fondo", systemImage: isBackgroundColorEnabled ? "paintbrush.fill" : "paintbrush")
-            }
-
-            Divider()
-
-            Button {
-                safariURL = URL(string: "https://getfacts.app/privacy")
-                showingSafari = true
-            } label: {
-                Label("Política de Privacidad", systemImage: "hand.raised")
-            }
-
-            Button {
-                safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
-                showingSafari = true
-            } label: {
-                Label("Términos de Uso", systemImage: "doc.text")
-            }
+    private var settingsButton: some View {
+        Button {
+            showingSettings = true
         } label: {
-            Label("Opciones", systemImage: "ellipsis")
+            Image(systemName: "ellipsis")
         }
+        .accessibilityLabel("Ajustes")
+        .matchedTransitionSource(id: "settings-sheet", in: settingsTransitionNamespace)
     }
     
     private var dayMenu: some View {

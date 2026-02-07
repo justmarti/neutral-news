@@ -15,12 +15,13 @@ struct HomeView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var targetNews: NeutralNews?
-    @State private var showingSettingsSheet = false
     @State private var showingPaywall = false
     @State private var savedNewsState = SavedNewsState.shared
 
     @Namespace private var animationNamespace
+    @Namespace private var settingsTransitionNamespace
     var config: AppConfig
+    @Binding var showingSettingsSheet: Bool
 
     // Premium manager for UI state
     private let premiumManager = PremiumManager.shared
@@ -53,7 +54,11 @@ struct HomeView: View {
                             }
                         }
                         .toolbar {
-                            HomeToolbar(vm: vm, showingPaywall: $showingPaywall, showingSafari: $showingSafari, safariURL: $safariURL).content
+                            HomeToolbar(
+                                vm: vm,
+                                showingSettings: $showingSettingsSheet,
+                                settingsTransitionNamespace: settingsTransitionNamespace
+                            ).content
                         }
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .animation(.default, value: vm.isShowingSavedNews)
@@ -101,7 +106,14 @@ struct HomeView: View {
                 .sheet(isPresented: $showingPaywall) {
                     PaywallView(isPresented: $showingPaywall)
                 }
-                .safariSheet(url: safariURL, isPresented: $showingSafari)
+                .sheet(isPresented: $showingSettingsSheet) {
+                    SettingsView(
+                        vm: vm,
+                        isPresented: $showingSettingsSheet,
+                        settingsTransitionNamespace: settingsTransitionNamespace
+                    )
+                    .presentationDragIndicator(.hidden)
+                }
             }
         }
         .animation(.default, value: config.isInMaintenance)
@@ -319,7 +331,7 @@ extension View {
 }
 
 #Preview {
-    HomeView(config: AppConfig(isTestMode: true))
+    HomeView(config: AppConfig(isTestMode: true), showingSettingsSheet: .constant(false))
 }
 
 private struct HomeNewsCard: View {

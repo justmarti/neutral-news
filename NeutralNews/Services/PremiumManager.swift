@@ -16,6 +16,9 @@ final class PremiumManager {
 
     private(set) var isPremium = false
     private(set) var isLoading = false
+    private(set) var subscriptionExpirationDate: Date?
+    private(set) var subscriptionWillRenew: Bool?
+    private let entitlementId = "pro"
 
     private var pendingAction: (() -> Void)?
     private var customerInfoTask: Task<Void, Never>?
@@ -67,6 +70,9 @@ final class PremiumManager {
                 }
 
                 self?.isPremium = !(info?.entitlements.active.isEmpty ?? true)
+                if let info {
+                    self?.updateEntitlementInfo(from: info)
+                }
 #if DEBUG
                 print("✅ Premium status: \(self?.isPremium ?? false)")
 #endif
@@ -81,6 +87,7 @@ final class PremiumManager {
                     guard let self else { return }
 
                     self.isPremium = !customerInfo.entitlements.active.isEmpty
+                    self.updateEntitlementInfo(from: customerInfo)
 #if DEBUG
                     print("📱 CustomerInfo updated. Premium: \(self.isPremium)")
 #endif
@@ -159,6 +166,9 @@ final class PremiumManager {
                             print("❌ Error checking subscription status: \(error)")
                         } else {
                             self.isPremium = !(customerInfo?.entitlements.active.isEmpty ?? true)
+                            if let customerInfo {
+                                self.updateEntitlementInfo(from: customerInfo)
+                            }
 #if DEBUG
                             print("✅ Subscription status checked. Premium: \(self.isPremium)")
 #endif
@@ -182,6 +192,7 @@ final class PremiumManager {
     func updatePremiumStatus(_ customerInfo: CustomerInfo) async {
         await MainActor.run {
             self.isPremium = !customerInfo.entitlements.active.isEmpty
+            self.updateEntitlementInfo(from: customerInfo)
 #if DEBUG
             print("✅ Premium status force updated: \(self.isPremium)")
 #endif
@@ -192,6 +203,12 @@ final class PremiumManager {
                 action()
             }
         }
+    }
+
+    private func updateEntitlementInfo(from customerInfo: CustomerInfo) {
+        let entitlement = customerInfo.entitlements.active[entitlementId]
+        subscriptionExpirationDate = entitlement?.expirationDate
+        subscriptionWillRenew = entitlement?.willRenew
     }
 
 }
