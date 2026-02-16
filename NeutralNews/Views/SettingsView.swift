@@ -27,7 +27,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             settingsContent
-            .navigationTitle("Ajustes")
+            .navigationTitle("Settings")
             .listStyle(.insetGrouped)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -37,7 +37,7 @@ struct SettingsView: View {
                     } label: {
                         Image(systemName: "xmark")
                     }
-                    .accessibilityLabel("Cerrar")
+                    .accessibilityLabel("Close")
                 }
             }
             .safariSheet(url: safariURL, isPresented: $showingSafari)
@@ -76,10 +76,10 @@ struct SettingsView: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             }
 
-            Section("Apariencia") {
+            Section("Appearance") {
                 Toggle(isOn: $isBackgroundColorEnabled) {
                     SettingsRowLabel(
-                        title: "Fondo de color",
+                        title: "Colored background",
                         systemImage: "paintbrush.fill",
                         tint: .orange
                     )
@@ -92,7 +92,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingsRowLabel(
-                        title: "Tema",
+                        title: "Theme",
                         systemImage: "circle.lefthalf.filled",
                         tint: .indigo
                     )
@@ -100,7 +100,7 @@ struct SettingsView: View {
                 .pickerStyle(.navigationLink)
             }
 
-            Section("Contenido") {
+            Section("Content") {
                 Button {
                     withAnimation {
                         vm.toggleSavedNewsMode()
@@ -108,7 +108,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingsRowLabel(
-                        title: "Noticias guardadas",
+                        title: "Saved news",
                         systemImage: "bookmark.fill",
                         tint: .blue
                     )
@@ -121,7 +121,7 @@ struct SettingsView: View {
                     }
                 } label: {
                     SettingsRowLabel(
-                        title: "Región",
+                        title: "Region",
                         systemImage: "globe.americas.fill",
                         tint: .teal
                     )
@@ -142,12 +142,12 @@ struct SettingsView: View {
 //                .foregroundStyle(.secondary)
             }
 
-            Section("Feedback") {
+            Section("Promote") {
                 Button {
                     openAppStoreReview()
                 } label: {
                     SettingsRowLabel(
-                        title: "Valorar en la App Store",
+                        title: "Rate on the App Store",
                         systemImage: "star.fill",
                         tint: .yellow,
                         showsExternalIndicator: true
@@ -157,7 +157,7 @@ struct SettingsView: View {
 
                 ShareLink(item: URL(string: "https://apps.apple.com/app/id6748583935")!) {
                     SettingsRowLabel(
-                        title: "Recomendar a un amigo",
+                        title: "Recommend to a friend",
                         systemImage: "square.and.arrow.up.fill",
                         tint: .green
                     )
@@ -171,7 +171,7 @@ struct SettingsView: View {
                     showingSafari = true
                 } label: {
                     SettingsRowLabel(
-                        title: "Política de Privacidad",
+                        title: "Privacy Policy",
                         systemImage: "hand.raised.fill",
                         tint: .gray
                     )
@@ -183,7 +183,7 @@ struct SettingsView: View {
                     showingSafari = true
                 } label: {
                     SettingsRowLabel(
-                        title: "Términos de Uso",
+                        title: "Terms of Use",
                         systemImage: "doc.text.fill",
                         tint: .gray
                     )
@@ -218,7 +218,7 @@ struct SettingsView: View {
                 Text("Facts Pro")
                     .font(.title)
                     .fontWeight(.bold)
-                Text("Desbloquea el acceso completo.")
+                Text("Unlock full access.")
                     .font(.headline)
                     .foregroundStyle(.secondary)
             }
@@ -241,25 +241,25 @@ struct SettingsView: View {
         }
     }
 
-    private var premiumThanksBanner: some View {
-        VStack(alignment: .center) {
-            Image(systemName: "heart.fill")
-                .font(.title)
-                .symbolEffect(.pulse, options: .repeating.speed(0.5))
-
-            Text("Gracias por apoyar Facts")
-                .font(.headline)
-            Text(subscriptionStatusText)
-                .font(.subheadline)
-        }
-        .padding()
-        .padding(.vertical)
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity)
-    }
+//    private var premiumThanksBanner: some View {
+//        VStack(alignment: .center) {
+//            Image(systemName: "heart.fill")
+//                .font(.title)
+//                .symbolEffect(.pulse, options: .repeating.speed(0.5))
+//
+//            Text("Thanks for supporting Facts")
+//                .font(.headline)
+//            Text(subscriptionStatusText)
+//                .font(.subheadline)
+//        }
+//        .padding()
+//        .padding(.vertical)
+//        .foregroundStyle(.secondary)
+//        .frame(maxWidth: .infinity)
+//    }
 
     private struct SettingsRowLabel: View {
-        let title: String
+        let title: LocalizedStringResource
         let systemImage: String
         let tint: Color
         var showsExternalIndicator = false
@@ -290,29 +290,29 @@ struct SettingsView: View {
         openURL(url)
     }
 
-    private var subscriptionStatusText: String {
-        guard let expirationDate = premiumManager.subscriptionExpirationDate else {
-            return "Tu suscripción es vitalicia"
-        }
-
-        let now = Date()
-        let dayDifference = Calendar.current.dateComponents([.day], from: now, to: expirationDate).day ?? 0
-        let remainingDays = max(dayDifference, 0)
-        let remainingMonths = max(remainingDays / 30, 0)
-
-        let remainingText: String
-        if remainingDays >= 60 {
-            remainingText = remainingMonths == 1 ? "1 mes" : "\(remainingMonths) meses"
-        } else {
-            remainingText = remainingDays == 1 ? "1 día" : "\(remainingDays) días"
-        }
-
-        if premiumManager.subscriptionWillRenew == true {
-            return "Tu suscripción renueva en \(remainingText)"
-        } else {
-            return "Tu suscripción termina en \(remainingText)"
-        }
-    }
+//    private var subscriptionStatusText: String {
+//        guard let expirationDate = premiumManager.subscriptionExpirationDate else {
+//            return "Tu suscripción es vitalicia"
+//        }
+//
+//        let now = Date()
+//        let dayDifference = Calendar.current.dateComponents([.day], from: now, to: expirationDate).day ?? 0
+//        let remainingDays = max(dayDifference, 0)
+//        let remainingMonths = max(remainingDays / 30, 0)
+//
+//        let remainingText: String
+//        if remainingDays >= 60 {
+//            remainingText = remainingMonths == 1 ? "1 mes" : "\(remainingMonths) meses"
+//        } else {
+//            remainingText = remainingDays == 1 ? "1 día" : "\(remainingDays) días"
+//        }
+//
+//        if premiumManager.subscriptionWillRenew == true {
+//            return "Tu suscripción renueva en \(remainingText)"
+//        } else {
+//            return "Tu suscripción termina en \(remainingText)"
+//        }
+//    }
 
     private var selectedColorScheme: AppColorScheme {
         AppColorScheme(rawValue: appColorScheme) ?? .system

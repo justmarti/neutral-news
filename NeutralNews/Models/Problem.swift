@@ -8,25 +8,26 @@
 import SwiftUI
 
 enum Problem: String, CaseIterable {
-    case newsRepeated = "Noticia repetida"
-    case notRelatedNews = "Noticia no relacionada"
-    case wrongInformation = "Información incorrecta"
-    case offensiveLanguage = "Lenguaje ofensivo"
+    case newsRepeated = "news_repeated"
+    case notRelatedNews = "not_related_news"
+    case wrongInformation = "wrong_information"
+    case offensiveLanguage = "offensive_language"
     
-    var title: String {
-        return self.rawValue
+    var title: LocalizedStringResource {
+        switch self {
+        case .newsRepeated: "Duplicate article"
+        case .notRelatedNews: "Unrelated article"
+        case .wrongInformation: "Incorrect information"
+        case .offensiveLanguage: "Offensive language"
+        }
     }
     
-    var description: String {
+    var description: LocalizedStringResource {
         switch self {
-        case .newsRepeated:
-            return "Esta noticia ya aparece en otra sección o día"
-        case .notRelatedNews:
-            return "Hay alguna noticia no relacionada abajo"
-        case .wrongInformation:
-            return "La información mostrada contiene errores"
-        case .offensiveLanguage:
-            return "El contenido incluye lenguaje inapropiado"
+        case .newsRepeated: "This story already appears in another section or day"
+        case .notRelatedNews: "There is an unrelated article below"
+        case .wrongInformation: "The displayed information contains errors"
+        case .offensiveLanguage: "The content includes inappropriate language"
         }
     }
     

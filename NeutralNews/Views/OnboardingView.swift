@@ -10,12 +10,12 @@ import SwiftUI
 // MARK: - Models
 
 struct OnboardingPageData {
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
     let image: ImageResource?
     let customContent: (() -> AnyView)?
 
-    init(title: String, subtitle: String, image: ImageResource? = nil, customContent: (() -> AnyView)? = nil) {
+    init(title: LocalizedStringResource, subtitle: LocalizedStringResource, image: ImageResource? = nil, customContent: (() -> AnyView)? = nil) {
         self.title = title
         self.subtitle = subtitle
         self.image = image
@@ -26,11 +26,11 @@ struct OnboardingPageData {
 // MARK: - Reusable Components
 
 struct ChatBubble: View {
-    let text: String
+    let text: LocalizedStringResource
     let alignment: Alignment
     let maxWidth: CGFloat
 
-    init(_ text: String, alignment: Alignment = .leading, maxWidth: CGFloat = 280) {
+    init(_ text: LocalizedStringResource, alignment: Alignment = .leading, maxWidth: CGFloat = 280) {
         self.text = text
         self.alignment = alignment
         self.maxWidth = maxWidth
@@ -84,17 +84,17 @@ struct ChatBubble: View {
 // MARK: - Individual Page Views
 
 struct OnboardingPageOne: View {
-    private let chatMessages = [
-        ("El Madrid vence con facilidad a un Barça en horas bajas", Alignment.leading),
-        ("El Gobierno elude su responsabilidad en la crisis económica", Alignment.trailing),
-        ("España lidera Europa en crecimiento pese a las críticas de la oposición", Alignment.leading)
+    private let chatMessages: [(LocalizedStringResource, Alignment)] = [
+        ("Lakers cruise past Celtics in dominant home win", Alignment.leading),
+        ("White House deflects blame for higher prices", Alignment.trailing),
+        ("U.S. growth holds firm despite mounting recession concerns", Alignment.leading)
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             OnboardingPageHeader(
-                title: "Informarse no es fácil",
-                subtitle: "A menudo los medios muestran los hechos de forma parcial"
+                title: "Media Noise",
+                subtitle: "Between bias and opinion, it’s hard to see what matters"
             )
 
             VStack(spacing: 16) {
@@ -102,6 +102,7 @@ struct OnboardingPageOne: View {
                     ChatBubble(message.0, alignment: message.1)
                 }
             }
+            .padding(.top)
 
             Spacer()
         }
@@ -110,32 +111,16 @@ struct OnboardingPageOne: View {
 }
 
 struct OnboardingPageTwo: View {
+    let image: ImageResource
+
     var body: some View {
         VStack(alignment: .leading) {
             OnboardingPageHeader(
-                title: "Forma tu propia opinión",
-                subtitle: "Facts muestra la actualidad sin sesgos ideológicos"
+                title: "Neutral Summary",
+                subtitle: "Key facts, clear and straight to the point"
             )
 
-            Image(.screenshot1)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 32)
-    }
-}
-
-struct OnboardingPageThree: View {
-    var body: some View {
-        VStack(alignment: .leading) {
-            OnboardingPageHeader(
-                title: "Resumen neutral",
-                subtitle: "Un vistazo claro y objetivo de las noticias"
-            )
-
-            Image(.screenshot2)
+            Image(image)
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -145,26 +130,30 @@ struct OnboardingPageThree: View {
     }
 }
 
-struct OnboardingPageFour: View {
+struct OnboardingPageThree: View {
+    let image: ImageResource
+
     var body: some View {
         VStack(alignment: .leading) {
             OnboardingPageHeader(
-                title: "Compara perspectivas",
-                subtitle: "Diferentes versiones de los mismos hechos"
+                title: "Multiple Perspectives",
+                subtitle: "Different angles on the same story"
             )
 
-            Image(.screenshot3)
+            Image(image)
                 .resizable()
                 .scaledToFit()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.top, 16)
         }
         .padding(.horizontal)
+        .padding(.bottom, 48)
     }
 }
 
 struct OnboardingPageHeader: View {
-    let title: String
-    let subtitle: String
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -186,10 +175,11 @@ struct OnboardingPageHeader: View {
 struct OnboardingView: View {
     @Binding var isPresented: Bool
     @State private var currentPage = 1
+    @Environment(\.locale) private var appLocale
     let onComplete: () -> Void
 
     private enum Constants {
-        static let totalPages = 4
+        static let totalPages = 3
         static let iconSize: CGFloat = 80
         static let animationDuration: TimeInterval = 0.3
         static let buttonVerticalPadding: CGFloat = 8
@@ -199,8 +189,20 @@ struct OnboardingView: View {
         currentPage >= Constants.totalPages
     }
 
-    private var buttonTitle: String {
-        isLastPage ? "Empezar" : "Siguiente"
+    private var buttonTitle: LocalizedStringResource {
+        isLastPage ? "Get Started" : "Next"
+    }
+
+    private var isSpanishLocale: Bool {
+        appLocale.language.languageCode?.identifier == "es"
+    }
+
+    private var imageOne: ImageResource {
+        isSpanishLocale ? .onboarding01EsES : .onboarding01EnUS
+    }
+
+    private var imageTwo: ImageResource {
+        isSpanishLocale ? .onboarding02EsES : .onboarding02EnUS
     }
 
     var body: some View {
@@ -220,9 +222,8 @@ struct OnboardingView: View {
             
             TabView(selection: $currentPage) {
                 OnboardingPageOne().tag(1)
-                OnboardingPageTwo().tag(2)
-                OnboardingPageThree().tag(3)
-                OnboardingPageFour().tag(4)
+                OnboardingPageTwo(image: imageOne).tag(2)
+                OnboardingPageThree(image: imageTwo).tag(3)
             }
 
             Button(action: handleButtonTap) {
@@ -255,7 +256,5 @@ struct OnboardingView: View {
 }
 
 #Preview {
-    OnboardingView(isPresented: .constant(true)) {
-        print("Onboarding completed")
-    }
+    OnboardingView(isPresented: .constant(true)) { }
 }

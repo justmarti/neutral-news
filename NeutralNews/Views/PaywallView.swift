@@ -15,6 +15,7 @@ struct PaywallView: View {
     @State private var isRestoringPurchases = false
     @State private var showingSafari = false
     @State private var safariURL: URL?
+    @Environment(\.locale) private var appLocale
 
     var body: some View {
         SubscriptionStoreView(productIDs: [
@@ -33,19 +34,20 @@ struct PaywallView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
-                    Text("Acceso completo a la app")
+                    Text("Full app access")
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
                 
                 VStack(spacing: 16) {
-                    ProFeatureRow(icon: "calendar", text: "Lee noticias de los últimos 7 días")
-                    ProFeatureRow(icon: "bookmark.fill", text: "Guarda noticias")
-                    ProFeatureRow(icon: "heart.fill", text: "Apoya una app independiente")
+                    ProFeatureRow(icon: "calendar", text: "Read news from the last 7 days")
+                    ProFeatureRow(icon: "bookmark.fill", text: "Save stories")
+                    ProFeatureRow(icon: "heart.fill", text: "Support an independent app")
                 }
                 .padding(.vertical, 16)
 
             }
+            .environment(\.locale, appLocale)
         }
         .scrollIndicators(.hidden)
         .subscriptionStoreButtonLabel(.automatic)
@@ -62,7 +64,7 @@ struct PaywallView: View {
                             isRestoringPurchases = false
                         }
                     } label: {
-                        Text(isRestoringPurchases ? "Restaurando..." : "Restaurar Compras")
+                        Text(isRestoringPurchases ? "Restoring..." : "Restore Purchases")
                     }
                     .disabled(isRestoringPurchases)
 
@@ -83,14 +85,14 @@ struct PaywallView: View {
 
                 // Terms and Privacy Links
                 HStack {
-                    Button("Términos de Uso") {
+                    Button("Terms of Use") {
                         safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
                         showingSafari = true
                     }
 
                     Text("•")
 
-                    Button("Política de Privacidad") {
+                    Button("Privacy Policy") {
                         safariURL = URL(string: "https://getfacts.app/privacy")
                         showingSafari = true
                     }
@@ -103,14 +105,14 @@ struct PaywallView: View {
         .overlay {
             if isProcessingPurchase {
                 ZStack {
-                    Color.black.opacity(0.3)
+                    Color.nnBackground
                         .ignoresSafeArea()
 
                     VStack(spacing: 16) {
                         ProgressView()
                             .scaleEffect(1.2)
 
-                        Text("Activando suscripción...")
+                        Text("Activating subscription...")
                             .font(.headline)
                     }
                     .padding(32)
@@ -196,7 +198,7 @@ struct PaywallView: View {
 
 struct ProFeatureRow: View {
     let icon: String
-    let text: String
+    let text: LocalizedStringResource
     
     var body: some View {
         HStack(spacing: 16) {

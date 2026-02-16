@@ -13,9 +13,9 @@ struct MaintenanceView: View {
     var body: some View {
         ScrollView {
             ContentUnavailableView(
-                "En mantenimiento",
+                "Under maintenance",
                 systemImage: "gearshape.2.fill",
-                description: Text("Pronto estará todo listo, gracias por tu paciencia.")
+                description: Text("Everything will be ready soon. Thanks for your patience.")
             )
             .containerRelativeFrame([.horizontal, .vertical])
         }

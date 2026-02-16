@@ -21,14 +21,14 @@ enum ContentRegionPreference: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
         case .automatic:
-            return "Automático"
+            return "Automatic"
         case .us:
-            return "Estados Unidos"
+            return "United States"
         case .es:
-            return "España"
+            return "Spain"
         }
     }
 }

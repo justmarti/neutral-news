@@ -35,6 +35,26 @@ struct HomeView: View {
         vm.searchScope == .lastSevenDays && !premiumManager.isPremium
     }
 
+    private var navigationTitleText: String {
+        if vm.isShowingSavedNews {
+            return String(localized: "Saved news")
+        } else if vm.isShowingAllDays {
+            return String(localized: "All news")
+        } else {
+            return vm.daySelected.dayName
+        }
+    }
+
+    private var navigationSubtitleText: String {
+        if vm.isShowingSavedNews {
+            return String(localized: vm.savedNewsSubtitle)
+        } else if vm.isShowingAllDays {
+            return String(localized: "Last 7 days")
+        } else {
+            return vm.daySelected.formattedDateShort
+        }
+    }
+
     var body: some View {
         Group {
             if config.isInMaintenance {
@@ -42,15 +62,15 @@ struct HomeView: View {
             } else {
                 NavigationStack {
                     newsContentView
-                        .navigationTitle(vm.isShowingSavedNews ? "Guardadas" : (vm.isShowingAllDays ? "Todas las noticias" : vm.daySelected.dayName))
+                        .navigationTitle(navigationTitleText)
                         // TODO: Mirar que opción es mejor para el title
 //                        .toolbarTitleDisplayMode(.inlineLarge)
-                        .myNavigationSubtitle(vm.isShowingSavedNews ? vm.savedNewsSubtitle : (vm.isShowingAllDays ? "Últimos 7 días" : vm.daySelected.formattedDateShort))
-                        .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Buscar")
+                        .myNavigationSubtitle(navigationSubtitleText)
+                        .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Search")
                         .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
                             if !vm.isShowingAllDays && !vm.isShowingSavedNews {
                                 Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
-                                Text("Últimos 7 días").tag(SearchScope.lastSevenDays)
+                                Text("Last 7 days").tag(SearchScope.lastSevenDays)
                             }
                         }
                         .toolbar {
@@ -183,7 +203,7 @@ struct HomeView: View {
                 HStack {
                     ProgressView()
                         .scaleEffect(0.8)
-                    Text("Cargando más noticias...")
+                    Text("Loading more news...")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -197,23 +217,23 @@ struct HomeView: View {
     private var noResultsView: some View {
         ContentUnavailableView(
             vm.isShowingAllDays || vm.searchScope == .lastSevenDays
-                ? "No hay resultados para \"\(vm.searchText)\""
-                : "No hay resultados para \"\(vm.searchText)\" en noticias de \(vm.daySelected.dayName)",
+                ? "No results for \"\(vm.searchText)\""
+                : "No results for \"\(vm.searchText)\" in news from \(vm.daySelected.dayName)",
             systemImage: "magnifyingglass",
             description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
-                ? "Intenta con otro término de búsqueda."
-                : "Intenta con otro término o selecciona un día distinto.")
+                ? "Try another search term."
+                : "Try another term or select a different day.")
         )
         .containerRelativeFrame([.horizontal, .vertical])
     }
     
     private var noNewsYetView: some View {
         ContentUnavailableView(
-            "Aún no hay noticias",
+            "No news yet",
             systemImage: "newspaper",
             description: Text(vm.isShowingAllDays || vm.searchScope == .lastSevenDays
-                ? "Vuelve a intentarlo en unos minutos."
-                : "Vuelve a intentarlo más tarde o selecciona otro día.")
+                ? "Try again in a few minutes."
+                : "Try again later or select another day.")
         )
         .containerRelativeFrame([.horizontal, .vertical])
     }
@@ -222,7 +242,7 @@ struct HomeView: View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.2)
-            Text("Cargando noticias...")
+            Text("Loading news...")
                 .font(.headline)
                 .foregroundStyle(.secondary)
         }
@@ -232,20 +252,20 @@ struct HomeView: View {
     private var savedNewsContentView: some View {
         Group {
             if vm.isLoadingSavedNews {
-                ProgressView("Cargando noticias guardadas...")
+                ProgressView("Loading saved news...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty {
                 ContentUnavailableView(
-                    "No se encontraron resultados para \"\(vm.searchText)\"",
+                    "No results for \"\(vm.searchText)\"",
                     systemImage: "magnifyingglass",
-                    description: Text("Prueba con otra búsqueda en tus noticias guardadas.")
+                    description: Text("Try another search in your saved news.")
                 )
                 .containerRelativeFrame([.horizontal, .vertical])
             } else if vm.savedNews.isEmpty {
                 ContentUnavailableView(
-                    "No tienes noticias guardadas",
+                    "You don't have any saved news",
                     systemImage: "bookmark.slash",
-                    description: Text("Guarda noticias que te interesen para leerlas más tarde.")
+                    description: Text("Save stories you're interested in to read later.")
                 )
                 .containerRelativeFrame([.horizontal, .vertical])
             } else {
@@ -264,10 +284,10 @@ struct HomeView: View {
                     .foregroundStyle(.accent)
                 
                 VStack(alignment: .leading) {
-                    Text("Mejores resultados")
+                    Text("Top results")
                         .font(.headline)
                     
-                    Text("Accede a todos los resultados con Facts Pro")
+                    Text("Access all results with Facts Pro")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -278,7 +298,7 @@ struct HomeView: View {
             .background(.accent.quinary.opacity(0.5), in: .rect(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(.accent.secondary, lineWidth: 2)
+                    .stroke(.quinary, lineWidth: 2)
             )
         }
         .buttonStyle(.plain)
@@ -383,18 +403,18 @@ private struct HomeNewsCard: View {
             Button {
                 handleSaveAction()
             } label: {
-                Label(saved ? "Guardada" : "Guardar", systemImage: saved ? "bookmark.fill" : "bookmark")
+                Label(saved ? "Saved" : "Save", systemImage: saved ? "bookmark.fill" : "bookmark")
             }
 
             ShareLink(item: DeepLinkService.generateShareURL(for: news)) {
-                Label("Compartir", systemImage: "square.and.arrow.up")
+                Label("Share", systemImage: "square.and.arrow.up")
             }
 
             Button {
                 UIPasteboard.general.string = news.neutralTitle
                 copyHeadlineTrigger.toggle()
             } label: {
-                Label("Copiar titular", systemImage: "doc.on.doc")
+                Label("Copy headline", systemImage: "doc.on.doc")
             }
         }
         .sensoryFeedback(trigger: isArticleSaved) { oldValue, newValue in

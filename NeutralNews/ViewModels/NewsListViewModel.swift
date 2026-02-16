@@ -168,14 +168,14 @@ final class NewsListViewModel {
     
     var isShowingAllDays = false
 
-    var savedNewsSubtitle: String {
+    var savedNewsSubtitle: LocalizedStringResource {
         let filteredCount = newsToShow.count
         let totalCount = savedNews.count
 
         if isAnyFilterEnabled && filteredCount != totalCount {
-            return "\(filteredCount) de \(totalCount) noticias"
+            return "\(filteredCount) out of \(totalCount) news articles"
         } else {
-            return "\(totalCount) noticias"
+            return "\(totalCount) news articles"
         }
     }
     

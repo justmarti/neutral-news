@@ -57,7 +57,7 @@ struct NewsView: View {
                                 showSafari = true
                             } label: {
                                 HStack {
-                                    Text("Leer en la fuente")
+                                    Text("Read at the source")
                                     Image(systemName: "arrow.up.right")
                                 }
                                 .fontWeight(.semibold)
@@ -67,7 +67,7 @@ struct NewsView: View {
                         
                         Spacer()
                         
-                        Text("Facts es independiente, no está asociado a \(news.publisher) ni a ningún otro medio de comunicación.")
+                        Text("Facts is independent and not affiliated with \(news.publisher) or any other news outlet.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }

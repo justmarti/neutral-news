@@ -34,7 +34,7 @@ struct HomeToolbar {
                         vm.toggleSavedNewsMode()
                     }
                 } label: {
-                    Label("Salir de guardadas", systemImage: "bookmark.fill")
+                    Label("Exit saved", systemImage: "bookmark.fill")
                 }
             } else {
                 dayMenu
@@ -50,7 +50,7 @@ struct HomeToolbar {
         } label: {
             Image(systemName: "ellipsis")
         }
-        .accessibilityLabel("Ajustes")
+        .accessibilityLabel("Settings")
         .matchedTransitionSource(id: "settings-sheet", in: settingsTransitionNamespace)
     }
     
@@ -65,8 +65,8 @@ struct HomeToolbar {
                     }
                 }
             } label: {
-                Label("Todas las noticias", systemImage: !premiumManager.canViewAllDays ? "lock.fill" : (vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack"))
-                Text("Últimos 7 días")
+                Label("All news", systemImage: !premiumManager.canViewAllDays ? "lock.fill" : (vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack"))
+                Text("Last 7 days")
             }
             
             Divider()
@@ -85,7 +85,7 @@ struct HomeToolbar {
                 }
             }
         } label: {
-            Label("Cambiar día", systemImage: "calendar")
+            Label("Change day", systemImage: "calendar")
         }
     }
     
@@ -94,23 +94,23 @@ struct HomeToolbar {
             Button {
                 vm.orderBy = .hour
             } label: {
-                Label("Hora", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
-                Text("Últimas noticias")
+                Label("Time", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
+                Text("Latest news")
             }
             Button {
                 vm.orderBy = .relevance
             } label: {
-                Label("Relevancia", systemImage: vm.orderBy == .relevance ? "megaphone.fill" : "megaphone")
-                Text("Las más importantes")
+                Label("Relevance", systemImage: vm.orderBy == .relevance ? "megaphone.fill" : "megaphone")
+                Text("Top stories")
             }
             Button {
                 vm.orderBy = .popularity
             } label: {
-                Label("Cobertura", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
-                Text("Las más comentadas")
+                Label("Coverage", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
+                Text("Most commented")
             }
         } label: {
-            Label("Ordenar", systemImage: "arrow.up.arrow.down.circle")
+            Label("Sort", systemImage: "arrow.up.arrow.down.circle")
         }
     }
     
@@ -120,17 +120,17 @@ struct HomeToolbar {
                 Button {
                     vm.orderBy = .hour
                 } label: {
-                    Label("Hora", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
+                    Label("Time", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
                 }
                 Button {
                     vm.orderBy = .relevance
                 } label: {
-                    Label("Relevancia", systemImage: vm.orderBy == .relevance ? "megaphone.fill" : "megaphone")
+                    Label("Relevance", systemImage: vm.orderBy == .relevance ? "megaphone.fill" : "megaphone")
                 }
                 Button {
                     vm.orderBy = .popularity
                 } label: {
-                    Label("Cobertura", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
+                    Label("Coverage", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
                 }
             }
             
@@ -153,12 +153,12 @@ struct HomeToolbar {
                     Button(role: .destructive) {
                         vm.clearFilters()
                     } label: {
-                        Label("Borrar filtros", systemImage: "trash")
+                        Label("Clear filters", systemImage: "trash")
                     }
                 }
             }
         } label: {
-            Label("Filtrar", systemImage: vm.isAnyFilterEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+            Label("Filter", systemImage: vm.isAnyFilterEnabled ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
         }
     }
 }

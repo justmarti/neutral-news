@@ -31,23 +31,23 @@ struct NeutralNewsOptionsMenu: View {
                 }
             } label: {
                 Label(
-                    (isArticleSaved ?? false) ? "Guardada" : "Guardar",
+                    (isArticleSaved ?? false) ? "Saved" : "Save",
                     systemImage: !premiumManager.canSaveNews ? "lock.fill" : ((isArticleSaved ?? false) ? "bookmark.fill" : "bookmark")
                 )
             }
 
             ShareLink(item: generateShareURL()) {
-                Label("Compartir", systemImage: "square.and.arrow.up")
+                Label("Share", systemImage: "square.and.arrow.up")
             }
 
             Button {
                 isShowingReportProblemSheet.toggle()
             } label: {
-                Label("Reportar problema", systemImage: "exclamationmark.bubble")
+                Label("Report a problem", systemImage: "exclamationmark.bubble")
             }
 
         } label: {
-            Label("Opciones", systemImage: "ellipsis")
+            Label("Options", systemImage: "ellipsis")
         }
         .sensoryFeedback(trigger: isArticleSaved) { oldValue, newValue in
             // Only trigger if we had a previous value (not initial load from nil)

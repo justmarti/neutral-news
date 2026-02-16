@@ -80,10 +80,10 @@ struct BiasScoreView: View {
                 .foregroundStyle(.accent, .secondary)
             
             VStack(alignment: .leading, spacing: 6) {
-                Text("Nivel de neutralidad")
+                Text("Neutrality level")
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .foregroundStyle(.accent)
-                Text("Este valor indica cuán neutral es la noticia,\nsiendo 0 muy sesgada y 10 neutral.")
+                Text("This value indicates how neutral the story is,\nwith 0 being very biased and 10 neutral.")
                     .font(.system(.footnote, design: .rounded))
                     .foregroundStyle(.secondary)
             }

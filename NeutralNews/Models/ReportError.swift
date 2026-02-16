@@ -14,33 +14,23 @@ enum ReportError: Equatable {
     case permissionDenied
     case unknown
     
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
-        case .cooldown:
-            return "Espera un momento"
-        case .networkError:
-            return "Sin conexión"
-        case .firebaseError:
-            return "Error del servidor"
-        case .permissionDenied:
-            return "Sin permisos"
-        case .unknown:
-            return "Error inesperado"
+        case .cooldown: "Wait a moment"
+        case .networkError: "No connection"
+        case .firebaseError: "Server error"
+        case .permissionDenied: "Permission denied"
+        case .unknown: "Unexpected error"
         }
     }
     
-    var description: String {
+    var description: LocalizedStringResource {
         switch self {
-        case .cooldown(let time):
-            return "Puedes enviar otro reporte en \(time)"
-        case .networkError:
-            return "Revisa tu conexión a internet e inténtalo de nuevo"
-        case .firebaseError:
-            return "Hubo un problema con el servidor. Inténtalo más tarde"
-        case .permissionDenied:
-            return "No tienes permisos para enviar reportes"
-        case .unknown:
-            return "Algo salió mal. Inténtalo de nuevo"
+        case .cooldown(let time): "You can send another report in \(time)."
+        case .networkError: "Check your internet connection and try again."
+        case .firebaseError: "There was a problem with the server. Try again later."
+        case .permissionDenied: "You don’t have permission to send reports."
+        case .unknown: "Something went wrong. Try again."
         }
     }
     

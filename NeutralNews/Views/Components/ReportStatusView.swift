@@ -91,10 +91,10 @@ struct ReportStatusView: View {
         }
     }
     
-    private var statusMessage: String {
+    private var statusMessage: LocalizedStringResource {
         switch type {
         case .success:
-            return "Reporte enviado correctamente."
+            return "Report sent successfully"
         case .error(let reportError):
             return reportError.description
         }

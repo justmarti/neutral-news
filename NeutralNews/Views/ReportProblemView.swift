@@ -61,7 +61,7 @@ struct ReportProblemView: View {
     }
     
     private var headerSection: some View {
-        Text("Selecciona el tipo de problema que mejor describe la situación.")
+        Text("Select the type of problem that best describes the issue.")
             .font(.subheadline)
             .foregroundStyle(.secondary)
     }
@@ -82,7 +82,7 @@ struct ReportProblemView: View {
                 } else {
                     Image(systemName: "paperplane")
                 }
-                Text(viewModel.isSubmitting ? "Enviando..." : "Enviar reporte")
+                Text(viewModel.isSubmitting ? "Sending..." : "Send report")
             }
             .font(.headline)
             .foregroundStyle(.white)
@@ -106,7 +106,7 @@ struct ReportProblemView: View {
         } else if isVeryCompact {
             return ""
         } else {
-            return "Reportar problema"
+            return "Report a problem"
         }
     }
 }

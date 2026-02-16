@@ -30,7 +30,7 @@ struct NeutralNewsView: View {
                                         .month()
                                         .hour()
                                         .minute()
-                                        .locale(Locale(identifier: "es_ES"))
+                                        .locale(.autoupdatingCurrent)
                                 ).uppercased())
                             }
                             .font(.subheadline)
@@ -56,7 +56,7 @@ struct NeutralNewsView: View {
                                                 .scaledToFit()
                                                 .clipShape(.rect(cornerRadius: 16))
                                             
-                                            Text("Imagen extraída de \(news.imageMedium), ver su noticia al final de la página.")
+                                            Text("Image from \(news.imageMedium). Source articles are at the bottom of the page.")
                                                     .font(.footnote)
                                                     .foregroundStyle(.secondary)
                                         }

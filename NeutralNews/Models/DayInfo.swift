@@ -16,14 +16,19 @@ struct DayInfo: Identifiable, Hashable {
     var dayName: String {
         let calendar = Calendar.current
         let dayFormatter = DateFormatter()
+        let relativeDayFormatter = DateFormatter()
 
-        dayFormatter.locale = Locale(identifier: "es_ES")
+        dayFormatter.locale = .autoupdatingCurrent
         dayFormatter.dateFormat = "EEEE"
+        relativeDayFormatter.locale = .autoupdatingCurrent
+        relativeDayFormatter.dateStyle = .full
+        relativeDayFormatter.timeStyle = .none
+        relativeDayFormatter.doesRelativeDateFormatting = true
 
         if calendar.isDateInToday(date) {
-            return "Hoy"
+            return relativeDayFormatter.string(from: date).capitalized
         } else if calendar.isDateInYesterday(date) {
-            return "Ayer"
+            return relativeDayFormatter.string(from: date).capitalized
         } else {
             return dayFormatter.string(from: date).capitalized
         }
@@ -39,7 +44,7 @@ struct DayInfo: Identifiable, Hashable {
         let calendar = Calendar.current
         let monthFormatter = DateFormatter()
 
-        monthFormatter.locale = Locale(identifier: "es_ES")
+        monthFormatter.locale = .autoupdatingCurrent
         monthFormatter.dateFormat = "LLLL"
 
         self.dayNumber = calendar.component(.day, from: date)
@@ -48,15 +53,28 @@ struct DayInfo: Identifiable, Hashable {
     }
     
     var formattedDateLong: String {
-        "\(dayName), \(dayNumber) de \(monthName)"
+        date.formatted(
+            Date.FormatStyle.dateTime
+                .weekday(.wide)
+                .day()
+                .month(.wide)
+                .locale(.autoupdatingCurrent)
+        ).capitalized
     }
     var formattedDateShort: String {
-        "\(dayNumber) de \(monthName)"
+        date.formatted(
+            Date.FormatStyle.dateTime
+                .day()
+                .month(.wide)
+                .locale(.autoupdatingCurrent)
+        )
     }
     
     var shortFormat: String {
-        switch dayName {
-        case "Hoy", "Ayer":
+        switch Calendar.current {
+        case let calendar where calendar.isDateInToday(date):
+            return dayName
+        case let calendar where calendar.isDateInYesterday(date):
             return dayName
         default:
             return "\(dayName) \(dayNumber)"
