@@ -1,50 +1,11 @@
 //
-//  NewsRowView.swift
+//  NewsImageView.swift
 //  NeutralNews
 //
 //  Created by Martí Espinosa Farran on 12/17/24.
 //
 
 import SwiftUI
-
-struct NewsRowView: View {
-    let news: NeutralNews
-    let imageUrl: String?
-    let dominantColor: Color
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(news.category.uppercased())
-                Spacer()
-//                Text(String(news.pubDate.toDate()?.formatted(date: .abbreviated, time: .omitted) ?? ""))
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .lineLimit(1)
-            
-            Text(news.neutralTitle)
-                .font(.headline)
-                .lineLimit(3)
-            
-            NewsImageView(news: news, imageUrl: imageUrl)
-            
-            Text(news.neutralDescription)
-                .foregroundStyle(.secondary)
-                .lineLimit(5)
-                .padding(.top, 8)
-        }
-        .padding()
-        .frame(maxWidth: .infinity)
-        .background(.regularMaterial)
-        .clipShape(.rect(cornerRadius: 20))
-        .padding(.horizontal)
-    }
-}
-
-#Preview {
-    NewsRowView(news: NeutralNews.mock, imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg", dominantColor: .blue)
-}
 
 struct NewsImageView: View {
     let news: NeutralNews
@@ -103,5 +64,9 @@ struct NewsImageView: View {
 }
 
 #Preview {
-    NewsImageView(news: NeutralNews.mock, imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg")
+    NewsImageView(
+        news: NeutralNews.mock,
+        imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg"
+    )
+    .padding()
 }
