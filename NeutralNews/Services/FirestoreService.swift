@@ -104,7 +104,7 @@ final class FirestoreService {
     private func parseNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
         guard let neutralTitle = data["neutral_title"] as? String,
               let neutralDescription = data["neutral_description"] as? String,
-              let category = data["category"] as? String,
+              let category = (data["category_id"] as? String) ?? (data["category"] as? String),
               let relevance = data["relevance"] as? Int,
               let imageUrl = data["image_url"] as? String,
               let imageMedium = data["image_medium"] as? String,
@@ -135,7 +135,7 @@ final class FirestoreService {
         guard let title = data["title"] as? String,
               let description = data["description_short"] as? String,
               let group = data["group"] as? Int,
-              let category = data["category"] as? String,
+              let category = (data["category_id"] as? String) ?? (data["category"] as? String),
               let link = data["link"] as? String,
               let pubDate = data["pub_date"] as? Timestamp,
               let createdAt = data["created_at"] as? Timestamp,

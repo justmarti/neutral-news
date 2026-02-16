@@ -73,9 +73,9 @@ final class NewsFilterViewModel {
         
         // Apply category filter
         if !categoryFilter.isEmpty {
-            let normalizedCategories = Set(categoryFilter.map { $0.rawValue.normalized() })
             filteredNews = filteredNews.filter { newsItem in
-                normalizedCategories.contains(newsItem.category.normalized())
+                guard let newsCategory = Category.fromBackendValue(newsItem.category) else { return false }
+                return categoryFilter.contains(newsCategory)
             }
         }
         

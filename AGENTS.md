@@ -41,6 +41,7 @@ This file defines how the AI should work in this repository. The goal is to keep
 
 ## Swift & SwiftUI Guidelines
 - Formatting: standard Xcode formatting (4-space indentation).
+- Respect existing UI code style and initializer format (e.g., keep `Label(_, systemImage:)` when already used). Do not refactor style-only formatting unless there is a clear technical benefit and explicit user approval.
 - Naming: `UpperCamelCase` for types, `lowerCamelCase` for properties/methods.
 - Prefer value types (struct) where appropriate.
 - Avoid global state. Favor dependency injection and explicit inputs.

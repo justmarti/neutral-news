@@ -47,7 +47,7 @@ struct News: Codable, Identifiable, Hashable {
         title: "Lorem ipsum dolor sit amet",
         description: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
         scrappedDescription: nil,
-        category: Category.politica.rawValue,
+        category: Category.politics.rawValue,
         imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg",
         link: "itram.dev",
         pubDate: .now,

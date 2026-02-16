@@ -238,7 +238,7 @@ final class NewsListViewModel {
             newsToFilter = newsDataManager.getNewsArrayForDay(daySelected)
         }
 
-        let categoriesSet = Set(newsToFilter.compactMap { Category(rawValue: $0.category) })
+        let categoriesSet = Set(newsToFilter.compactMap { Category.fromBackendValue($0.category) })
         return Category.allCases.filter { categoriesSet.contains($0) }
     }
     

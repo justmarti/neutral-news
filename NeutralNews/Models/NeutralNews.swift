@@ -44,7 +44,7 @@ struct NeutralNews: Codable, Hashable, Identifiable {
         id: "mock-id",
         neutralTitle: "Lorem ipsum dolor sit amet",
         neutralDescription: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-        category: Category.economia.rawValue,
+        category: Category.business.rawValue,
         relevance: 3,
         imageUrl: "https://www.lavanguardia.com/files/og_thumbnail/files/fp/uploads/2025/04/22/68075b725f598.r_d.1714-2017-0.jpeg",
         imageMedium: "laVanguardia",

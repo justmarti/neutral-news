@@ -22,7 +22,7 @@ struct NeutralNewsView: View {
                     VStack {
                         VStack(alignment: .leading, spacing: 16) {
                             HStack {
-                                Text(news.category.uppercased())
+                                Text(Category.displayName(for: news.category).uppercased())
                                 Spacer()
                                 Text(news.date.formatted(
                                     Date.FormatStyle.dateTime

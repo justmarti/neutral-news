@@ -139,7 +139,7 @@ struct HomeToolbar {
                     vm.filterByCategory(category)
                 } label: {
                     Label {
-                        Label(category.rawValue, systemImage: category.systemImageName)
+                        Label(category.title, systemImage: category.systemImageName)
                     } icon: {
                         if vm.categoryFilter.contains(category) {
                             Image(systemName: "checkmark")
