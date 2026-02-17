@@ -75,12 +75,40 @@ struct AdaptiveBackgroundView: View {
     @Environment(\.colorScheme) private var colorScheme
     
     var body: some View {
-        let targetTextColor: Color = colorScheme == .light ? .black : .white
-        let adaptedColor = optimizeContrastDynamically(for: targetTextColor)
+        if colorScheme == .light {
+            softenForLightMode()
+        } else {
+            optimizeContrastDynamically(for: .white)
+        }
+    }
+
+    /// Softens vivid dominant colors in light mode to improve readability.
+    /// Keeps hue, reduces saturation, and enforces a bright background.
+    /// - Returns: A lighter and less saturated color for light mode surfaces.
+    private func softenForLightMode() -> Color {
+        let uiColor = UIColor(baseColor)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return .nnBackground
+        }
         
-        return adaptedColor
+        let adjustedSaturation = min(0.22, max(0.08, saturation * 0.35))
+        let adjustedBrightness = max(0.92, brightness)
+        
+        return Color(
+            hue: Double(hue),
+            saturation: Double(adjustedSaturation),
+            brightness: Double(adjustedBrightness)
+        )
     }
     
+    /// Adjusts the base color brightness to reach readable contrast against text.
+    /// - Parameter textColor: The reference text color used to calculate target contrast.
+    /// - Returns: A contrast-optimized color derived from `baseColor`.
     private func optimizeContrastDynamically(for textColor: Color) -> Color {
         let currentLuminance = baseColor.relativeLuminance()
         let textLuminance = textColor.relativeLuminance()
@@ -116,7 +144,8 @@ struct AdaptiveBackgroundView: View {
         
         uiColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
         
-        let adjustmentFactor = sqrt(targetLuminance / currentLuminance)
+        let safeLuminance = max(currentLuminance, 0.0001)
+        let adjustmentFactor = sqrt(targetLuminance / safeLuminance)
         
         return Color(
             red: min(1.0, max(0.0, red * adjustmentFactor)),
