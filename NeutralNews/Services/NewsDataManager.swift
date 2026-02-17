@@ -7,10 +7,6 @@
 
 import Foundation
 
-extension Notification.Name {
-    static let newsDidUpdate = Notification.Name("NewsDidUpdate")
-}
-
 @Observable
 final class NewsDataManager {
     static let shared = NewsDataManager()
@@ -21,14 +17,12 @@ final class NewsDataManager {
     // MARK: - Data Collections
     private(set) var allNews = [News]() {
         didSet {
-            NotificationCenter.default.post(name: .newsDidUpdate, object: nil)
+            // Keep O(1) lookup for related-news resolution in Home cards.
+            newsById = Dictionary(uniqueKeysWithValues: allNews.map { ($0.id, $0) })
         }
     }
-    private(set) var neutralNews = [NeutralNews]() {
-        didSet {
-            NotificationCenter.default.post(name: .newsDidUpdate, object: nil)
-        }
-    }
+    private(set) var neutralNews = [NeutralNews]()
+    private var newsById: [String: News] = [:]
 
     // MARK: - Optimized News by Day Storage
     private(set) var newsByDay: [Date: Set<NeutralNews>] = [:]
@@ -102,7 +96,7 @@ final class NewsDataManager {
     ///   - forceRefresh: If `true`, bypasses cache and forces a fresh Firebase fetch. Default is `false`.
     ///
     /// - Note: This method is safe to call multiple times for the same day - it automatically skips if already loaded.
-    /// - Important: Runs on background thread and posts `newsDidUpdate` notification when complete.
+    /// - Important: Runs on background thread and updates observed state when complete.
     func loadNews(for day: DayInfo, forceRefresh: Bool = false) async {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day.date)
@@ -236,7 +230,7 @@ final class NewsDataManager {
     /// - Parameter neutralNews: The neutral news item to find related articles for
     /// - Returns: Array of `News` items from various media outlets that are referenced in the neutral news.
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
-        return allNews.filter { neutralNews.sourceIds.contains($0.id) }
+        neutralNews.sourceIds.compactMap { newsById[$0] }
     }
 
     /// Checks if news data for a specific day has been loaded into memory.

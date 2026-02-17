@@ -8,9 +8,22 @@
 import Foundation
 import SwiftData
 import CoreData
+import Observation
 
 @Observable
 final class NewsListViewModel {
+    private actor ObservationStreamState {
+        private var isTerminated = false
+
+        func terminate() {
+            isTerminated = true
+        }
+
+        func canContinue() -> Bool {
+            !isTerminated
+        }
+    }
+
     static let shared = NewsListViewModel()
     
     // MARK: - Init
@@ -82,26 +95,24 @@ final class NewsListViewModel {
     }
     
     var newsToShow: [NeutralNews] {
-        // Cache key includes all dependencies
-        let dayNewsCount = newsDataManager.getNewsArrayForDay(daySelected).count
-
-        // Hash paginated items to detect content changes (not just count)
-        let paginatedItemsHash = paginationManager.paginatedItems.prefix(5).map(\.id).joined()
+        let dayNews = newsDataManager.getNewsArrayForDay(daySelected)
 
         let cacheKey = """
             \(isShowingSavedNews)-\
             \(savedNews.count)-\
+            \(hashNewsList(savedNews))-\
             \(isShowingAllDays)-\
             \(searchScope)-\
             \(daySelected.date.timeIntervalSince1970)-\
-            \(dayNewsCount)-\
-            \(paginatedItemsHash)-\
+            \(dayNews.count)-\
+            \(hashNewsList(dayNews))-\
+            \(paginationManager.paginatedItems.count)-\
+            \(hashNewsList(paginationManager.paginatedItems))-\
             \(filterViewModel.searchText)-\
             \(filterViewModel.categoryFilter.hashValue)-\
             \(filterViewModel.orderBy)
             """
 
-        // Cache optimization: avoid recalculations
         if cacheKey != lastNewsToShowCacheKey {
             newsToShowCache = computeNewsToShow()
             lastNewsToShowCacheKey = cacheKey
@@ -131,7 +142,7 @@ final class NewsListViewModel {
     
     private var allAvailableNews: [NeutralNews] {
         let currentNews = newsDataManager.neutralNews
-        let currentHash = currentNews.count
+        let currentHash = hashNewsData(currentNews)
         
         // Cache optimization: avoid recalculations
         if currentHash != lastNewsDataHash {
@@ -184,12 +195,14 @@ final class NewsListViewModel {
     private let paginationManager = PaginationManager<NeutralNews>()
     private var cachedAllNews: [NeutralNews] = []
     private var lastNewsDataHash: Int = 0
+    private var isObservingNewsDataChanges = false
+    private var allDaysLoadingTask: Task<Void, Never>?
 
     // MARK: - newsToShow Cache
 
     private var newsToShowCache: [NeutralNews] = []
     private var lastNewsToShowCacheKey: String = ""
-    
+
     // MARK: - Public Methods
 
     /// Changes the selected day and switches to single-day view mode.
@@ -197,6 +210,8 @@ final class NewsListViewModel {
     /// - Parameter dayInfo: The day to display news for
     /// - Note: Automatically resets search scope to `.daySelected` and disables "all days" mode.
     func changeDay(to dayInfo: DayInfo) {
+        allDaysLoadingTask?.cancel()
+        allDaysLoadingTask = nil
         isShowingAllDays = false
         daySelected = dayInfo
         searchScope = .daySelected
@@ -211,6 +226,8 @@ final class NewsListViewModel {
         searchScope = .lastSevenDays
         let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
         paginationManager.configure(with: filteredNews)
+
+        startLoadingMissingLastSevenDaysIfNeeded()
     }
     
     /// Retrieves all related news articles from different media sources for a neutral news item.
@@ -277,6 +294,36 @@ final class NewsListViewModel {
             isLoadingNeutralNews = false
         }
     }
+
+    /// Handles content region changes by resetting data and reloading current context.
+    ///
+    /// In all-days/search scope, reloads all last-7-days data to keep pagination consistent.
+    /// In single-day scope, reloads only the selected day.
+    func reloadAfterRegionChange() async {
+        allDaysLoadingTask?.cancel()
+        allDaysLoadingTask = nil
+
+        await MainActor.run {
+            isLoadingNeutralNews = true
+            paginationManager.reset()
+        }
+
+        await newsDataManager.resetForRegionChange()
+
+        if isShowingAllDays || searchScope == .lastSevenDays {
+            await loadMissingLastSevenDays(showLoading: true)
+            await MainActor.run {
+                let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
+                paginationManager.configure(with: filteredNews)
+                isLoadingNeutralNews = false
+            }
+        } else {
+            await newsDataManager.loadNews(for: daySelected, forceRefresh: true)
+            await MainActor.run {
+                isLoadingNeutralNews = false
+            }
+        }
+    }
     
     /// Toggles the filter for a specific news category.
     ///
@@ -302,6 +349,8 @@ final class NewsListViewModel {
     private func loadNewsForSelectedDay() {
         // Don't load if already loaded
         guard !newsDataManager.isDayLoaded(daySelected) else { return }
+
+        startObservingNewsDataChangesIfNeeded()
         
         Task {
             await MainActor.run {
@@ -317,6 +366,8 @@ final class NewsListViewModel {
     }
     
     private func findNearestDayWithNewsOnLaunch() {
+        startObservingNewsDataChangesIfNeeded()
+
         Task {
             // Show loading if we have a pending deep link
             if pendingDeepLink != nil {
@@ -399,41 +450,74 @@ final class NewsListViewModel {
         let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
         paginationManager.reconfigure(with: filteredNews)
     }
+
+    private func startObservingNewsDataChangesIfNeeded() {
+        guard !isObservingNewsDataChanges else { return }
+        isObservingNewsDataChanges = true
+        observeNewsDataChanges()
+    }
+
+    private func observeNewsDataChanges() {
+        withObservationTracking {
+            _ = newsDataManager.neutralNews
+        } onChange: { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.handleNewsDatasetUpdate()
+                self.observeNewsDataChanges()
+            }
+        }
+    }
+
+    private func handleNewsDatasetUpdate() {
+        let currentHash = hashNewsData(newsDataManager.neutralNews)
+        guard currentHash != lastNewsDataHash else { return }
+
+        refreshPaginationIfNeeded()
+    }
     
     private func handleFilterChanges() {
         if searchScope == .lastSevenDays && !isShowingAllDays {
-            // Load all days for both free and premium users
-            // Premium users might have background loading still in progress
-            // loadNews() will skip already-loaded days automatically
-            Task {
-                await loadAllDaysForSearch()
-                // Configure pagination AFTER loading completes
-                await MainActor.run {
-                    let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
-                    paginationManager.configure(with: filteredNews)
-                }
-            }
+            refreshPaginationIfNeeded()
+            startLoadingMissingLastSevenDaysIfNeeded()
         } else {
             refreshPaginationIfNeeded()
         }
     }
 
-    private func loadAllDaysForSearch() async {
-        await MainActor.run {
-            isLoadingForSearch = true
+    private func startLoadingMissingLastSevenDaysIfNeeded() {
+        guard allDaysLoadingTask == nil else { return }
+
+        allDaysLoadingTask = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                Task { @MainActor [weak self] in
+                    self?.allDaysLoadingTask = nil
+                }
+            }
+
+            await self.loadMissingLastSevenDays(showLoading: true)
+        }
+    }
+
+    private func loadMissingLastSevenDays(showLoading: Bool) async {
+        if showLoading {
+            await MainActor.run { isLoadingForSearch = true }
         }
 
-        // Load all 7 days in parallel
-        await withTaskGroup(of: Void.self) { group in
-            for day in lastSevenDays {
-                group.addTask {
-                    await self.newsDataManager.loadNews(for: day)
+        defer {
+            if showLoading {
+                Task { @MainActor in
+                    self.isLoadingForSearch = false
                 }
             }
         }
 
-        await MainActor.run {
-            isLoadingForSearch = false
+        // Incremental, cache-first loading to avoid spikes and keep UI responsive.
+        for day in lastSevenDays {
+            if Task.isCancelled { return }
+            guard !newsDataManager.isDayLoaded(day) else { continue }
+            await newsDataManager.loadNews(for: day)
         }
     }
     
@@ -441,6 +525,32 @@ final class NewsListViewModel {
         return newsDataManager.neutralNews.first { news in
             news.id == newsId
         }
+    }
+
+    private func hashNewsData(_ news: [NeutralNews]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(news.count)
+
+        for item in news {
+            hasher.combine(item.id)
+            hasher.combine(item.updatedAt.timeIntervalSince1970)
+            hasher.combine(item.date.timeIntervalSince1970)
+        }
+
+        return hasher.finalize()
+    }
+
+    private func hashNewsList(_ news: [NeutralNews]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(news.count)
+
+        for item in news {
+            hasher.combine(item.id)
+            hasher.combine(item.updatedAt.timeIntervalSince1970)
+            hasher.combine(item.date.timeIntervalSince1970)
+        }
+
+        return hasher.finalize()
     }
 
     // MARK: - Reactive News Updates Stream
@@ -451,19 +561,29 @@ final class NewsListViewModel {
             // Emit current value immediately
             continuation.yield(newsDataManager.neutralNews)
 
-            // Observe future updates
-            let observer = NotificationCenter.default.addObserver(
-                forName: .newsDidUpdate,
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                guard let self = self else { return }
-                continuation.yield(self.newsDataManager.neutralNews)
-            }
+            let streamState = ObservationStreamState()
+            observeNewsChanges(for: continuation, streamState: streamState)
 
-            // Cleanup when stream terminates
             continuation.onTermination = { _ in
-                NotificationCenter.default.removeObserver(observer)
+                Task {
+                    await streamState.terminate()
+                }
+            }
+        }
+    }
+
+    private func observeNewsChanges(
+        for continuation: AsyncStream<[NeutralNews]>.Continuation,
+        streamState: ObservationStreamState
+    ) {
+        withObservationTracking {
+            _ = newsDataManager.neutralNews
+        } onChange: { [weak self] in
+            Task { @MainActor in
+                guard let self else { return }
+                guard await streamState.canContinue() else { return }
+                continuation.yield(self.newsDataManager.neutralNews)
+                self.observeNewsChanges(for: continuation, streamState: streamState)
             }
         }
     }

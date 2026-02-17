@@ -14,6 +14,7 @@ import RevenueCat
 
 @main
 struct NeutralNewsApp: App {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var config = AppConfig()
     @State private var showingSettingsSheet = false
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
@@ -82,15 +83,17 @@ struct NeutralNewsApp: App {
                     // Perform cache cleanup if needed (runs in background)
                     CacheService.shared.cleanExpiredCacheIfNeeded()
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                .onChange(of: scenePhase) { oldValue, newValue in
+                    guard oldValue == .background, newValue == .active else { return }
                     config.startFetching()
 
                     // Also cleanup when app returns from background
                     CacheService.shared.cleanExpiredCacheIfNeeded()
 
-                    // Sync purchases when returning to app (for promotional codes redeemed in App Store)
+                    // Refresh subscription state and capture external redemptions
+                    // without forcing a user-facing restore flow.
                     Task {
-                        await PremiumManager.shared.restorePurchases()
+                        await PremiumManager.shared.refreshSubscriptionStatusAfterActivation()
                     }
                 }
                 .onOpenURL { url in

@@ -129,8 +129,7 @@ struct SettingsView: View {
                 .pickerStyle(.navigationLink)
                 .onChange(of: regionPreference) { _, _ in
                     Task {
-                        await NewsDataManager.shared.resetForRegionChange()
-                        await vm.refreshNews()
+                        await vm.reloadAfterRegionChange()
                     }
                 }
 

@@ -11,6 +11,7 @@ import SwiftData
 
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var cacheContext
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
@@ -115,12 +116,13 @@ struct HomeView: View {
                 .onAppear {
                     vm.checkPendingDeepLink()
                 }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                .onChange(of: scenePhase) { oldValue, newValue in
+                    guard oldValue == .background, newValue == .active else { return }
                     Task {
                         await vm.refreshNews()
                     }
                 }
-                .onReceive(NotificationCenter.default.publisher(for: .showPaywall)) { _ in
+                .onChange(of: premiumManager.paywallPresentationToken) { _, _ in
                     showingPaywall = true
                 }
                 .sheet(isPresented: $showingPaywall) {
@@ -142,21 +144,10 @@ struct HomeView: View {
     // MARK: - Content Views
     
     private var newsContentView: some View {
-        ScrollView {
-            if vm.isShowingSavedNews {
-                savedNewsContentView
-            } else if vm.pendingDeepLink != nil {
-                // Show loading while processing deep link
-                loadingView
-            } else if vm.isLoadingNeutralNews && vm.newsToShow.isEmpty {
-                loadingView
-            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews && !vm.isLoadingForSearch {
-                noResultsView
-            } else if vm.searchText.isEmpty && vm.newsToShow.isEmpty && !vm.isLoadingNeutralNews {
-                noNewsYetView
-            } else {
-                newsListView
-            }
+        let currentNews = vm.newsToShow
+
+        return ScrollView {
+            contentStateView(newsItems: currentNews)
         }
         .refreshable {
             if vm.isShowingSavedNews {
@@ -170,8 +161,26 @@ struct HomeView: View {
             SearchableContentView(vm: vm)
         }
     }
+
+    @ViewBuilder
+    private func contentStateView(newsItems: [NeutralNews]) -> some View {
+        if vm.isShowingSavedNews {
+            savedNewsContentView(newsItems: newsItems)
+        } else if vm.pendingDeepLink != nil {
+            // Show loading while processing deep link
+            loadingView
+        } else if vm.isLoadingNeutralNews && newsItems.isEmpty {
+            loadingView
+        } else if !vm.searchText.isEmpty && newsItems.isEmpty && !vm.isLoadingNeutralNews && !vm.isLoadingForSearch {
+            noResultsView
+        } else if vm.searchText.isEmpty && newsItems.isEmpty && !vm.isLoadingNeutralNews {
+            noNewsYetView
+        } else {
+            newsListView(newsItems: newsItems)
+        }
+    }
     
-    private var newsListView: some View {
+    private func newsListView(newsItems: [NeutralNews]) -> some View {
         LazyVStack {
             // Premium search results banner
             if shouldShowPremiumBanner {
@@ -185,7 +194,7 @@ struct HomeView: View {
                     .padding(.vertical)
             }
 
-            ForEach(vm.newsToShow) { neutralNews in
+            ForEach(newsItems) { neutralNews in
                 HomeNewsCard(
                     news: neutralNews,
                     relatedNews: vm.getRelatedNews(from: neutralNews),
@@ -196,7 +205,7 @@ struct HomeView: View {
                     savedNewsState: savedNewsState
                 )
             }
-            .animation(.default, value: vm.newsToShow)
+            .animation(.default, value: newsItems)
             
             // Loading indicator for pagination
             if vm.isLoadingMore {
@@ -249,12 +258,12 @@ struct HomeView: View {
         .containerRelativeFrame([.horizontal, .vertical])
     }
 
-    private var savedNewsContentView: some View {
+    private func savedNewsContentView(newsItems: [NeutralNews]) -> some View {
         Group {
             if vm.isLoadingSavedNews {
                 ProgressView("Loading saved news...")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if !vm.searchText.isEmpty && vm.newsToShow.isEmpty {
+            } else if !vm.searchText.isEmpty && newsItems.isEmpty {
                 ContentUnavailableView(
                     "No results for \"\(vm.searchText)\"",
                     systemImage: "magnifyingglass",
@@ -269,7 +278,7 @@ struct HomeView: View {
                 )
                 .containerRelativeFrame([.horizontal, .vertical])
             } else {
-                newsListView
+                newsListView(newsItems: newsItems)
             }
         }
     }

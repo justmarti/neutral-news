@@ -18,6 +18,7 @@ final class PremiumManager {
     private(set) var isLoading = false
     private(set) var subscriptionExpirationDate: Date?
     private(set) var subscriptionWillRenew: Bool?
+    private(set) var paywallPresentationToken = UUID()
     private let entitlementId = "pro"
 
     private var pendingAction: (() -> Void)?
@@ -108,7 +109,9 @@ final class PremiumManager {
     func requirePremium(for feature: String = "", onPurchaseComplete: (() -> Void)? = nil) {
         if !isPremium {
             pendingAction = onPurchaseComplete
-            NotificationCenter.default.post(name: .showPaywall, object: feature)
+            Task { @MainActor in
+                self.paywallPresentationToken = UUID()
+            }
         }
     }
 
@@ -187,6 +190,28 @@ final class PremiumManager {
         }
     }
 
+    /// Refreshes premium state when app becomes active.
+    ///
+    /// Uses a lightweight status check first, and only attempts `syncPurchases()`
+    /// when still non-premium to capture redemptions made outside the app
+    /// (for example, App Store offer-code flows).
+    func refreshSubscriptionStatusAfterActivation() async {
+        await checkSubscriptionStatus()
+
+        // If already premium, no sync is needed.
+        guard !isPremium else { return }
+
+        do {
+            let customerInfo = try await Purchases.shared.syncPurchases()
+            await updatePremiumStatus(customerInfo)
+#if DEBUG
+            print("✅ Foreground sync completed")
+#endif
+        } catch {
+            print("⚠️ Foreground sync failed: \(error)")
+        }
+    }
+
     // MARK: - Internal Methods
 
     func updatePremiumStatus(_ customerInfo: CustomerInfo) async {
@@ -211,10 +236,4 @@ final class PremiumManager {
         subscriptionWillRenew = entitlement?.willRenew
     }
 
-}
-
-// MARK: - Notification Extensions
-
-extension Notification.Name {
-    static let showPaywall = Notification.Name("ShowPaywall")
 }
