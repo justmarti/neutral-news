@@ -12,7 +12,7 @@ import Observation
 
 @Observable
 final class NewsListViewModel {
-    private actor ObservationStreamState {
+    actor ObservationStreamState {
         private var isTerminated = false
 
         func terminate() {
@@ -46,9 +46,9 @@ final class NewsListViewModel {
     }
     
     // MARK: - Dependencies
-    private let newsDataManager = NewsDataManager.shared
-    private let filterViewModel = NewsFilterViewModel.shared
-    private let savedNewsService = SavedNewsService.shared
+    let newsDataManager = NewsDataManager.shared
+    let filterViewModel = NewsFilterViewModel.shared
+    let savedNewsService = SavedNewsService.shared
 
     // Model context for SwiftData (cache) - will be injected
     var modelContext: ModelContext?
@@ -193,7 +193,7 @@ final class NewsListViewModel {
     private var lastNewsDataHash: Int = 0
     private var isObservingNewsDataChanges = false
     private var allDaysLoadingTask: Task<Void, Never>?
-    private var savedNewsPrefetchTask: Task<Void, Never>?
+    var savedNewsPrefetchTask: Task<Void, Never>?
     private var dayFeedPrefetchTask: Task<Void, Never>?
     private var selectedDayLoadTask: Task<Void, Never>?
     private var lastDayPrefetchHash: Int = 0
@@ -655,236 +655,6 @@ final class NewsListViewModel {
             guard !Task.isCancelled else { return }
             await CachedAsyncImageHelper.prefetchImages(from: prefetchURLs)
         }
-    }
-
-    // MARK: - Reactive News Updates Stream
-
-    /// Creates an AsyncStream that emits whenever news data is updated
-    private var newsUpdatesStream: AsyncStream<[NeutralNews]> {
-        AsyncStream { continuation in
-            // Emit current value immediately
-            continuation.yield(newsDataManager.neutralNews)
-
-            let streamState = ObservationStreamState()
-            observeNewsChanges(for: continuation, streamState: streamState)
-
-            continuation.onTermination = { _ in
-                Task {
-                    await streamState.terminate()
-                }
-            }
-        }
-    }
-
-    private func observeNewsChanges(
-        for continuation: AsyncStream<[NeutralNews]>.Continuation,
-        streamState: ObservationStreamState
-    ) {
-        withObservationTracking {
-            _ = newsDataManager.neutralNews
-        } onChange: { [weak self] in
-            Task { @MainActor in
-                guard let self else { return }
-                guard await streamState.canContinue() else { return }
-                continuation.yield(self.newsDataManager.neutralNews)
-                self.observeNewsChanges(for: continuation, streamState: streamState)
-            }
-        }
-    }
-
-    /// Handles incoming deep link requests to navigate to a specific news article.
-    ///
-    /// If news data is already loaded, processes the deep link immediately. Otherwise, stores it
-    /// as pending and waits for news to load. Uses reactive AsyncStream for efficient waiting.
-    ///
-    /// - Parameter deepLinkData: The deep link data containing the target news ID
-    /// - Note: Sets `isLoadingNeutralNews` to `true` during processing
-    /// - Important: Automatically clears loading state once article is found or timeout occurs (10s)
-    func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
-        isLoadingNeutralNews = true
-
-        if !newsDataManager.neutralNews.isEmpty {
-            processDeepLink(deepLinkData)
-        } else {
-            pendingDeepLink = deepLinkData
-        }
-    }
-
-    private func processDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
-#if DEBUG
-        print("🔄 Processing deep link in ViewModel - newsId: \(deepLinkData.newsId)")
-#endif
-
-        // Try to find the news immediately
-        if let news = findNews(newsId: deepLinkData.newsId) {
-#if DEBUG
-            print("✅ News found immediately: \(news.neutralTitle)")
-#endif
-            deepLinkTargetNews = news
-            pendingDeepLink = nil
-            isLoadingNeutralNews = false
-            hasCompletedInitialLaunchLoad = true
-            return
-        }
-
-        // If not found, wait reactively for news to load
-#if DEBUG
-        print("⏳ News not loaded yet, listening for updates...")
-#endif
-
-        Task {
-            // Use reactive stream instead of polling with timeout
-            await withTaskGroup(of: Bool.self) { group in
-                // Task 1: Search for news reactively
-                group.addTask {
-                    for await newsArray in self.newsUpdatesStream {
-                        if let news = newsArray.first(where: { $0.id == deepLinkData.newsId }) {
-#if DEBUG
-                            print("✅ News found reactively: \(news.neutralTitle)")
-#endif
-                            await MainActor.run {
-                                self.deepLinkTargetNews = news
-                                self.pendingDeepLink = nil
-                                self.isLoadingNeutralNews = false
-                                self.hasCompletedInitialLaunchLoad = true
-                            }
-                            return true
-                        }
-                    }
-                    return false
-                }
-
-                // Task 2: Timeout after 10 seconds
-                group.addTask {
-                    try? await Task.sleep(for: .seconds(10))
-                    return false
-                }
-
-                // Wait for first task to complete (race condition)
-                if let found = await group.next(), found {
-                    // News found! Cancel the timeout
-                    group.cancelAll()
-                } else {
-                    // Timeout or not found
-#if DEBUG
-                    print("❌ News not found within timeout - newsId: \(deepLinkData.newsId)")
-#endif
-                    await MainActor.run {
-                        self.pendingDeepLink = nil
-                        self.isLoadingNeutralNews = false
-                        self.hasCompletedInitialLaunchLoad = true
-                    }
-                    group.cancelAll()
-                }
-            }
-        }
-    }
-    
-    func checkPendingDeepLink() {
-        guard let pendingDeepLink = pendingDeepLink,
-              !newsDataManager.neutralNews.isEmpty else { return }
-        processDeepLink(pendingDeepLink)
-    }
-
-    // MARK: - Saved News Methods
-
-    /// Toggles between saved news view and regular news view.
-    ///
-    /// Automatically clears all active filters when switching modes to prevent confusion.
-    ///
-    /// - Note: When entering saved news mode, automatically triggers `loadSavedNews()`
-    /// - Important: Premium feature - requires `PremiumManager.canSaveNews` permission
-    func toggleSavedNewsMode() {
-        isShowingSavedNews.toggle()
-        filterViewModel.clearFilters()
-    }
-
-    /// Loads all saved news from Core Data persistent storage.
-    ///
-    /// Fetches saved news items from Core Data, converts them back to `NeutralNews` objects,
-    /// and updates the `savedNews` array sorted by date (newest first).
-    ///
-    /// - Important: Requires `coreDataContext` to be set. Will fail silently if not available.
-    /// - Note: This is an async operation that updates `isLoadingSavedNews` state
-    func loadSavedNews() async {
-        guard let context = coreDataContext else {
-            print("❌ No Core Data context available")
-            return
-        }
-
-#if DEBUG
-        print("🔄 Loading saved news from Core Data")
-#endif
-
-        await MainActor.run {
-            isLoadingSavedNews = true
-        }
-
-        defer {
-            Task { @MainActor in
-                isLoadingSavedNews = false
-            }
-        }
-
-        do {
-            let savedNewsItems = try savedNewsService.getSavedNews(context: context)
-#if DEBUG
-            print("📰 Found \(savedNewsItems.count) saved news items")
-#endif
-
-            // Convert saved news back to NeutralNews objects
-            let neutralNewsList = savedNewsItems.compactMap { savedNews -> NeutralNews? in
-                guard savedNews.newsType == SavedNewsType.neutralNews.rawValue else {
-#if DEBUG
-                    print("⚠️ Skipping non-neutral news: \(savedNews.newsType ?? "unknown")")
-#endif
-                    return nil
-                }
-
-                // Create NeutralNews from saved data
-                return savedNews.toNeutralNews()
-            }
-
-#if DEBUG
-            print("✅ Successfully parsed \(neutralNewsList.count) neutral news items")
-#endif
-
-            await MainActor.run {
-                savedNews = neutralNewsList.sorted { $0.date > $1.date }
-                SavedNewsState.shared.markSaved(newsIds: savedNews.map(\.id))
-#if DEBUG
-                print("🎯 savedNews updated with \(savedNews.count) items")
-#endif
-            }
-
-            // Warm up image decode cache for first saved-news screens to reduce initial scroll stutter.
-            let prefetchURLs = neutralNewsList
-                .prefix(50)
-                .compactMap { URL(string: $0.imageUrl) }
-
-            await MainActor.run {
-                savedNewsPrefetchTask?.cancel()
-                savedNewsPrefetchTask = Task(priority: .utility) {
-                    await CachedAsyncImageHelper.prefetchImages(from: prefetchURLs)
-                }
-            }
-        } catch {
-            print("❌ Error loading saved news: \(error)")
-            await MainActor.run {
-                savedNews = []
-            }
-        }
-    }
-
-
-    /// Removes a news item from the saved news array (UI state only).
-    ///
-    /// This only removes the item from the in-memory array. To permanently delete from Core Data,
-    /// use `SavedNewsService.deleteSavedNews()`.
-    ///
-    /// - Parameter newsId: The ID of the news item to remove from the array
-    func removeFromSavedNews(_ newsId: String) {
-        savedNews.removeAll { $0.id == newsId }
     }
 
 }
