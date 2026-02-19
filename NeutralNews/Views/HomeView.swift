@@ -364,7 +364,7 @@ private struct HomeNewsCard: View {
     let vm: NewsListViewModel
     let premiumManager: PremiumManager
     let savedNewsState: SavedNewsState
-    @State private var isArticleSaved: Bool?
+    @State private var saveFeedbackTrigger = 0
     @State private var copyHeadlineTrigger = false
 
     init(
@@ -399,11 +399,16 @@ private struct HomeNewsCard: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            let saved = vm.isShowingSavedNews ? true : (isArticleSaved ?? savedNewsState.isSaved(news.id))
+            let saved = vm.isShowingSavedNews ? true : savedNewsState.isSaved(news.id)
             Button {
                 handleSaveAction()
             } label: {
-                Label(saved ? "Saved" : "Save", systemImage: saved ? "bookmark.fill" : "bookmark")
+                Label(
+                    saved ? "Saved" : "Save",
+                    systemImage: !premiumManager.canSaveNews
+                        ? "lock.fill"
+                        : (saved ? "bookmark.fill" : "bookmark")
+                )
             }
 
             ShareLink(item: DeepLinkService.generateShareURL(for: news)) {
@@ -417,14 +422,15 @@ private struct HomeNewsCard: View {
                 Label("Copy headline", systemImage: "doc.on.doc")
             }
         }
-        .sensoryFeedback(trigger: isArticleSaved) { oldValue, newValue in
-            oldValue != nil && newValue != oldValue ? .success : nil
-        }
+        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
         .sensoryFeedback(.success, trigger: copyHeadlineTrigger)
         .onAppear {
             if vm.shouldLoadMore(currentItem: news) {
                 vm.loadNextPage()
             }
+        }
+        .task(id: news.id) {
+            await ensureSavedStatusLoadedIfNeeded()
         }
     }
 
@@ -450,18 +456,31 @@ private struct HomeNewsCard: View {
                 try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
                 await MainActor.run {
                     vm.removeFromSavedNews(news.id)
-                    isArticleSaved = false
+                    savedNewsState.setSaved(false, for: news.id)
+                    saveFeedbackTrigger &+= 1
                 }
             } else {
                 try SavedNewsService.shared.saveNews(news, context: context)
                 await MainActor.run {
                     RatingManager.shared.incrementSavedNewsCount()
                     RatingManager.shared.requestRatingAfterPositiveInteraction()
-                    isArticleSaved = true
+                    savedNewsState.setSaved(true, for: news.id)
+                    saveFeedbackTrigger &+= 1
                 }
             }
         } catch {
             print("❌ Error saving/unsaving article: \(error)")
+        }
+    }
+
+    private func ensureSavedStatusLoadedIfNeeded() async {
+        guard !vm.isShowingSavedNews else { return }
+        guard !savedNewsState.hasStatus(for: news.id) else { return }
+        guard let context = vm.coreDataContext else { return }
+
+        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+        await MainActor.run {
+            savedNewsState.setSaved(isSaved, for: news.id)
         }
     }
 }

@@ -20,6 +20,10 @@ final class SavedNewsState {
         savedById[newsId] ?? false
     }
 
+    func hasStatus(for newsId: String) -> Bool {
+        savedById[newsId] != nil
+    }
+
     @MainActor
     func setSaved(_ isSaved: Bool, for newsId: String) {
         savedById[newsId] = isSaved

@@ -13,7 +13,8 @@ struct NeutralNewsOptionsMenu: View {
     @Binding var isShowingReportProblemSheet: Bool
 
     private let premiumManager = PremiumManager.shared
-    @State private var isArticleSaved: Bool?
+    @State private var savedNewsState = SavedNewsState.shared
+    @State private var saveFeedbackTrigger = 0
 
     var body: some View {
         Menu {
@@ -30,9 +31,12 @@ struct NeutralNewsOptionsMenu: View {
                     }
                 }
             } label: {
+                let saved = savedNewsState.isSaved(news.id)
                 Label(
-                    (isArticleSaved ?? false) ? "Saved" : "Save",
-                    systemImage: !premiumManager.canSaveNews ? "lock.fill" : ((isArticleSaved ?? false) ? "bookmark.fill" : "bookmark")
+                    saved ? "Saved" : "Save",
+                    systemImage: !premiumManager.canSaveNews
+                        ? "lock.fill"
+                        : (saved ? "bookmark.fill" : "bookmark")
                 )
             }
 
@@ -49,18 +53,20 @@ struct NeutralNewsOptionsMenu: View {
         } label: {
             Label("Options", systemImage: "ellipsis")
         }
-        .sensoryFeedback(trigger: isArticleSaved) { oldValue, newValue in
-            // Only trigger if we had a previous value (not initial load from nil)
-            oldValue != nil ? .success : nil
-        }
+        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
         .task {
-            await checkIfArticleIsSaved()
+            await ensureSavedStatusLoadedIfNeeded()
         }
     }
 
-    private func checkIfArticleIsSaved() async {
+    private func ensureSavedStatusLoadedIfNeeded() async {
+        guard !savedNewsState.hasStatus(for: news.id) else { return }
         guard let context = NewsListViewModel.shared.coreDataContext else { return }
-        isArticleSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+
+        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+        await MainActor.run {
+            savedNewsState.setSaved(isSaved, for: news.id)
+        }
     }
 
     private func handleSaveArticle() async {
@@ -69,13 +75,14 @@ struct NeutralNewsOptionsMenu: View {
         print("🔄 Attempting to save article: \(news.id)")
 #endif
         do {
-            if isArticleSaved == true {
+            if savedNewsState.isSaved(news.id) {
 #if DEBUG
                 print("🗑️ Unsaving article...")
 #endif
                 try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
                 await MainActor.run {
-                    isArticleSaved = false
+                    savedNewsState.setSaved(false, for: news.id)
+                    saveFeedbackTrigger &+= 1
                 }
 #if DEBUG
                 print("✅ Article unsaved successfully")
@@ -90,7 +97,8 @@ struct NeutralNewsOptionsMenu: View {
 #endif
                 try SavedNewsService.shared.saveNews(news, context: context)
                 await MainActor.run {
-                    isArticleSaved = true
+                    savedNewsState.setSaved(true, for: news.id)
+                    saveFeedbackTrigger &+= 1
                 }
 #if DEBUG
                 print("✅ Article saved successfully")
