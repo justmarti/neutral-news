@@ -29,15 +29,14 @@ final class NewsListViewModel {
     // MARK: - Init
     private init() {
         findNearestDayWithNewsOnLaunch()
-        loadNewsForSelectedDay()
         
         filterViewModel.onFiltersChanged = { [weak self] in
             self?.handleFilterChanges()
         }
+
+        recomputeVisibleNews()
         
         Task {
-            await newsDataManager.preloadCache()
-
             // Wait for premium status to be ready before starting background loading
             await PremiumManager.shared.checkSubscriptionStatus()
 
@@ -61,15 +60,15 @@ final class NewsListViewModel {
     var daySelected: DayInfo = .today {
         didSet {
             if daySelected != oldValue {
-                Task {
-                    await refreshNews()
-                }
+                recomputeVisibleNews()
+                scheduleSelectedDayLoadIfNeeded()
             }
         }
     }
     
     var isLoadingNeutralNews = false
     var isLoadingForSearch = false
+    var hasCompletedInitialLaunchLoad = false
 
     // MARK: - Saved News State
     var isShowingSavedNews = false {
@@ -79,14 +78,30 @@ final class NewsListViewModel {
                 print("🔄 isShowingSavedNews changed to: \(isShowingSavedNews)")
 #endif
                 if isShowingSavedNews {
+                    selectedDayLoadTask?.cancel()
+                    selectedDayLoadTask = nil
+                    dayFeedPrefetchTask?.cancel()
+                    lastDayPrefetchHash = 0
+                    isLoadingNeutralNews = false
                     Task {
                         await loadSavedNews()
                     }
+                } else {
+                    savedNewsPrefetchTask?.cancel()
+                    recomputeVisibleNews()
                 }
             }
         }
     }
-    var savedNews: [NeutralNews] = []
+    var savedNews: [NeutralNews] = [] {
+        didSet {
+            if isShowingSavedNews {
+                refreshSavedNewsPaginationIfNeeded(forceReconfigure: true)
+            } else {
+                recomputeVisibleNews()
+            }
+        }
+    }
     var isLoadingSavedNews = false
     
     // MARK: - Computed Properties
@@ -95,35 +110,12 @@ final class NewsListViewModel {
     }
     
     var newsToShow: [NeutralNews] {
-        let dayNews = newsDataManager.getNewsArrayForDay(daySelected)
-
-        let cacheKey = """
-            \(isShowingSavedNews)-\
-            \(savedNews.count)-\
-            \(hashNewsList(savedNews))-\
-            \(isShowingAllDays)-\
-            \(searchScope)-\
-            \(daySelected.date.timeIntervalSince1970)-\
-            \(dayNews.count)-\
-            \(hashNewsList(dayNews))-\
-            \(paginationManager.paginatedItems.count)-\
-            \(hashNewsList(paginationManager.paginatedItems))-\
-            \(filterViewModel.searchText)-\
-            \(filterViewModel.categoryFilter.hashValue)-\
-            \(filterViewModel.orderBy)
-            """
-
-        if cacheKey != lastNewsToShowCacheKey {
-            newsToShowCache = computeNewsToShow()
-            lastNewsToShowCacheKey = cacheKey
-        }
-
-        return newsToShowCache
+        visibleNews
     }
 
     private func computeNewsToShow() -> [NeutralNews] {
         if isShowingSavedNews {
-            return filterViewModel.applyFilters(to: savedNews)
+            return savedPaginationManager.paginatedItems
         } else if isShowingAllDays || searchScope == .lastSevenDays {
             return paginationManager.paginatedItems
         } else {
@@ -133,7 +125,10 @@ final class NewsListViewModel {
     }
     
     var isLoadingMore: Bool {
-        paginationManager.isLoading
+        if isShowingSavedNews {
+            return savedPaginationManager.isLoading
+        }
+        return paginationManager.isLoading
     }
 
     var isShowingLimitedSearchResults: Bool {
@@ -180,7 +175,7 @@ final class NewsListViewModel {
     var isShowingAllDays = false
 
     var savedNewsSubtitle: LocalizedStringResource {
-        let filteredCount = newsToShow.count
+        let filteredCount = savedPaginationManager.totalItemCount
         let totalCount = savedNews.count
 
         if isAnyFilterEnabled && filteredCount != totalCount {
@@ -193,15 +188,17 @@ final class NewsListViewModel {
     // MARK: - Pagination
 
     private let paginationManager = PaginationManager<NeutralNews>()
+    private let savedPaginationManager = PaginationManager<NeutralNews>()
     private var cachedAllNews: [NeutralNews] = []
     private var lastNewsDataHash: Int = 0
     private var isObservingNewsDataChanges = false
     private var allDaysLoadingTask: Task<Void, Never>?
-
-    // MARK: - newsToShow Cache
-
-    private var newsToShowCache: [NeutralNews] = []
-    private var lastNewsToShowCacheKey: String = ""
+    private var savedNewsPrefetchTask: Task<Void, Never>?
+    private var dayFeedPrefetchTask: Task<Void, Never>?
+    private var selectedDayLoadTask: Task<Void, Never>?
+    private var lastDayPrefetchHash: Int = 0
+    private var lastVisibleNewsHash: Int?
+    private(set) var visibleNews: [NeutralNews] = []
 
     // MARK: - Public Methods
 
@@ -213,8 +210,14 @@ final class NewsListViewModel {
         allDaysLoadingTask?.cancel()
         allDaysLoadingTask = nil
         isShowingAllDays = false
-        daySelected = dayInfo
         searchScope = .daySelected
+
+        if daySelected != dayInfo {
+            daySelected = dayInfo
+        } else {
+            recomputeVisibleNews()
+            scheduleSelectedDayLoadIfNeeded()
+        }
     }
 
     /// Switches to "all days" view mode showing news from the last 7 days.
@@ -222,10 +225,16 @@ final class NewsListViewModel {
     /// - Note: Automatically updates search scope to `.lastSevenDays` and configures pagination.
     /// - Important: Premium users can access this feature without restrictions. Free users have limited access.
     func changeToAllDays() {
+        selectedDayLoadTask?.cancel()
+        selectedDayLoadTask = nil
+        dayFeedPrefetchTask?.cancel()
+        lastDayPrefetchHash = 0
+        isLoadingNeutralNews = false
         isShowingAllDays = true
         searchScope = .lastSevenDays
         let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
         paginationManager.configure(with: filteredNews)
+        recomputeVisibleNews()
 
         startLoadingMissingLastSevenDaysIfNeeded()
     }
@@ -315,11 +324,13 @@ final class NewsListViewModel {
             await MainActor.run {
                 let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
                 paginationManager.configure(with: filteredNews)
+                recomputeVisibleNews()
                 isLoadingNeutralNews = false
             }
         } else {
             await newsDataManager.loadNews(for: daySelected, forceRefresh: true)
             await MainActor.run {
+                recomputeVisibleNews()
                 isLoadingNeutralNews = false
             }
         }
@@ -346,21 +357,34 @@ final class NewsListViewModel {
     
     // MARK: - Private Methods
     
-    private func loadNewsForSelectedDay() {
-        // Don't load if already loaded
-        guard !newsDataManager.isDayLoaded(daySelected) else { return }
+    private func scheduleSelectedDayLoadIfNeeded() {
+        let selectedDay = daySelected
 
-        startObservingNewsDataChangesIfNeeded()
-        
-        Task {
+        // Keep only the latest day-change request active.
+        selectedDayLoadTask?.cancel()
+
+        // If we already have this day in memory, avoid any extra work.
+        if newsDataManager.isDayLoaded(selectedDay) {
+            isLoadingNeutralNews = false
+            selectedDayLoadTask = nil
+            return
+        }
+
+        selectedDayLoadTask = Task { [weak self] in
+            guard let self else { return }
+            guard !Task.isCancelled else { return }
+
             await MainActor.run {
-                isLoadingNeutralNews = true
+                self.isLoadingNeutralNews = true
             }
-            
-            await newsDataManager.loadNews(for: daySelected)
-            
+
+            await self.newsDataManager.loadNews(for: selectedDay)
+
             await MainActor.run {
-                isLoadingNeutralNews = false
+                guard self.daySelected == selectedDay else { return }
+                self.isLoadingNeutralNews = false
+                self.recomputeVisibleNews()
+                self.selectedDayLoadTask = nil
             }
         }
     }
@@ -369,11 +393,9 @@ final class NewsListViewModel {
         startObservingNewsDataChangesIfNeeded()
 
         Task {
-            // Show loading if we have a pending deep link
-            if pendingDeepLink != nil {
-                await MainActor.run {
-                    isLoadingNeutralNews = true
-                }
+            await MainActor.run {
+                isLoadingNeutralNews = true
+                hasCompletedInitialLaunchLoad = false
             }
 
             await newsDataManager.loadNews(for: .today)
@@ -387,6 +409,7 @@ final class NewsListViewModel {
                 if pendingDeepLink == nil {
                     await MainActor.run {
                         isLoadingNeutralNews = false
+                        hasCompletedInitialLaunchLoad = true
                     }
                 }
                 return
@@ -415,9 +438,16 @@ final class NewsListViewModel {
                 if !dayNews.isEmpty {
                     await MainActor.run {
                         daySelected = day
+                        isLoadingNeutralNews = false
+                        hasCompletedInitialLaunchLoad = true
                     }
                     return
                 }
+            }
+
+            await MainActor.run {
+                isLoadingNeutralNews = false
+                hasCompletedInitialLaunchLoad = true
             }
         }
     }
@@ -427,11 +457,18 @@ final class NewsListViewModel {
     
     // MARK: - Pagination Methods
     
-    /// Loads the next page of news items when using pagination (all days view).
+    /// Loads the next page of items for the active paginated list (all days or saved news).
     ///
-    /// - Note: Only applicable when `isShowingAllDays` is `true` or `searchScope == .lastSevenDays`
+    /// - Note: Triggered from row `onAppear` in all-days and saved-news modes.
     func loadNextPage() {
+        if isShowingSavedNews {
+            savedPaginationManager.loadNextPage()
+            recomputeVisibleNews()
+            return
+        }
+
         paginationManager.loadNextPage()
+        recomputeVisibleNews()
     }
     
     /// Determines if more news items should be loaded when scrolling reaches a specific item.
@@ -441,6 +478,10 @@ final class NewsListViewModel {
     /// - Parameter currentItem: The news item currently being displayed
     /// - Returns: `true` if more items should be loaded, `false` otherwise
     func shouldLoadMore(currentItem: NeutralNews) -> Bool {
+        if isShowingSavedNews {
+            return savedPaginationManager.shouldLoadMore(for: currentItem)
+        }
+
         guard isShowingAllDays || searchScope == .lastSevenDays else { return false }
         return paginationManager.shouldLoadMore(for: currentItem)
     }
@@ -449,6 +490,19 @@ final class NewsListViewModel {
         guard isShowingAllDays || searchScope == .lastSevenDays else { return }
         let filteredNews = filterViewModel.applyFilters(to: allAvailableNews, daySelected: daySelected)
         paginationManager.reconfigure(with: filteredNews)
+        recomputeVisibleNews()
+    }
+
+    private func refreshSavedNewsPaginationIfNeeded(forceReconfigure: Bool) {
+        guard isShowingSavedNews else { return }
+
+        let filteredSavedNews = filterViewModel.applyFilters(to: savedNews)
+        if forceReconfigure {
+            savedPaginationManager.reconfigure(with: filteredSavedNews)
+        } else {
+            savedPaginationManager.configure(with: filteredSavedNews)
+        }
+        recomputeVisibleNews()
     }
 
     private func startObservingNewsDataChangesIfNeeded() {
@@ -470,18 +524,28 @@ final class NewsListViewModel {
     }
 
     private func handleNewsDatasetUpdate() {
-        let currentHash = hashNewsData(newsDataManager.neutralNews)
-        guard currentHash != lastNewsDataHash else { return }
-
-        refreshPaginationIfNeeded()
+        if isShowingAllDays || searchScope == .lastSevenDays {
+            refreshPaginationIfNeeded()
+        } else {
+            recomputeVisibleNews()
+        }
     }
     
     private func handleFilterChanges() {
+        if isShowingSavedNews {
+            refreshSavedNewsPaginationIfNeeded(forceReconfigure: true)
+            return
+        }
+
         if searchScope == .lastSevenDays && !isShowingAllDays {
             refreshPaginationIfNeeded()
             startLoadingMissingLastSevenDaysIfNeeded()
         } else {
-            refreshPaginationIfNeeded()
+            if isShowingAllDays || searchScope == .lastSevenDays {
+                refreshPaginationIfNeeded()
+            } else {
+                recomputeVisibleNews()
+            }
         }
     }
 
@@ -540,17 +604,57 @@ final class NewsListViewModel {
         return hasher.finalize()
     }
 
-    private func hashNewsList(_ news: [NeutralNews]) -> Int {
-        var hasher = Hasher()
-        hasher.combine(news.count)
+    /// Recomputes `visibleNews` from the current view state.
+    ///
+    /// - Important: Call this method after mutating mode, selected day, filters, sorting,
+    ///   pagination state, or the underlying datasets.
+    ///
+    /// Keep this as the single entry point for updating `visibleNews` so state changes stay
+    /// consistent. If a new state dependency is added and this method is not called after that
+    /// dependency changes, the UI can display stale data.
+    ///
+    /// Complexity is O(n), where `n` is the number of items in the active source list.
+    private func recomputeVisibleNews() {
+        let newVisibleNews = computeNewsToShow()
+        let newVisibleNewsHash = hashNewsData(newVisibleNews)
+        guard lastVisibleNewsHash != newVisibleNewsHash else { return }
 
-        for item in news {
-            hasher.combine(item.id)
-            hasher.combine(item.updatedAt.timeIntervalSince1970)
-            hasher.combine(item.date.timeIntervalSince1970)
+        lastVisibleNewsHash = newVisibleNewsHash
+        visibleNews = newVisibleNews
+        scheduleDayFeedPrefetchIfNeeded()
+    }
+
+    private func scheduleDayFeedPrefetchIfNeeded() {
+        guard !isShowingSavedNews else { return }
+        guard !isShowingAllDays else { return }
+        guard searchScope == .daySelected else { return }
+
+        let prefetchURLs = visibleNews
+            .prefix(12)
+            .compactMap { URL(string: $0.imageUrl) }
+
+        if prefetchURLs.isEmpty {
+            dayFeedPrefetchTask?.cancel()
+            dayFeedPrefetchTask = nil
+            lastDayPrefetchHash = 0
+            return
         }
 
-        return hasher.finalize()
+        var hasher = Hasher()
+        hasher.combine(prefetchURLs.count)
+        for url in prefetchURLs {
+            hasher.combine(url.absoluteString)
+        }
+        let newHash = hasher.finalize()
+        guard newHash != lastDayPrefetchHash else { return }
+        lastDayPrefetchHash = newHash
+
+        dayFeedPrefetchTask?.cancel()
+        dayFeedPrefetchTask = Task(priority: .utility) {
+            try? await Task.sleep(for: .seconds(1))
+            guard !Task.isCancelled else { return }
+            await CachedAsyncImageHelper.prefetchImages(from: prefetchURLs)
+        }
     }
 
     // MARK: - Reactive News Updates Stream
@@ -619,6 +723,7 @@ final class NewsListViewModel {
             deepLinkTargetNews = news
             pendingDeepLink = nil
             isLoadingNeutralNews = false
+            hasCompletedInitialLaunchLoad = true
             return
         }
 
@@ -641,6 +746,7 @@ final class NewsListViewModel {
                                 self.deepLinkTargetNews = news
                                 self.pendingDeepLink = nil
                                 self.isLoadingNeutralNews = false
+                                self.hasCompletedInitialLaunchLoad = true
                             }
                             return true
                         }
@@ -666,6 +772,7 @@ final class NewsListViewModel {
                     await MainActor.run {
                         self.pendingDeepLink = nil
                         self.isLoadingNeutralNews = false
+                        self.hasCompletedInitialLaunchLoad = true
                     }
                     group.cancelAll()
                 }
@@ -744,9 +851,22 @@ final class NewsListViewModel {
 
             await MainActor.run {
                 savedNews = neutralNewsList.sorted { $0.date > $1.date }
+                SavedNewsState.shared.markSaved(newsIds: savedNews.map(\.id))
 #if DEBUG
                 print("🎯 savedNews updated with \(savedNews.count) items")
 #endif
+            }
+
+            // Warm up image decode cache for first saved-news screens to reduce initial scroll stutter.
+            let prefetchURLs = neutralNewsList
+                .prefix(50)
+                .compactMap { URL(string: $0.imageUrl) }
+
+            await MainActor.run {
+                savedNewsPrefetchTask?.cancel()
+                savedNewsPrefetchTask = Task(priority: .utility) {
+                    await CachedAsyncImageHelper.prefetchImages(from: prefetchURLs)
+                }
             }
         } catch {
             print("❌ Error loading saved news: \(error)")

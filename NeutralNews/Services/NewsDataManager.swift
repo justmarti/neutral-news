@@ -289,20 +289,18 @@ final class NewsDataManager {
         regularNews fetchedNews: [News],
         for date: Date
     ) {
-        // Add only truly new neutral news that don't exist yet
-        let newNeutralNews = fetchedNeutralNews.filter { fetchedNews in
-            !neutralNews.contains { existingNews in existingNews.id == fetchedNews.id }
-        }
+        // Add only truly new neutral news with O(n) ID lookups.
+        let existingNeutralIDs = Set(neutralNews.map(\.id))
+        let newNeutralNews = fetchedNeutralNews.filter { !existingNeutralIDs.contains($0.id) }
         
         if !newNeutralNews.isEmpty {
             self.neutralNews.append(contentsOf: newNeutralNews)
             self.addNewsToDay(newNeutralNews, for: date)
         }
         
-        // Add only truly new regular news that don't exist yet
-        let newNews = fetchedNews.filter { fetchedNews in
-            !allNews.contains { existingNews in existingNews.id == fetchedNews.id }
-        }
+        // Add only truly new regular news with O(n) ID lookups.
+        let existingNewsIDs = Set(allNews.map(\.id))
+        let newNews = fetchedNews.filter { !existingNewsIDs.contains($0.id) }
         
         if !newNews.isEmpty {
             self.allNews.append(contentsOf: newNews)
@@ -324,9 +322,8 @@ final class NewsDataManager {
         }
         
         // Step 2: Add only genuinely new items that don't exist yet
-        let newNeutralNews = fetchedNeutralNews.filter { fetchedNews in
-            !neutralNews.contains { existingNews in existingNews.id == fetchedNews.id }
-        }
+        let existingNeutralIDs = Set(neutralNews.map(\.id))
+        let newNeutralNews = fetchedNeutralNews.filter { !existingNeutralIDs.contains($0.id) }
         
         if !newNeutralNews.isEmpty {
             neutralNews.append(contentsOf: newNeutralNews)
@@ -347,9 +344,8 @@ final class NewsDataManager {
         }
         
         // Add only genuinely new items that don't exist yet
-        let newNews = fetchedNews.filter { fetchedNews in
-            !allNews.contains { existingNews in existingNews.id == fetchedNews.id }
-        }
+        let existingNewsIDs = Set(allNews.map(\.id))
+        let newNews = fetchedNews.filter { !existingNewsIDs.contains($0.id) }
         
         if !newNews.isEmpty {
             allNews.append(contentsOf: newNews)

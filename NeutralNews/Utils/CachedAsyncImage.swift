@@ -6,6 +6,29 @@
 //
 
 import SwiftUI
+import UIKit
+
+fileprivate final class ImageCacheKey: NSObject {
+    let urlString: String
+    let pixelSize: Int
+
+    init(url: URL, maxPixelSize: Double) {
+        self.urlString = url.absoluteString
+        self.pixelSize = max(1, Int(maxPixelSize.rounded()))
+    }
+
+    override var hash: Int {
+        var hasher = Hasher()
+        hasher.combine(urlString)
+        hasher.combine(pixelSize)
+        return hasher.finalize()
+    }
+
+    override func isEqual(_ object: Any?) -> Bool {
+        guard let other = object as? ImageCacheKey else { return false }
+        return urlString == other.urlString && pixelSize == other.pixelSize
+    }
+}
 
 enum CachedAsyncImageHelper {
     static let urlSession: URLSession = {
@@ -20,45 +43,115 @@ enum CachedAsyncImageHelper {
         configuration.requestCachePolicy = .returnCacheDataElseLoad
         return URLSession(configuration: configuration)
     }()
+    
+    fileprivate static let decodedImageCache: NSCache<ImageCacheKey, UIImage> = {
+        let cache = NSCache<ImageCacheKey, UIImage>()
+        cache.countLimit = 300
+        cache.totalCostLimit = 150 * 1024 * 1024
+        return cache
+    }()
+
+    static var defaultPixelSize: Double {
+        Double(UIScreen.main.bounds.width * UIScreen.main.scale)
+    }
+
+    fileprivate static func cacheKey(for url: URL, maxPixelSize: Double) -> ImageCacheKey {
+        ImageCacheKey(url: url, maxPixelSize: maxPixelSize)
+    }
+
+    static func prefetchImages(from urls: [URL], maxPixelSize: Double? = nil) async {
+        guard !urls.isEmpty else { return }
+        let targetPixelSize = maxPixelSize ?? defaultPixelSize
+
+        for url in urls {
+            if Task.isCancelled { return }
+            let key = cacheKey(for: url, maxPixelSize: targetPixelSize)
+            if decodedImageCache.object(forKey: key) != nil { continue }
+
+            do {
+                let (data, _) = try await urlSession.data(from: url)
+                guard !Task.isCancelled else { return }
+
+                let decodeTask = Task.detached(priority: .utility) { () -> UIImage? in
+                    data.downsampledImage(maxPixelSize: targetPixelSize)
+                }
+
+                if let uiImage = await decodeTask.value {
+                    decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
+                }
+            } catch {
+                continue
+            }
+
+            await Task.yield()
+        }
+    }
 }
 
 struct CachedAsyncImage<Content: View>: View {
     let url: URL?
+    let maxPixelSize: Double?
     let content: (AsyncImagePhase) -> Content
     
     @State private var phase: AsyncImagePhase = .empty
     
-    init(url: URL?, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
+    init(url: URL?, maxPixelSize: Double? = nil, @ViewBuilder content: @escaping (AsyncImagePhase) -> Content) {
         self.url = url
+        self.maxPixelSize = maxPixelSize
         self.content = content
     }
     
     var body: some View {
         content(phase)
-            .task(id: url) {
+            .task(id: cacheTaskIdentifier) {
                 await loadImage()
             }
     }
-    
-    @MainActor
+
+    private var cacheTaskIdentifier: String {
+        guard let url else { return "nil" }
+        let targetPixelSize = maxPixelSize ?? CachedAsyncImageHelper.defaultPixelSize
+        return "\(url.absoluteString)|\(Int(targetPixelSize.rounded()))"
+    }
+
     private func loadImage() async {
         guard let url = url else {
-            phase = .failure(URLError(.badURL))
+            updatePhase(.failure(URLError(.badURL)))
             return
         }
 
-        phase = .empty
+        let targetPixelSize = maxPixelSize ?? CachedAsyncImageHelper.defaultPixelSize
+        let key = CachedAsyncImageHelper.cacheKey(for: url, maxPixelSize: targetPixelSize)
+
+        if let cachedImage = CachedAsyncImageHelper.decodedImageCache.object(forKey: key) {
+            updatePhase(.success(Image(uiImage: cachedImage)))
+            return
+        }
+
+        updatePhase(.empty)
 
         do {
             let (data, _) = try await CachedAsyncImageHelper.urlSession.data(from: url)
+            guard !Task.isCancelled else { return }
 
-            if let uiImage = data.downsampledImage() {
-                phase = .success(Image(uiImage: uiImage))
+            let decodeTask = Task.detached(priority: .utility) { () -> UIImage? in
+                data.downsampledImage(maxPixelSize: targetPixelSize)
+            }
+
+            if let uiImage = await decodeTask.value {
+                CachedAsyncImageHelper.decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
+                updatePhase(.success(Image(uiImage: uiImage)))
             } else {
-                phase = .failure(URLError(.cannotDecodeContentData))
+                updatePhase(.failure(URLError(.cannotDecodeContentData)))
             }
         } catch {
-            phase = .failure(error)
+            guard !Task.isCancelled else { return }
+            updatePhase(.failure(error))
         }
+    }
+
+    @MainActor
+    private func updatePhase(_ newPhase: AsyncImagePhase) {
+        phase = newPhase
     }
 }

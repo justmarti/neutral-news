@@ -10,6 +10,7 @@ import SwiftUI
 
 final class ImageService: @unchecked Sendable {
     static let shared = ImageService()
+    private static let dominantColorDownsamplePixelSize: Double = 128
     
     private var colorCache = [String: Color]()
     private let cacheQueue = DispatchQueue(label: "imageservice.cache", qos: .utility)
@@ -39,7 +40,8 @@ final class ImageService: @unchecked Sendable {
         
         do {
             let (data, _) = try await urlSession.data(from: url)
-            guard let image = data.downsampledImage(), let cgImage = image.cgImage else { return .nnBackground }
+            guard let image = data.downsampledImage(maxPixelSize: Self.dominantColorDownsamplePixelSize),
+                  let cgImage = image.cgImage else { return .nnBackground }
 
             let color = extractDominantColor(from: cgImage)
             await setCachedColor(color, for: urlString)
@@ -54,7 +56,7 @@ final class ImageService: @unchecked Sendable {
 
         let request = URLRequest(url: url)
         if let cachedResponse = CachedAsyncImageHelper.urlSession.configuration.urlCache?.cachedResponse(for: request),
-           let image = cachedResponse.data.downsampledImage(),
+           let image = cachedResponse.data.downsampledImage(maxPixelSize: Self.dominantColorDownsamplePixelSize),
            let cgImage = image.cgImage {
             return extractDominantColor(from: cgImage)
         }

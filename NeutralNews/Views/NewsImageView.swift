@@ -10,6 +10,7 @@ import SwiftUI
 struct NewsImageView: View {
     let news: NeutralNews
     let imageUrl: String?
+    @Environment(\.displayScale) private var displayScale
 
     // Gradient is created once and shared by all instances
     private static let overlayGradient = LinearGradient(
@@ -27,7 +28,10 @@ struct NewsImageView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
-                CachedAsyncImage(url: URL(string: imageUrl ?? "")) { phase in
+                CachedAsyncImage(
+                    url: URL(string: imageUrl ?? ""),
+                    maxPixelSize: Double(geometry.size.width * displayScale)
+                ) { phase in
                     if let image = phase.image {
                         image
                             .resizable()

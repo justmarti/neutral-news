@@ -7,7 +7,6 @@
 
 import Foundation
 import Observation
-import CoreData
 
 @Observable
 final class SavedNewsState {
@@ -27,9 +26,12 @@ final class SavedNewsState {
     }
 
     @MainActor
-    func ensureCached(newsId: String, context: NSManagedObjectContext) {
-        guard savedById[newsId] == nil else { return }
-        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: newsId, context: context)
-        savedById[newsId] = isSaved
+    func markSaved(newsIds: [String]) {
+        guard !newsIds.isEmpty else { return }
+
+        savedById.reserveCapacity(max(savedById.count, newsIds.count))
+        for newsId in newsIds {
+            savedById[newsId] = true
+        }
     }
 }

@@ -18,15 +18,18 @@ final class PaginationManager<Item: Identifiable> {
     private(set) var currentPage = 0
     private(set) var isLoading = false
     private(set) var hasMorePages = true
+    var totalItemCount: Int { cachedAllItems.count }
     
     // MARK: - Private Properties
     private let pageSize: Int
+    private let preloadMargin: Int
     private var cachedAllItems: [Item] = []
     private var lastDataHash: Int = 0
     
     // MARK: - Initialization
-    init(pageSize: Int = defaultPageSize) {
+    init(pageSize: Int = defaultPageSize, preloadMargin: Int = 5) {
         self.pageSize = pageSize
+        self.preloadMargin = max(1, preloadMargin)
     }
     
     // MARK: - Public Methods
@@ -72,10 +75,11 @@ final class PaginationManager<Item: Identifiable> {
     }
     
     func shouldLoadMore(for item: Item) -> Bool {
-        guard let lastItem = paginatedItems.last,
-              lastItem.id == item.id else { return false }
-        
-        return hasMorePages && !isLoading
+        guard hasMorePages && !isLoading else { return false }
+        guard let currentIndex = paginatedItems.firstIndex(where: { $0.id == item.id }) else { return false }
+
+        let thresholdIndex = max(0, paginatedItems.count - preloadMargin)
+        return currentIndex >= thresholdIndex
     }
     
     func reset() {

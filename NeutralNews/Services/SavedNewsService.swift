@@ -103,11 +103,7 @@ final class SavedNewsService {
         fetchRequest.predicate = NSPredicate(format: "newsId == %@", newsId)
 
         let results = try? context.fetch(fetchRequest)
-        let isSaved = results?.first != nil
-#if DEBUG
-        print("🔍 Checking if news \(newsId) is saved: \(isSaved) (found \(results?.count ?? 0) results)")
-#endif
-        return isSaved
+        return results?.first != nil
     }
 
     func getSavedNews(context: NSManagedObjectContext) throws -> [SavedNews] {

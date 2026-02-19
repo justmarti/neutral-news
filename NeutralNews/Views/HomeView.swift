@@ -7,12 +7,10 @@
 
 import SwiftUI
 import UIKit
-import SwiftData
 
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.modelContext) private var cacheContext
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var targetNews: NeutralNews?
@@ -26,9 +24,6 @@ struct HomeView: View {
 
     // Premium manager for UI state
     private let premiumManager = PremiumManager.shared
-
-    // Access to saved news container
-    @State private var savedNewsContext: ModelContext?
 
     // MARK: - Computed Properties
 
@@ -173,7 +168,7 @@ struct HomeView: View {
             loadingView
         } else if !vm.searchText.isEmpty && newsItems.isEmpty && !vm.isLoadingNeutralNews && !vm.isLoadingForSearch {
             noResultsView
-        } else if vm.searchText.isEmpty && newsItems.isEmpty && !vm.isLoadingNeutralNews {
+        } else if vm.searchText.isEmpty && newsItems.isEmpty && !vm.isLoadingNeutralNews && vm.hasCompletedInitialLaunchLoad {
             noNewsYetView
         } else {
             newsListView(newsItems: newsItems)
@@ -197,7 +192,6 @@ struct HomeView: View {
             ForEach(newsItems) { neutralNews in
                 HomeNewsCard(
                     news: neutralNews,
-                    relatedNews: vm.getRelatedNews(from: neutralNews),
                     namespace: animationNamespace,
                     isBackgroundColorEnabled: isBackgroundColorEnabled,
                     vm: vm,
@@ -365,18 +359,16 @@ extension View {
 
 private struct HomeNewsCard: View {
     let news: NeutralNews
-    let relatedNews: [News]
     let namespace: Namespace.ID
     let isBackgroundColorEnabled: Bool
-    @Bindable var vm: NewsListViewModel
+    let vm: NewsListViewModel
     let premiumManager: PremiumManager
-    @State private var savedNewsState: SavedNewsState
+    let savedNewsState: SavedNewsState
     @State private var isArticleSaved: Bool?
     @State private var copyHeadlineTrigger = false
 
     init(
         news: NeutralNews,
-        relatedNews: [News],
         namespace: Namespace.ID,
         isBackgroundColorEnabled: Bool,
         vm: NewsListViewModel,
@@ -384,17 +376,16 @@ private struct HomeNewsCard: View {
         savedNewsState: SavedNewsState
     ) {
         self.news = news
-        self.relatedNews = relatedNews
         self.namespace = namespace
         self.isBackgroundColorEnabled = isBackgroundColorEnabled
         self.vm = vm
         self.premiumManager = premiumManager
-        _savedNewsState = State(initialValue: savedNewsState)
+        self.savedNewsState = savedNewsState
     }
 
     var body: some View {
         NavigationLink {
-            NeutralNewsView(news: news, relatedNews: relatedNews, namespace: namespace)
+            NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: namespace)
                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                 .navigationTransition(.zoom(sourceID: news.id, in: namespace))
                 .onAppear {
@@ -408,7 +399,7 @@ private struct HomeNewsCard: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            let saved = isArticleSaved ?? savedNewsState.isSaved(news.id)
+            let saved = vm.isShowingSavedNews ? true : (isArticleSaved ?? savedNewsState.isSaved(news.id))
             Button {
                 handleSaveAction()
             } label: {
@@ -434,16 +425,6 @@ private struct HomeNewsCard: View {
             if vm.shouldLoadMore(currentItem: news) {
                 vm.loadNextPage()
             }
-
-            if let context = vm.coreDataContext {
-                Task { @MainActor in
-                    savedNewsState.ensureCached(newsId: news.id, context: context)
-                    isArticleSaved = savedNewsState.isSaved(news.id)
-                }
-            }
-        }
-        .onChange(of: savedNewsState.isSaved(news.id)) { _, newValue in
-            isArticleSaved = newValue
         }
     }
 
