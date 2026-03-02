@@ -23,6 +23,16 @@ struct SavedNewsSourcesPayloadTests {
         #expect(decodedRelated.isEmpty)
     }
 
+    @Test("Storage key includes region to avoid cross-country collisions")
+    func storageKeyIncludesRegion() {
+        let usKey = SavedNewsItem.storageKey(newsId: "same-id", regionRaw: "US")
+        let esKey = SavedNewsItem.storageKey(newsId: "same-id", regionRaw: "ES")
+
+        #expect(usKey != esKey)
+        #expect(usKey == "US|same-id")
+        #expect(esKey == "ES|same-id")
+    }
+
     @Test("Encode and decode extended payload with related snapshots")
     func encodeAndDecodeExtendedPayload() {
         let relatedNews = [
@@ -53,5 +63,13 @@ struct SavedNewsSourcesPayloadTests {
         #expect(decodedRelated.first?.id == "related-1")
         #expect(decodedRelated.first?.title == "Related title")
         #expect(decodedRelated.first?.embedding.isEmpty == true)
+
+        let encodedSwiftData = SavedNewsItem.encodeStoredSources(sourceIds: ["related-1"], relatedNews: relatedNews)
+        let decodedSwiftDataIds = SavedNewsItem.decodeStoredSourceIds(from: encodedSwiftData)
+        let decodedSwiftDataRelated = SavedNewsItem.decodeStoredRelatedNews(from: encodedSwiftData)
+
+        #expect(decodedSwiftDataIds == ["related-1"])
+        #expect(decodedSwiftDataRelated.count == 1)
+        #expect(decodedSwiftDataRelated.first?.id == "related-1")
     }
 }

@@ -19,21 +19,16 @@ extension NewsListViewModel {
         filterViewModel.clearFilters()
     }
 
-    /// Loads all saved news from Core Data persistent storage.
+    /// Loads all saved news from persistent storage.
     ///
-    /// Fetches saved news items from Core Data, converts them back to `NeutralNews` objects,
-    /// and updates the `savedNews` array sorted by date (newest first).
+    /// Fetches saved news items, converts them back to `NeutralNews` objects,
+    /// and updates the `savedNews` array for display.
     ///
-    /// - Important: Requires `coreDataContext` to be set. Will fail silently if not available.
+    /// - Note: Uses SwiftData as primary store and Core Data as temporary migration fallback.
     /// - Note: This is an async operation that updates `isLoadingSavedNews` state
     func loadSavedNews() async {
-        guard let context = coreDataContext else {
-            print("❌ No Core Data context available")
-            return
-        }
-
 #if DEBUG
-        print("🔄 Loading saved news from Core Data")
+        print("🔄 Loading saved news")
 #endif
 
         await MainActor.run {
@@ -47,24 +42,13 @@ extension NewsListViewModel {
         }
 
         do {
-            let savedNewsItems = try savedNewsService.getSavedNews(context: context)
+            let savedNewsItems = try savedNewsService.getSavedNeutralNews(context: coreDataContext)
 #if DEBUG
             print("📰 Found \(savedNewsItems.count) saved news items")
 #endif
 
-            let parsedSavedItems = savedNewsItems.compactMap { savedNews -> (neutral: NeutralNews, related: [News])? in
-                guard savedNews.newsType == SavedNewsType.neutralNews.rawValue else {
-#if DEBUG
-                    print("⚠️ Skipping non-neutral news: \(savedNews.newsType ?? "unknown")")
-#endif
-                    return nil
-                }
-
-                guard let neutralNews = savedNews.toNeutralNews() else {
-                    return nil
-                }
-
-                return (neutral: neutralNews, related: savedNews.savedRelatedNews())
+            let parsedSavedItems = savedNewsItems.map { savedNews -> (neutral: NeutralNews, related: [News], regionRaw: String) in
+                (neutral: savedNews.neutralNews, related: savedNews.relatedNews, regionRaw: savedNews.regionRaw)
             }
 
 #if DEBUG
@@ -72,10 +56,21 @@ extension NewsListViewModel {
 #endif
 
             await MainActor.run {
-                let sortedSavedItems = parsedSavedItems.sorted { $0.neutral.date > $1.neutral.date }
+                let activeRegionRaw = ContentRegionProvider().currentRegion.rawValue
+                let sortedSavedItems = parsedSavedItems.sorted { lhs, rhs in
+                    let lhsIsActiveRegion = lhs.regionRaw == activeRegionRaw
+                    let rhsIsActiveRegion = rhs.regionRaw == activeRegionRaw
+
+                    if lhsIsActiveRegion != rhsIsActiveRegion {
+                        return lhsIsActiveRegion
+                    }
+
+                    return lhs.neutral.date > rhs.neutral.date
+                }
                 var seenNewsIds = Set<String>()
                 var deduplicatedNews: [NeutralNews] = []
                 var deduplicatedRelatedNewsById: [String: [News]] = [:]
+                var deduplicatedRegionById: [String: String] = [:]
 
                 for item in sortedSavedItems {
                     let newsId = item.neutral.id
@@ -83,11 +78,15 @@ extension NewsListViewModel {
 
                     deduplicatedNews.append(item.neutral)
                     deduplicatedRelatedNewsById[newsId] = item.related
+                    deduplicatedRegionById[newsId] = item.regionRaw
                 }
 
                 savedNews = deduplicatedNews
                 savedRelatedNewsByNeutralId = deduplicatedRelatedNewsById
-                SavedNewsState.shared.markSaved(newsIds: savedNews.map(\.id))
+                savedRegionByNewsId = deduplicatedRegionById
+                for item in sortedSavedItems {
+                    SavedNewsState.shared.setSaved(true, for: item.neutral.id, regionRaw: item.regionRaw)
+                }
 #if DEBUG
                 print("🎯 savedNews updated with \(savedNews.count) items")
 #endif
@@ -108,18 +107,23 @@ extension NewsListViewModel {
             await MainActor.run {
                 savedNews = []
                 savedRelatedNewsByNeutralId = [:]
+                savedRegionByNewsId = [:]
             }
         }
     }
 
     /// Removes a news item from the saved news array (UI state only).
     ///
-    /// This only removes the item from the in-memory array. To permanently delete from Core Data,
-    /// use `SavedNewsService.deleteSavedNews()`.
+    /// This only removes the item from in-memory UI state.
     ///
     /// - Parameter newsId: The ID of the news item to remove from the array
     func removeFromSavedNews(_ newsId: String) {
         savedNews.removeAll { $0.id == newsId }
         savedRelatedNewsByNeutralId.removeValue(forKey: newsId)
+        savedRegionByNewsId.removeValue(forKey: newsId)
+    }
+
+    func savedRegionRaw(for newsId: String) -> String? {
+        savedRegionByNewsId[newsId]
     }
 }

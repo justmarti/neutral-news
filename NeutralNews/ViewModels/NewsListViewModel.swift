@@ -104,6 +104,7 @@ final class NewsListViewModel {
     }
     var isLoadingSavedNews = false
     var savedRelatedNewsByNeutralId: [String: [News]] = [:]
+    var savedRegionByNewsId: [String: String] = [:]
     
     // MARK: - Computed Properties
     var lastSevenDays: [DayInfo] {

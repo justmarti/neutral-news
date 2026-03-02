@@ -449,14 +449,15 @@ private struct HomeNewsCard: View {
     }
 
     private func toggleSave() async {
-        guard let context = vm.coreDataContext else { return }
+        let context = vm.coreDataContext
         let currentlySaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
         do {
             if currentlySaved {
-                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
+                let unsaveRegionRaw = vm.isShowingSavedNews ? vm.savedRegionRaw(for: news.id) : nil
+                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context, regionRaw: unsaveRegionRaw)
                 await MainActor.run {
                     vm.removeFromSavedNews(news.id)
-                    savedNewsState.setSaved(false, for: news.id)
+                    savedNewsState.setSaved(false, for: news.id, regionRaw: unsaveRegionRaw)
                     saveFeedbackTrigger &+= 1
                 }
             } else {
@@ -476,9 +477,8 @@ private struct HomeNewsCard: View {
     private func ensureSavedStatusLoadedIfNeeded() async {
         guard !vm.isShowingSavedNews else { return }
         guard !savedNewsState.hasStatus(for: news.id) else { return }
-        guard let context = vm.coreDataContext else { return }
 
-        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: vm.coreDataContext)
         await MainActor.run {
             savedNewsState.setSaved(isSaved, for: news.id)
         }

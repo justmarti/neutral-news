@@ -13,29 +13,41 @@ final class SavedNewsState {
     static let shared = SavedNewsState()
 
     private(set) var savedById: [String: Bool] = [:]
+    private let regionProvider: ContentRegionProviding
 
-    private init() {}
-
-    func isSaved(_ newsId: String) -> Bool {
-        savedById[newsId] ?? false
+    private init(regionProvider: ContentRegionProviding = ContentRegionProvider()) {
+        self.regionProvider = regionProvider
     }
 
-    func hasStatus(for newsId: String) -> Bool {
-        savedById[newsId] != nil
+    private func scopedKey(newsId: String, regionRaw: String?) -> String {
+        let resolvedRegionRaw = regionRaw ?? regionProvider.currentRegion.rawValue
+        return "\(resolvedRegionRaw)|\(newsId)"
+    }
+
+    func isSaved(_ newsId: String, regionRaw: String? = nil) -> Bool {
+        let key = scopedKey(newsId: newsId, regionRaw: regionRaw)
+        return savedById[key] ?? false
+    }
+
+    func hasStatus(for newsId: String, regionRaw: String? = nil) -> Bool {
+        let key = scopedKey(newsId: newsId, regionRaw: regionRaw)
+        return savedById[key] != nil
     }
 
     @MainActor
-    func setSaved(_ isSaved: Bool, for newsId: String) {
-        savedById[newsId] = isSaved
+    func setSaved(_ isSaved: Bool, for newsId: String, regionRaw: String? = nil) {
+        let key = scopedKey(newsId: newsId, regionRaw: regionRaw)
+        savedById[key] = isSaved
     }
 
     @MainActor
-    func markSaved(newsIds: [String]) {
+    func markSaved(newsIds: [String], regionRaw: String? = nil) {
         guard !newsIds.isEmpty else { return }
 
         savedById.reserveCapacity(max(savedById.count, newsIds.count))
         for newsId in newsIds {
-            savedById[newsId] = true
+            let key = scopedKey(newsId: newsId, regionRaw: regionRaw)
+            savedById[key] = true
         }
     }
 }

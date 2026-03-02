@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct NeutralNewsOptionsMenu: View {
     let news: NeutralNews
@@ -31,7 +30,7 @@ struct NeutralNewsOptionsMenu: View {
                     }
                 }
             } label: {
-                let saved = savedNewsState.isSaved(news.id)
+                let saved = NewsListViewModel.shared.isShowingSavedNews ? true : savedNewsState.isSaved(news.id)
                 Label(
                     saved ? "Saved" : "Save",
                     systemImage: !premiumManager.canSaveNews
@@ -60,28 +59,35 @@ struct NeutralNewsOptionsMenu: View {
     }
 
     private func ensureSavedStatusLoadedIfNeeded() async {
+        guard !NewsListViewModel.shared.isShowingSavedNews else { return }
         guard !savedNewsState.hasStatus(for: news.id) else { return }
-        guard let context = NewsListViewModel.shared.coreDataContext else { return }
 
-        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: NewsListViewModel.shared.coreDataContext)
         await MainActor.run {
             savedNewsState.setSaved(isSaved, for: news.id)
         }
     }
 
     private func handleSaveArticle() async {
-        guard let context = NewsListViewModel.shared.coreDataContext else { return }
+        let context = NewsListViewModel.shared.coreDataContext
 #if DEBUG
         print("🔄 Attempting to save article: \(news.id)")
 #endif
         do {
-            if savedNewsState.isSaved(news.id) {
+            let currentlySaved = NewsListViewModel.shared.isShowingSavedNews
+                ? true
+                : savedNewsState.isSaved(news.id)
+
+            if currentlySaved {
 #if DEBUG
                 print("🗑️ Unsaving article...")
 #endif
-                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context)
+                let unsaveRegionRaw = NewsListViewModel.shared.isShowingSavedNews
+                    ? NewsListViewModel.shared.savedRegionRaw(for: news.id)
+                    : nil
+                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context, regionRaw: unsaveRegionRaw)
                 await MainActor.run {
-                    savedNewsState.setSaved(false, for: news.id)
+                    savedNewsState.setSaved(false, for: news.id, regionRaw: unsaveRegionRaw)
                     saveFeedbackTrigger &+= 1
                 }
 #if DEBUG

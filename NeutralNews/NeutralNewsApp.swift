@@ -34,7 +34,6 @@ struct NeutralNewsApp: App {
         }
     }()
 
-
     init() {
         FirebaseApp.configure()
 
