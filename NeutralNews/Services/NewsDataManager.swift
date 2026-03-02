@@ -7,6 +7,50 @@
 
 import Foundation
 
+private final class RegularNewsLoadCoordinator {
+    private var tasksByDay: [Date: Task<Void, Never>] = [:]
+    private var sessionID = UUID()
+
+    @MainActor
+    func currentSessionID() -> UUID {
+        sessionID
+    }
+
+    @MainActor
+    func isCurrentSession(_ id: UUID) -> Bool {
+        sessionID == id
+    }
+
+    @MainActor
+    func storeTask(_ task: Task<Void, Never>, for date: Date) {
+        cancelTask(for: date)
+        tasksByDay[date] = task
+    }
+
+    @MainActor
+    func removeTask(for date: Date) {
+        tasksByDay.removeValue(forKey: date)
+    }
+
+    @MainActor
+    func cancelTask(for date: Date) {
+        tasksByDay[date]?.cancel()
+        tasksByDay.removeValue(forKey: date)
+    }
+
+    @MainActor
+    func invalidateSession() {
+        cancelAll()
+        sessionID = UUID()
+    }
+
+    @MainActor
+    func cancelAll() {
+        tasksByDay.values.forEach { $0.cancel() }
+        tasksByDay.removeAll()
+    }
+}
+
 @Observable
 final class NewsDataManager {
     static let shared = NewsDataManager()
@@ -68,6 +112,7 @@ final class NewsDataManager {
     
     // MARK: - Background Loading
     private var backgroundLoadingTask: Task<Void, Never>?
+    private let regularNewsLoadCoordinator = RegularNewsLoadCoordinator()
     
     // MARK: - Computed Properties
     var lastSevenDays: [DayInfo] {
@@ -80,6 +125,9 @@ final class NewsDataManager {
     
     deinit {
         backgroundLoadingTask?.cancel()
+        Task { @MainActor [regularNewsLoadCoordinator] in
+            regularNewsLoadCoordinator.cancelAll()
+        }
     }
     
     // MARK: - Public Methods
@@ -100,6 +148,11 @@ final class NewsDataManager {
     func loadNews(for day: DayInfo, forceRefresh: Bool = false) async {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day.date)
+        let dayDate = day.date
+        let dayName = day.dayName
+        let sessionID = await MainActor.run {
+            self.regularNewsLoadCoordinator.currentSessionID()
+        }
         
         // Skip if already loaded unless forced refresh
         guard !isDateLoaded(startOfDay) || forceRefresh else { return }
@@ -126,59 +179,161 @@ final class NewsDataManager {
         
         // Step 2: Cache miss or force refresh - fetch from Firebase
 #if DEBUG
-        print("🔥 Cache MISS for \(day.dayName) - fetching from Firebase")
+        print("🔥 Cache MISS for \(dayName) - fetching from Firebase")
 #endif
-        
-        do {
-            async let neutralNewsTask = FirestoreService.shared.fetchNeutralNews(for: day)
-            async let newsTask = FirestoreService.shared.fetchNews(for: day)
-            
-            let (fetchedNeutralNews, fetchedNews) = try await (neutralNewsTask, newsTask)
-            
+
+        if forceRefresh {
             await MainActor.run {
-                if forceRefresh {
+                self.regularNewsLoadCoordinator.cancelTask(for: startOfDay)
+            }
+
+            do {
+                async let neutralNewsTask = FirestoreService.shared.fetchNeutralNews(for: day)
+                async let newsTask = FirestoreService.shared.fetchNews(for: day)
+
+                let (fetchedNeutralNews, fetchedNews) = try await (neutralNewsTask, newsTask)
+
+                await MainActor.run {
+                    guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return }
+
                     // Smart incremental refresh: merge instead of replace
                     self.mergeNewsForDay(
                         neutralNews: fetchedNeutralNews,
                         regularNews: fetchedNews,
                         for: startOfDay
                     )
-                } else {
-                    // Normal loading: add only new items
-                    self.addNewNewsForDay(
-                        neutralNews: fetchedNeutralNews,
-                        regularNews: fetchedNews,
-                        for: startOfDay
-                    )
+
+                    // Mark day as loaded
+                    self.markDateAsLoaded(startOfDay)
+
+                    // Cache the fresh data after processing
+                    self.cacheService.cacheNeutralNews(fetchedNeutralNews, for: day)
+                    self.cacheService.cacheNews(fetchedNews, for: day)
                 }
-                
-                // Mark day as loaded
+            } catch {
+                print("❌ Error loading news for \(dayName): \(error.localizedDescription)")
+
+                // Fallback: try to load from cache even if potentially stale
+                let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
+                let cachedNews = cacheService.getCachedNews(for: day)
+
+                if !cachedNeutralNews.isEmpty || !cachedNews.isEmpty {
+#if DEBUG
+                    print("🔄 Using stale cache as fallback for \(dayName)")
+#endif
+                    await MainActor.run {
+                        guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return }
+
+                        self.addNewNewsForDay(
+                            neutralNews: cachedNeutralNews,
+                            regularNews: cachedNews,
+                            for: startOfDay
+                        )
+                        self.markDateAsLoaded(startOfDay)
+                    }
+                }
+            }
+            return
+        }
+
+        // For initial/day loading, prioritize neutral news so Home can render immediately.
+        await MainActor.run {
+            self.regularNewsLoadCoordinator.cancelTask(for: startOfDay)
+        }
+
+        do {
+            let fetchedNeutralNews = try await FirestoreService.shared.fetchNeutralNews(for: day)
+
+            await MainActor.run {
+                guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return }
+
+                self.addNewNewsForDay(
+                    neutralNews: fetchedNeutralNews,
+                    regularNews: [],
+                    for: startOfDay
+                )
                 self.markDateAsLoaded(startOfDay)
-                
-                // Cache the fresh data after processing
                 self.cacheService.cacheNeutralNews(fetchedNeutralNews, for: day)
-                self.cacheService.cacheNews(fetchedNews, for: day)
             }
         } catch {
-            print("❌ Error loading news for \(day.dayName): \(error.localizedDescription)")
-            
-            // Fallback: try to load from cache even if potentially stale
+            print("❌ Error loading neutral news for \(dayName): \(error.localizedDescription)")
+
+            // Fallback: try stale neutral cache
             let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
-            let cachedNews = cacheService.getCachedNews(for: day)
-            
-            if !cachedNeutralNews.isEmpty || !cachedNews.isEmpty {
+
+            if !cachedNeutralNews.isEmpty {
 #if DEBUG
-                print("🔄 Using stale cache as fallback for \(day.dayName)")
+                print("🔄 Using stale neutral cache as fallback for \(dayName)")
 #endif
                 await MainActor.run {
+                    guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return }
+
                     self.addNewNewsForDay(
                         neutralNews: cachedNeutralNews,
-                        regularNews: cachedNews,
+                        regularNews: [],
                         for: startOfDay
                     )
                     self.markDateAsLoaded(startOfDay)
                 }
             }
+        }
+
+        let regularNewsTask = Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            do {
+                let dayInfo = DayInfo(date: dayDate)
+                let fetchedNews = try await FirestoreService.shared.fetchNews(for: dayInfo)
+
+                await MainActor.run {
+                    guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else {
+                        self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                        return
+                    }
+
+                    self.addNewNewsForDay(
+                        neutralNews: [],
+                        regularNews: fetchedNews,
+                        for: startOfDay
+                    )
+                    self.cacheService.cacheNews(fetchedNews, for: dayInfo)
+                    self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                }
+            } catch is CancellationError {
+                await MainActor.run {
+                    self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                }
+            } catch {
+                print("❌ Error loading regular news for \(dayName): \(error.localizedDescription)")
+
+                // Fallback to stale regular cache to keep related-news lookups usable.
+                let dayInfo = DayInfo(date: dayDate)
+                let cachedNews = self.cacheService.getCachedNews(for: dayInfo)
+                guard !cachedNews.isEmpty else {
+                    await MainActor.run {
+                        self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                    }
+                    return
+                }
+
+                await MainActor.run {
+                    guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else {
+                        self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                        return
+                    }
+
+                    self.addNewNewsForDay(
+                        neutralNews: [],
+                        regularNews: cachedNews,
+                        for: startOfDay
+                    )
+                    self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                }
+            }
+        }
+
+        await MainActor.run {
+            self.regularNewsLoadCoordinator.storeTask(regularNewsTask, for: startOfDay)
         }
     }
     
@@ -198,6 +353,7 @@ final class NewsDataManager {
     func resetForRegionChange() async {
         await cacheService.clearAllCache()
         await MainActor.run {
+            self.regularNewsLoadCoordinator.invalidateSession()
             allNews = []
             neutralNews = []
             newsByDay = [:]
@@ -431,4 +587,5 @@ final class NewsDataManager {
             return newsDate < sevenDaysAgo
         }
     }
+
 }
