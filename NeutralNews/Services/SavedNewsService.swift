@@ -11,6 +11,7 @@ import CoreData
 // MARK: - Service
 final class SavedNewsService {
     static let shared = SavedNewsService()
+    private let newsDataManager = NewsDataManager.shared
 
     private init() {}
 
@@ -54,7 +55,8 @@ final class SavedNewsService {
 
         // Create the object ONLY if not already saved
         if let neutralNews = news as? NeutralNews {
-            _ = SavedNews(from: neutralNews, context: context)
+            let relatedNews = newsDataManager.getRelatedNews(from: neutralNews)
+            _ = SavedNews(from: neutralNews, relatedNews: relatedNews, context: context)
 #if DEBUG
             print("📰 Created SavedNews from NeutralNews: \(neutralNews.id)")
 #endif

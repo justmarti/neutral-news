@@ -52,7 +52,7 @@ extension NewsListViewModel {
             print("📰 Found \(savedNewsItems.count) saved news items")
 #endif
 
-            let neutralNewsList = savedNewsItems.compactMap { savedNews -> NeutralNews? in
+            let parsedSavedItems = savedNewsItems.compactMap { savedNews -> (neutral: NeutralNews, related: [News])? in
                 guard savedNews.newsType == SavedNewsType.neutralNews.rawValue else {
 #if DEBUG
                     print("⚠️ Skipping non-neutral news: \(savedNews.newsType ?? "unknown")")
@@ -60,22 +60,40 @@ extension NewsListViewModel {
                     return nil
                 }
 
-                return savedNews.toNeutralNews()
+                guard let neutralNews = savedNews.toNeutralNews() else {
+                    return nil
+                }
+
+                return (neutral: neutralNews, related: savedNews.savedRelatedNews())
             }
 
 #if DEBUG
-            print("✅ Successfully parsed \(neutralNewsList.count) neutral news items")
+            print("✅ Successfully parsed \(parsedSavedItems.count) neutral news items")
 #endif
 
             await MainActor.run {
-                savedNews = neutralNewsList.sorted { $0.date > $1.date }
+                let sortedSavedItems = parsedSavedItems.sorted { $0.neutral.date > $1.neutral.date }
+                var seenNewsIds = Set<String>()
+                var deduplicatedNews: [NeutralNews] = []
+                var deduplicatedRelatedNewsById: [String: [News]] = [:]
+
+                for item in sortedSavedItems {
+                    let newsId = item.neutral.id
+                    guard seenNewsIds.insert(newsId).inserted else { continue }
+
+                    deduplicatedNews.append(item.neutral)
+                    deduplicatedRelatedNewsById[newsId] = item.related
+                }
+
+                savedNews = deduplicatedNews
+                savedRelatedNewsByNeutralId = deduplicatedRelatedNewsById
                 SavedNewsState.shared.markSaved(newsIds: savedNews.map(\.id))
 #if DEBUG
                 print("🎯 savedNews updated with \(savedNews.count) items")
 #endif
             }
 
-            let prefetchURLs = neutralNewsList
+            let prefetchURLs = parsedSavedItems.map(\.neutral)
                 .prefix(50)
                 .compactMap { URL(string: $0.imageUrl) }
 
@@ -89,6 +107,7 @@ extension NewsListViewModel {
             print("❌ Error loading saved news: \(error)")
             await MainActor.run {
                 savedNews = []
+                savedRelatedNewsByNeutralId = [:]
             }
         }
     }
@@ -101,5 +120,6 @@ extension NewsListViewModel {
     /// - Parameter newsId: The ID of the news item to remove from the array
     func removeFromSavedNews(_ newsId: String) {
         savedNews.removeAll { $0.id == newsId }
+        savedRelatedNewsByNeutralId.removeValue(forKey: newsId)
     }
 }

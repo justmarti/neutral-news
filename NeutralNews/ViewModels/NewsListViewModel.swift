@@ -103,6 +103,7 @@ final class NewsListViewModel {
         }
     }
     var isLoadingSavedNews = false
+    var savedRelatedNewsByNeutralId: [String: [News]] = [:]
     
     // MARK: - Computed Properties
     var lastSevenDays: [DayInfo] {
@@ -244,7 +245,16 @@ final class NewsListViewModel {
     /// - Parameter neutralNews: The neutral news item to find related articles for
     /// - Returns: Array of `News` items from various media outlets referenced in the neutral news
     func getRelatedNews(from neutralNews: NeutralNews) -> [News] {
-        newsDataManager.getRelatedNews(from: neutralNews)
+        let liveRelatedNews = newsDataManager.getRelatedNews(from: neutralNews)
+        if !liveRelatedNews.isEmpty {
+            return liveRelatedNews
+        }
+
+        if isShowingSavedNews {
+            return savedRelatedNewsByNeutralId[neutralNews.id] ?? []
+        }
+
+        return []
     }
     
     /// Retrieves all news categories available for the current view context.
