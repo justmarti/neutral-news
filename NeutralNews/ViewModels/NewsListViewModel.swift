@@ -315,6 +315,14 @@ final class NewsListViewModel {
         }
     }
 
+    /// Preloads today's news on app resume without forcing refresh or UI loading state.
+    ///
+    /// This avoids competing with user-driven navigation when coming back from background.
+    func preloadTodayOnResume() async {
+        guard !isShowingSavedNews else { return }
+        await newsDataManager.loadNews(for: .today)
+    }
+
     /// Handles content region changes by resetting data and reloading current context.
     ///
     /// In all-days/search scope, reloads all last-7-days data to keep pagination consistent.

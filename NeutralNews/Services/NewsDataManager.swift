@@ -193,8 +193,8 @@ final class NewsDataManager {
 
                 let (fetchedNeutralNews, fetchedNews) = try await (neutralNewsTask, newsTask)
 
-                await MainActor.run {
-                    guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return }
+                let shouldCache = await MainActor.run {
+                    guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return false }
 
                     // Smart incremental refresh: merge instead of replace
                     self.mergeNewsForDay(
@@ -205,10 +205,15 @@ final class NewsDataManager {
 
                     // Mark day as loaded
                     self.markDateAsLoaded(startOfDay)
+                    return true
+                }
 
-                    // Cache the fresh data after processing
-                    self.cacheService.cacheNeutralNews(fetchedNeutralNews, for: day)
-                    self.cacheService.cacheNews(fetchedNews, for: day)
+                if shouldCache {
+                    let dayInfo = DayInfo(date: dayDate)
+                    Task(priority: .utility) { [cacheService] in
+                        cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
+                        cacheService.cacheNews(fetchedNews, for: dayInfo)
+                    }
                 }
             } catch {
                 print("❌ Error loading news for \(dayName): \(error.localizedDescription)")
@@ -244,8 +249,8 @@ final class NewsDataManager {
         do {
             let fetchedNeutralNews = try await FirestoreService.shared.fetchNeutralNews(for: day)
 
-            await MainActor.run {
-                guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return }
+            let shouldCache = await MainActor.run {
+                guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else { return false }
 
                 self.addNewNewsForDay(
                     neutralNews: fetchedNeutralNews,
@@ -253,7 +258,14 @@ final class NewsDataManager {
                     for: startOfDay
                 )
                 self.markDateAsLoaded(startOfDay)
-                self.cacheService.cacheNeutralNews(fetchedNeutralNews, for: day)
+                return true
+            }
+
+            if shouldCache {
+                let dayInfo = DayInfo(date: dayDate)
+                Task(priority: .utility) { [cacheService] in
+                    cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
+                }
             }
         } catch {
             print("❌ Error loading neutral news for \(dayName): \(error.localizedDescription)")
@@ -285,10 +297,10 @@ final class NewsDataManager {
                 let dayInfo = DayInfo(date: dayDate)
                 let fetchedNews = try await FirestoreService.shared.fetchNews(for: dayInfo)
 
-                await MainActor.run {
+                let shouldCache = await MainActor.run {
                     guard self.regularNewsLoadCoordinator.isCurrentSession(sessionID) else {
                         self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
-                        return
+                        return false
                     }
 
                     self.addNewNewsForDay(
@@ -296,8 +308,12 @@ final class NewsDataManager {
                         regularNews: fetchedNews,
                         for: startOfDay
                     )
-                    self.cacheService.cacheNews(fetchedNews, for: dayInfo)
                     self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
+                    return true
+                }
+
+                if shouldCache {
+                    self.cacheService.cacheNews(fetchedNews, for: dayInfo)
                 }
             } catch is CancellationError {
                 await MainActor.run {
