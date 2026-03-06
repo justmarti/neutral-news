@@ -48,10 +48,9 @@ struct HomeToolbar {
         Button {
             showingSettings = true
         } label: {
-            Image(systemName: "ellipsis")
+            Label("Settings", systemImage: "gearshape")
+                .matchedTransitionSource(id: "settings-sheet", in: settingsTransitionNamespace)
         }
-        .accessibilityLabel("Settings")
-        .matchedTransitionSource(id: "settings-sheet", in: settingsTransitionNamespace)
     }
     
     private var dayMenu: some View {
@@ -65,7 +64,7 @@ struct HomeToolbar {
                     }
                 }
             } label: {
-                Label("All news", systemImage: !premiumManager.canViewAllDays ? "lock.fill" : (vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack"))
+                Label("All News", systemImage: !premiumManager.canViewAllDays ? "lock.fill" : (vm.isShowingAllDays ? "rectangle.stack.fill" : "rectangle.stack"))
                 Text("Last 7 days")
             }
             

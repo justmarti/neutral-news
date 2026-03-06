@@ -15,12 +15,12 @@ struct HomeView: View {
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @State private var targetNews: NeutralNews?
     @State private var showingPaywall = false
+    @State private var showingSettingsSheet = false
     @State private var savedNewsState = SavedNewsState.shared
 
     @Namespace private var animationNamespace
     @Namespace private var settingsTransitionNamespace
     var config: AppConfig
-    @Binding var showingSettingsSheet: Bool
 
     // Premium manager for UI state
     private let premiumManager = PremiumManager.shared
@@ -33,9 +33,9 @@ struct HomeView: View {
 
     private var navigationTitleText: String {
         if vm.isShowingSavedNews {
-            return String(localized: "Saved news")
+            return String(localized: "Saved News")
         } else if vm.isShowingAllDays {
-            return String(localized: "All news")
+            return String(localized: "All News")
         } else {
             return vm.daySelected.dayName
         }
@@ -126,7 +126,6 @@ struct HomeView: View {
                 .sheet(isPresented: $showingSettingsSheet) {
                     SettingsView(
                         vm: vm,
-                        isPresented: $showingSettingsSheet,
                         settingsTransitionNamespace: settingsTransitionNamespace
                     )
                     .presentationDragIndicator(.hidden)
@@ -354,7 +353,7 @@ extension View {
 }
 
 #Preview {
-    HomeView(config: AppConfig(isTestMode: true), showingSettingsSheet: .constant(false))
+    HomeView(config: AppConfig(isTestMode: true))
 }
 
 private struct HomeNewsCard: View {

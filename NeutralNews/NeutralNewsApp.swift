@@ -16,7 +16,6 @@ import RevenueCat
 struct NeutralNewsApp: App {
     @Environment(\.scenePhase) private var scenePhase
     @State private var config = AppConfig()
-    @State private var showingSettingsSheet = false
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
 
     // Local cache container (no iCloud)
@@ -73,7 +72,7 @@ struct NeutralNewsApp: App {
 
     var body: some Scene {
         WindowGroup {
-            HomeView(config: config, showingSettingsSheet: $showingSettingsSheet)
+            HomeView(config: config)
                 .onAppear {
                     // Inject Core Data context
                     NewsListViewModel.shared.coreDataContext = CoreDataManager.shared.viewContext

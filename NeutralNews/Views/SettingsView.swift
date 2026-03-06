@@ -9,7 +9,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var vm: NewsListViewModel
-    @Binding var isPresented: Bool
     
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
@@ -19,6 +18,7 @@ struct SettingsView: View {
     @State private var safariURL: URL?
     @State private var showingPaywall = false
 
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     
     private let premiumManager = PremiumManager.shared
@@ -33,11 +33,10 @@ struct SettingsView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        isPresented = false
+                        dismiss()
                     } label: {
-                        Image(systemName: "xmark")
+                        Label("Close", systemImage: "xmark")
                     }
-                    .accessibilityLabel("Close")
                 }
             }
             .safariSheet(url: safariURL, isPresented: $showingSafari)
@@ -76,10 +75,61 @@ struct SettingsView: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
             }
 
+            if premiumManager.isPremium {
+                Section {
+                    LabeledContent {
+                        Text(subscriptionStatusValue)
+                    } label: {
+                        Text(subscriptionStatusLabel)
+                    }
+                } header: {
+                    Text("Facts Pro")
+                }
+            }
+
+            Section("Content") {
+                Button {
+                    vm.toggleSavedNewsMode()
+                    dismiss()
+                } label: {
+                    SettingsRowLabel(
+                        title: "Saved News",
+                        systemImage: "bookmark.fill",
+                        tint: .pink
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Picker(selection: $regionPreference) {
+                    ForEach(ContentRegionPreference.allCases) { preference in
+                        Text(preference.title).tag(preference.rawValue)
+                    }
+                } label: {
+                    SettingsRowLabel(
+                        title: "Region",
+                        systemImage: "globe.americas.fill",
+                        tint: .brown
+                    )
+                }
+                .pickerStyle(.navigationLink)
+                .onChange(of: regionPreference) { _, _ in
+                    Task {
+                        await vm.reloadAfterRegionChange()
+                    }
+                }
+
+//                SettingsRowLabel(
+//                    title: "Notificaciones",
+//                    systemImage: "bell.fill",
+//                    tint: .red
+//                )
+//                .foregroundStyle(.secondary)
+            }
+
             Section("Appearance") {
                 Toggle(isOn: $isBackgroundColorEnabled) {
                     SettingsRowLabel(
-                        title: "Colored background",
+                        title: "Colored Background",
                         systemImage: "paintbrush.fill",
                         tint: .orange
                     )
@@ -100,47 +150,6 @@ struct SettingsView: View {
                 .pickerStyle(.navigationLink)
             }
 
-            Section("Content") {
-                Button {
-                    withAnimation {
-                        vm.toggleSavedNewsMode()
-                        isPresented = false
-                    }
-                } label: {
-                    SettingsRowLabel(
-                        title: "Saved news",
-                        systemImage: "bookmark.fill",
-                        tint: .blue
-                    )
-                }
-                .buttonStyle(.plain)
-
-                Picker(selection: $regionPreference) {
-                    ForEach(ContentRegionPreference.allCases) { preference in
-                        Text(preference.title).tag(preference.rawValue)
-                    }
-                } label: {
-                    SettingsRowLabel(
-                        title: "Region",
-                        systemImage: "globe.americas.fill",
-                        tint: .teal
-                    )
-                }
-                .pickerStyle(.navigationLink)
-                .onChange(of: regionPreference) { _, _ in
-                    Task {
-                        await vm.reloadAfterRegionChange()
-                    }
-                }
-
-//                SettingsRowLabel(
-//                    title: "Notificaciones",
-//                    systemImage: "bell.fill",
-//                    tint: .red
-//                )
-//                .foregroundStyle(.secondary)
-            }
-
             Section("Promote") {
                 Button {
                     openAppStoreReview()
@@ -156,9 +165,22 @@ struct SettingsView: View {
 
                 ShareLink(item: URL(string: "https://apps.apple.com/app/id6748583935")!) {
                     SettingsRowLabel(
-                        title: "Recommend to a friend",
+                        title: "Recommend to a Friend",
                         systemImage: "square.and.arrow.up.fill",
                         tint: .green
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Section("Support") {
+                Button {
+                    contactSupport()
+                } label: {
+                    SettingsRowLabel(
+                        title: "Contact Us",
+                        systemImage: "envelope.fill",
+                        tint: .blue
                     )
                 }
                 .buttonStyle(.plain)
@@ -197,12 +219,18 @@ struct SettingsView: View {
 //                    .listRowSeparator(.hidden)
 //            }
 
-            Text("Built by Martí Espinosa in Barcelona")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+            VStack {
+                if let appVersionText {
+                    Text(appVersionText)
+                        .fontDesign(.monospaced)
+                }
+//                Text("Built by Martí Espinosa in Barcelona")
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
         }
     }
 
@@ -266,11 +294,11 @@ struct SettingsView: View {
         var body: some View {
             HStack(spacing: 12) {
                 ZStack {
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
                         .fill(tint.gradient)
-                        .frame(width: 28, height: 28)
+                        .frame(width: 32, height: 32)
                     Image(systemName: systemImage)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.headline)
                         .foregroundStyle(.white)
                 }
                 Text(title)
@@ -291,29 +319,40 @@ struct SettingsView: View {
         openURL(url)
     }
 
-//    private var subscriptionStatusText: String {
-//        guard let expirationDate = premiumManager.subscriptionExpirationDate else {
-//            return "Tu suscripción es vitalicia"
-//        }
-//
-//        let now = Date()
-//        let dayDifference = Calendar.current.dateComponents([.day], from: now, to: expirationDate).day ?? 0
-//        let remainingDays = max(dayDifference, 0)
-//        let remainingMonths = max(remainingDays / 30, 0)
-//
-//        let remainingText: String
-//        if remainingDays >= 60 {
-//            remainingText = remainingMonths == 1 ? "1 mes" : "\(remainingMonths) meses"
-//        } else {
-//            remainingText = remainingDays == 1 ? "1 día" : "\(remainingDays) días"
-//        }
-//
-//        if premiumManager.subscriptionWillRenew == true {
-//            return "Tu suscripción renueva en \(remainingText)"
-//        } else {
-//            return "Tu suscripción termina en \(remainingText)"
-//        }
-//    }
+    private func contactSupport() {
+        guard let url = URL(string: "mailto:support@getfacts.app") else { return }
+        openURL(url)
+    }
+
+    private var appVersionText: LocalizedStringResource? {
+        guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+              !version.isEmpty else {
+            return nil
+        }
+
+        return "Version \(version)"
+    }
+
+    private var subscriptionStatusLabel: LocalizedStringResource {
+        if premiumManager.subscriptionExpirationDate == nil {
+            return "Access"
+        }
+
+        return premiumManager.subscriptionWillRenew == true ? "Renews in" : "Expires in"
+    }
+
+    private var subscriptionStatusValue: String {
+        guard let expirationDate = premiumManager.subscriptionExpirationDate else {
+            return "Lifetime"
+        }
+
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.year, .month, .weekOfMonth, .day]
+        formatter.unitsStyle = .full
+        formatter.maximumUnitCount = 1
+
+        return formatter.string(from: Date(), to: expirationDate) ?? ""
+    }
 
     private var selectedColorScheme: AppColorScheme {
         AppColorScheme(rawValue: appColorScheme) ?? .system
@@ -335,7 +374,6 @@ private extension View {
 #Preview {
     SettingsView(
         vm: NewsListViewModel.shared,
-        isPresented: .constant(true),
         settingsTransitionNamespace: Namespace().wrappedValue
     )
 }
