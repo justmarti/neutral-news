@@ -10,6 +10,7 @@ import UIKit
 
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
+    @State private var newsDataManager = NewsDataManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
@@ -52,6 +53,8 @@ struct HomeView: View {
     }
 
     var body: some View {
+        let relatedNewsRefreshToken = newsDataManager.allNews.count
+
         Group {
             if config.isInMaintenance {
                 MaintenanceView(config: config)
@@ -78,8 +81,13 @@ struct HomeView: View {
                         }
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .animation(.default, value: vm.isShowingSavedNews)
+                        .animation(.default, value: relatedNewsRefreshToken)
                         .navigationDestination(item: $targetNews) { news in
-                            NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: animationNamespace)
+                            NeutralNewsView(
+                                news: news,
+                                relatedNews: vm.getRelatedNews(from: news),
+                                namespace: animationNamespace
+                            )
                                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                                 .onAppear {
                                     RatingManager.shared.incrementNewsReadCount()
@@ -191,6 +199,7 @@ struct HomeView: View {
             ForEach(newsItems) { neutralNews in
                 HomeNewsCard(
                     news: neutralNews,
+                    relatedNews: vm.getRelatedNews(from: neutralNews),
                     namespace: animationNamespace,
                     isBackgroundColorEnabled: isBackgroundColorEnabled,
                     vm: vm,
@@ -358,6 +367,7 @@ extension View {
 
 private struct HomeNewsCard: View {
     let news: NeutralNews
+    let relatedNews: [News]
     let namespace: Namespace.ID
     let isBackgroundColorEnabled: Bool
     let vm: NewsListViewModel
@@ -368,6 +378,7 @@ private struct HomeNewsCard: View {
 
     init(
         news: NeutralNews,
+        relatedNews: [News],
         namespace: Namespace.ID,
         isBackgroundColorEnabled: Bool,
         vm: NewsListViewModel,
@@ -375,6 +386,7 @@ private struct HomeNewsCard: View {
         savedNewsState: SavedNewsState
     ) {
         self.news = news
+        self.relatedNews = relatedNews
         self.namespace = namespace
         self.isBackgroundColorEnabled = isBackgroundColorEnabled
         self.vm = vm
@@ -384,7 +396,7 @@ private struct HomeNewsCard: View {
 
     var body: some View {
         NavigationLink {
-            NeutralNewsView(news: news, relatedNews: vm.getRelatedNews(from: news), namespace: namespace)
+            NeutralNewsView(news: news, relatedNews: relatedNews, namespace: namespace)
                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                 .navigationTransition(.zoom(sourceID: news.id, in: namespace))
                 .onAppear {

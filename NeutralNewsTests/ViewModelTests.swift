@@ -37,6 +37,30 @@ struct DataModelTests {
         #expect(!mockNews.id.isEmpty)
         #expect(!mockNews.sourceIds.isEmpty)
     }
+
+    @Test("Related news falls back to saved snapshots when live sources are missing")
+    func testRelatedNewsSavedFallback() async throws {
+        let viewModel = NewsListViewModel.shared
+        let neutralNewsId = "saved-\(UUID().uuidString)"
+        let sourceId = "source-\(UUID().uuidString)"
+        let neutralNews = createMockNeutralNews(id: neutralNewsId)
+        let savedRelatedNews = createMockNews(id: sourceId)
+
+        let previousIsShowingSavedNews = viewModel.isShowingSavedNews
+        let previousSavedRelatedNews = viewModel.savedRelatedNewsByNeutralId
+
+        defer {
+            viewModel.savedRelatedNewsByNeutralId = previousSavedRelatedNews
+            viewModel.isShowingSavedNews = previousIsShowingSavedNews
+        }
+
+        viewModel.isShowingSavedNews = true
+        viewModel.savedRelatedNewsByNeutralId = [neutralNewsId: [savedRelatedNews]]
+
+        let resolvedRelatedNews = viewModel.getRelatedNews(from: neutralNews)
+
+        #expect(resolvedRelatedNews == [savedRelatedNews])
+    }
     
     // MARK: - Helper Methods
     
@@ -63,5 +87,30 @@ struct DataModelTests {
             sourceIds: ["test-source-1", "test-source-2"]
         )
         return news
+    }
+
+    private func createMockNews(
+        id: String = "test-source-1",
+        title: String = "Related News",
+        category: String = "Test",
+        group: Int = 1,
+        date: Date = Date()
+    ) -> News {
+        News(
+            id: id,
+            title: title,
+            description: "Related description",
+            scrappedDescription: "Related description",
+            category: category,
+            imageUrl: "https://example.com/image.jpg",
+            link: "https://example.com/article",
+            pubDate: date,
+            createdAt: date,
+            updatedAt: date,
+            publisher: "Example Publisher",
+            neutralScore: 50,
+            group: group,
+            embedding: []
+        )
     }
 }
