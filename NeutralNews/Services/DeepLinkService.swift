@@ -8,6 +8,7 @@
 import Foundation
 
 struct DeepLinkService {
+    private static let shareHost = "share.getfacts.app"
 
     struct DeepLinkData: Equatable {
         let newsId: String
@@ -36,19 +37,51 @@ struct DeepLinkService {
     private static func extractNewsId(from url: URL) -> String? {
         if url.scheme == "neutralnews" {
             // Custom scheme: neutralnews://abc123
-            return url.host
-        } else {
-            // Universal Link: https://share.getfacts.app/news/\(news.id)
-            let path = url.path
-            if path.hasPrefix("/news/") {
-                return path.replacingOccurrences(of: "/news/", with: "")
-            }
+            return normalizedNewsId(url.host)
+        }
+
+        guard url.scheme?.lowercased() == "https",
+              url.host?.lowercased() == shareHost
+        else {
             return nil
         }
+
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+
+        if pathComponents.count == 2,
+           pathComponents[0] == "news" {
+            return normalizedNewsId(pathComponents[1])
+        }
+
+        if pathComponents.count == 3,
+           pathComponents[0] == "us",
+           pathComponents[1] == "news" {
+            return normalizedNewsId(pathComponents[2])
+        }
+
+        return nil
     }
 
-    static func generateShareURL(for news: NeutralNews) -> URL {
-        let shareURL = "https://share.getfacts.app/news/\(news.id)"
+    private static func normalizedNewsId(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let decodedValue = value.removingPercentEncoding ?? value
+        return decodedValue.isEmpty ? nil : decodedValue
+    }
+
+    static func generateShareURL(
+        for news: NeutralNews,
+        region: ContentRegion = ContentRegionProvider().currentRegion
+    ) -> URL {
+        let path: String
+
+        switch region {
+        case .us:
+            path = "/us/news/\(news.id)"
+        case .es:
+            path = "/news/\(news.id)"
+        }
+
+        let shareURL = "https://share.getfacts.app\(path)"
         return URL(string: shareURL) ?? URL(string: "https://apps.apple.com/app/id6748583935")!
     }
 }
