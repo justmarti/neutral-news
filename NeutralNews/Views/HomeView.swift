@@ -11,6 +11,7 @@ import UIKit
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
     @State private var newsDataManager = NewsDataManager.shared
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
@@ -134,6 +135,7 @@ struct HomeView: View {
                 .sheet(isPresented: $showingSettingsSheet) {
                     SettingsView(
                         vm: vm,
+                        systemColorScheme: colorScheme,
                         settingsTransitionNamespace: settingsTransitionNamespace
                     )
                     .presentationDragIndicator(.hidden)

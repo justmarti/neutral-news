@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @Bindable var vm: NewsListViewModel
+    let systemColorScheme: ColorScheme
     
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
@@ -26,7 +27,7 @@ struct SettingsView: View {
 
     var body: some View {
         NavigationStack {
-            settingsContent
+            settingsList
             .navigationTitle("Settings")
             .listStyle(.insetGrouped)
             .navigationBarTitleDisplayMode(.inline)
@@ -44,20 +45,8 @@ struct SettingsView: View {
                 PaywallView(isPresented: $showingPaywall)
             }
         }
+        .preferredColorScheme(isDarkModeForced ? .dark : systemColorScheme)
         .settingsSheetZoomTransition(namespace: settingsTransitionNamespace)
-    }
-
-    @ViewBuilder
-    private var settingsContent: some View {
-        let list = settingsList
-        switch selectedColorScheme {
-        case .system:
-            list
-        case .light:
-            list.preferredColorScheme(.light)
-        case .dark:
-            list.preferredColorScheme(.dark)
-        }
     }
 
     private var settingsList: some View {
@@ -136,18 +125,14 @@ struct SettingsView: View {
                 }
                 .tint(.accentColor)
 
-                Picker(selection: $appColorScheme) {
-                    ForEach(AppColorScheme.allCases) { scheme in
-                        Text(scheme.title).tag(scheme.rawValue)
-                    }
-                } label: {
+                Toggle(isOn: isDarkModeForcedBinding) {
                     SettingsRowLabel(
-                        title: "Theme",
-                        systemImage: "circle.lefthalf.filled",
+                        title: "Always Dark Mode",
+                        systemImage: "moon.fill",
                         tint: .indigo
                     )
                 }
-                .pickerStyle(.navigationLink)
+                .tint(.accentColor)
             }
 
             Section("Promote") {
@@ -358,6 +343,19 @@ struct SettingsView: View {
         AppColorScheme(rawValue: appColorScheme) ?? .system
     }
 
+    private var isDarkModeForcedBinding: Binding<Bool> {
+        Binding(
+            get: { selectedColorScheme == .dark },
+            set: { isForced in
+                appColorScheme = isForced ? AppColorScheme.dark.rawValue : AppColorScheme.system.rawValue
+            }
+        )
+    }
+
+    private var isDarkModeForced: Bool {
+        selectedColorScheme == .dark
+    }
+
 }
 
 private extension View {
@@ -374,6 +372,7 @@ private extension View {
 #Preview {
     SettingsView(
         vm: NewsListViewModel.shared,
+        systemColorScheme: .dark,
         settingsTransitionNamespace: Namespace().wrappedValue
     )
 }

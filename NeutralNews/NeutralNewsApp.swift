@@ -105,8 +105,12 @@ struct NeutralNewsApp: App {
                         NewsListViewModel.shared.handleDeepLink(deepLinkData)
                     }
                 }
-                .preferredColorScheme(AppColorScheme(rawValue: appColorScheme)?.colorScheme)
+                .preferredColorScheme(isDarkModeForced ? .dark : nil)
         }
         .modelContainer(cacheContainer)
+    }
+
+    private var isDarkModeForced: Bool {
+        AppColorScheme(rawValue: appColorScheme) == .dark
     }
 }
