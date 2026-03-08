@@ -61,19 +61,10 @@ struct ContentRegionProvider: ContentRegionProviding {
         
         switch regionCode?.uppercased() {
         case ContentRegion.es.rawValue:
-            #if DEBUG
-            print("🌍 Content region detected: ES")
-            #endif
             return .es
         case ContentRegion.us.rawValue:
-            #if DEBUG
-            print("🌍 Content region detected: US")
-            #endif
             return .us
         default:
-            #if DEBUG
-            print("🌍 Content region detected: fallback US (raw: \(regionCode ?? "nil"))")
-            #endif
             return .us
         }
     }

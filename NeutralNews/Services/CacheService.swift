@@ -67,10 +67,6 @@ final class CacheService {
         if let lastClean = lastCleanupDate {
             let timeSinceLastCleanup = now.timeIntervalSince(lastClean)
             if timeSinceLastCleanup < Self.cleanupInterval {
-#if DEBUG
-                let hoursRemaining = (Self.cleanupInterval - timeSinceLastCleanup) / 3600
-                print("⏳ Skipping cleanup - \(String(format: "%.1f", hoursRemaining)) hours until next cleanup")
-#endif
                 return
             }
         }
