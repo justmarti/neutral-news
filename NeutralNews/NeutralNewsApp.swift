@@ -15,6 +15,7 @@ import RevenueCat
 @main
 struct NeutralNewsApp: App {
     @Environment(\.scenePhase) private var scenePhase
+    @UIApplicationDelegateAdaptor(PushNotificationAppDelegate.self) private var pushNotificationAppDelegate
     @State private var config = AppConfig()
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
 
@@ -35,6 +36,7 @@ struct NeutralNewsApp: App {
 
     init() {
         FirebaseApp.configure()
+        PushNotificationService.shared.configureOnLaunch()
 
         // Configure Crashlytics
         #if !DEBUG
@@ -84,6 +86,7 @@ struct NeutralNewsApp: App {
                 .onChange(of: scenePhase) { oldValue, newValue in
                     guard oldValue == .background, newValue == .active else { return }
                     config.startFetching()
+                    PushNotificationService.shared.handleAppDidBecomeActive()
 
                     // Also cleanup when app returns from background
                     CacheService.shared.cleanExpiredCacheIfNeeded()

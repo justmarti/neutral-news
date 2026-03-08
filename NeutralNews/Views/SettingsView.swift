@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @Bindable var vm: NewsListViewModel
@@ -18,6 +19,7 @@ struct SettingsView: View {
     @State private var showingSafari = false
     @State private var safariURL: URL?
     @State private var showingPaywall = false
+    private let pushNotificationService = PushNotificationService.shared
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -45,12 +47,17 @@ struct SettingsView: View {
                 PaywallView(isPresented: $showingPaywall)
             }
         }
+        .task {
+            await pushNotificationService.refreshAuthorizationStatus()
+        }
         .preferredColorScheme(isDarkModeForced ? .dark : systemColorScheme)
         .settingsSheetZoomTransition(namespace: settingsTransitionNamespace)
     }
 
     private var settingsList: some View {
-        List {
+        @Bindable var bindablePushNotificationService = pushNotificationService
+
+        return List {
             if !premiumManager.isPremium {
                 Section {
                     Button {
@@ -104,15 +111,34 @@ struct SettingsView: View {
                 .onChange(of: regionPreference) { _, _ in
                     Task {
                         await vm.reloadAfterRegionChange()
+                        pushNotificationService.handleRegionPreferenceChange()
                     }
                 }
+            }
 
-//                SettingsRowLabel(
-//                    title: "Notificaciones",
-//                    systemImage: "bell.fill",
-//                    tint: .red
-//                )
-//                .foregroundStyle(.secondary)
+            Section("Notifications") {
+                Toggle(isOn: $bindablePushNotificationService.isTopStoriesEnabled) {
+                    SettingsRowLabel(
+                        title: "Top Story Alerts",
+                        systemImage: "bell.badge.fill",
+                        tint: .red
+                    )
+                }
+                .tint(.accentColor)
+
+                if bindablePushNotificationService.authorizationStatus == .denied {
+                    Button {
+                        openSystemSettings()
+                    } label: {
+                        SettingsRowLabel(
+                            title: "Open System Settings",
+                            systemImage: "gear",
+                            tint: .gray,
+                            showsExternalIndicator: true
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
             }
 
             Section("Appearance") {
@@ -307,6 +333,11 @@ struct SettingsView: View {
     private func contactSupport() {
         guard let url = URL(string: "mailto:support@getfacts.app") else { return }
         openURL(url)
+    }
+
+    private func openSystemSettings() {
+        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
+        openURL(settingsURL)
     }
 
     private var appVersionText: LocalizedStringResource? {

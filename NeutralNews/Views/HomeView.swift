@@ -120,6 +120,14 @@ struct HomeView: View {
                 .onAppear {
                     vm.checkPendingDeepLink()
                 }
+                .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
+                    guard let deepLink = notification.userInfo?[PushNotificationService.deepLinkUserInfoKey] as? DeepLinkService.DeepLinkData else {
+                        return
+                    }
+
+                    vm.isLoadingNeutralNews = true
+                    vm.handleDeepLink(deepLink)
+                }
                 .onChange(of: scenePhase) { oldValue, newValue in
                     guard oldValue == .background, newValue == .active else { return }
                     Task {

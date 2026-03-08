@@ -34,6 +34,21 @@ struct DeepLinkService {
         return deepLinkData
     }
 
+    static func parseNotificationPayload(_ userInfo: [AnyHashable: Any]) -> DeepLinkData? {
+        if let deepLink = userInfo["deep_link"] as? String,
+           let url = URL(string: deepLink),
+           let parsedDeepLink = parseDeepLink(url) {
+            return parsedDeepLink
+        }
+
+        if let newsId = userInfo["news_id"] as? String,
+           !newsId.isEmpty {
+            return DeepLinkData(newsId: newsId)
+        }
+
+        return nil
+    }
+
     private static func extractNewsId(from url: URL) -> String? {
         if url.scheme == "neutralnews" {
             // Custom scheme: neutralnews://abc123
