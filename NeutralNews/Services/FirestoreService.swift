@@ -59,6 +59,19 @@ final class FirestoreService {
             parseNeutralNews(from: doc.data(), documentID: doc.documentID)
         }
     }
+
+    func fetchNeutralNews(newsId: String) async throws -> NeutralNews? {
+        let region = regionProvider.currentRegion
+        let document = try await db.collection(Collection.neutralNews(for: region))
+            .document(newsId)
+            .getDocument()
+
+        guard let data = document.data() else {
+            return nil
+        }
+
+        return parseNeutralNews(from: data, documentID: document.documentID)
+    }
     
     
     // MARK: - Reports Methods

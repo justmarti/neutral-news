@@ -107,6 +107,31 @@ extension NewsListViewModel {
                 }
 
                 group.addTask {
+                    do {
+                        guard let news = try await FirestoreService.shared.fetchNeutralNews(newsId: deepLinkData.newsId) else {
+                            return false
+                        }
+
+#if DEBUG
+                        print("✅ News fetched directly from Firestore: \(news.neutralTitle)")
+#endif
+
+                        await MainActor.run {
+                            self.deepLinkTargetNews = news
+                            self.pendingDeepLink = nil
+                            self.isLoadingNeutralNews = false
+                            self.hasCompletedInitialLaunchLoad = true
+                        }
+                        return true
+                    } catch {
+#if DEBUG
+                        print("❌ Direct Firestore fetch failed for deep link \(deepLinkData.newsId): \(error)")
+#endif
+                        return false
+                    }
+                }
+
+                group.addTask {
                     try? await Task.sleep(for: .seconds(10))
                     return false
                 }
