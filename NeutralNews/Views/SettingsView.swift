@@ -91,7 +91,7 @@ struct SettingsView: View {
                     SettingsRowLabel(
                         title: "Saved News",
                         systemImage: "bookmark.fill",
-                        tint: .pink
+                        tint: .blue
                     )
                 }
                 .buttonStyle(.plain)
@@ -116,10 +116,10 @@ struct SettingsView: View {
                 }
             }
 
-            Section("Notifications") {
-                Toggle(isOn: $bindablePushNotificationService.isTopStoriesEnabled) {
+            Section {
+                Toggle(isOn: $bindablePushNotificationService.isTopStoriesToggleOn) {
                     SettingsRowLabel(
-                        title: "Top Story Alerts",
+                        title: "Top Stories",
                         systemImage: "bell.badge.fill",
                         tint: .red
                     )
@@ -138,6 +138,12 @@ struct SettingsView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                }
+            } header: {
+                Text("Notifications")
+            } footer: {
+                if let footerText = bindablePushNotificationService.notificationsFooterText {
+                    Text(footerText)
                 }
             }
 
@@ -336,7 +342,13 @@ struct SettingsView: View {
     }
 
     private func openSystemSettings() {
-        guard let settingsURL = URL(string: UIApplication.openSettingsURLString) else { return }
+        let settingsURLString = UIApplication.openNotificationSettingsURLString
+        let fallbackURLString = UIApplication.openSettingsURLString
+
+        guard let settingsURL = URL(string: settingsURLString.isEmpty ? fallbackURLString : settingsURLString) else {
+            return
+        }
+
         openURL(settingsURL)
     }
 

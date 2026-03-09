@@ -19,6 +19,7 @@ struct HomeView: View {
     @State private var showingPaywall = false
     @State private var showingSettingsSheet = false
     @State private var savedNewsState = SavedNewsState.shared
+    private let pushNotificationService = PushNotificationService.shared
 
     @Namespace private var animationNamespace
     @Namespace private var settingsTransitionNamespace
@@ -93,6 +94,10 @@ struct HomeView: View {
                                 .onAppear {
                                     RatingManager.shared.incrementNewsReadCount()
                                     RatingManager.shared.requestRatingAfterPositiveInteraction()
+
+                                    if hasSeenOnboarding {
+                                        pushNotificationService.handleOpenedArticle()
+                                    }
                                 }
                         }
                         .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
@@ -100,6 +105,7 @@ struct HomeView: View {
                 .fullScreenCover(isPresented: .constant(!hasSeenOnboarding)) {
                     OnboardingView(isPresented: .constant(true)) {
                         hasSeenOnboarding = true
+                        pushNotificationService.handleCompletedOnboarding()
                         showingPaywall = true
                     }
                 }

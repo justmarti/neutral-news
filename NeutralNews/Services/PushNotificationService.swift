@@ -49,6 +49,7 @@ final class PushNotificationService {
     @ObservationIgnored private var topicSyncTask: Task<Void, Never>?
     @ObservationIgnored private var isTopicSyncInProgress = false
     @ObservationIgnored private var hasPendingTopicSync = false
+    @ObservationIgnored private var isAuthorizationRequestInFlight = false
 
     var isTopStoriesEnabled: Bool {
         didSet {
@@ -74,6 +75,32 @@ final class PushNotificationService {
         PushNotificationTopic.news(for: regionProvider.currentRegion)
     }
 
+    private var hasStoredTopicSubscription: Bool {
+        defaults.string(forKey: Keys.subscribedTopic) != nil
+    }
+
+    var isTopStoriesToggleOn: Bool {
+        get {
+            isTopStoriesEnabled && areNotificationsAuthorized
+        }
+        set {
+            isTopStoriesEnabled = newValue
+        }
+    }
+
+    var notificationsFooterText: LocalizedStringResource? {
+        switch authorizationStatus {
+        case .authorized, .provisional, .ephemeral:
+            return nil
+        case .denied:
+            return "Notifications are disabled. Enable them in Settings."
+        case .notDetermined:
+            return "Allow notifications to receive alerts."
+        @unknown default:
+            return nil
+        }
+    }
+
     var areNotificationsAuthorized: Bool {
         switch authorizationStatus {
         case .authorized, .provisional, .ephemeral:
@@ -89,6 +116,10 @@ final class PushNotificationService {
         Task {
             await refreshAuthorizationStatus()
 
+            if hasStoredTopicSubscription {
+                scheduleTopicSync()
+            }
+
             guard isTopStoriesEnabled, areNotificationsAuthorized else { return }
             registerForRemoteNotifications()
         }
@@ -97,12 +128,13 @@ final class PushNotificationService {
     func handleAppDidBecomeActive() {
         Task {
             await refreshAuthorizationStatus()
-            guard isTopStoriesEnabled, areNotificationsAuthorized else { return }
-            registerForRemoteNotifications()
 
-            if hasAPNSToken {
+            if hasStoredTopicSubscription || hasAPNSToken {
                 scheduleTopicSync()
             }
+
+            guard isTopStoriesEnabled, areNotificationsAuthorized else { return }
+            registerForRemoteNotifications()
         }
     }
 
@@ -137,6 +169,18 @@ final class PushNotificationService {
             object: nil,
             userInfo: [Self.deepLinkUserInfoKey: deepLink]
         )
+    }
+
+    func handleCompletedOnboarding() {
+        Task {
+            await requestAuthorizationIfStillUndecided()
+        }
+    }
+
+    func handleOpenedArticle() {
+        Task {
+            await requestAuthorizationIfStillUndecided()
+        }
     }
 
     func handleRegionPreferenceChange() {
@@ -222,6 +266,19 @@ final class PushNotificationService {
             hasPendingTopicSync = false
             await syncTopicSubscription()
         }
+    }
+
+    private func requestAuthorizationIfStillUndecided() async {
+        await refreshAuthorizationStatus()
+
+        guard authorizationStatus == .notDetermined else { return }
+        guard !isAuthorizationRequestInFlight else { return }
+
+        isAuthorizationRequestInFlight = true
+        defer { isAuthorizationRequestInFlight = false }
+
+        let granted = await requestAuthorizationIfNeeded()
+        isTopStoriesEnabled = granted
     }
 
     private func requestAuthorizationIfNeeded() async -> Bool {
