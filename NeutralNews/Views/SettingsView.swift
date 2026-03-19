@@ -371,7 +371,7 @@ struct SettingsView: View {
 
     private var subscriptionStatusValue: String {
         guard let expirationDate = premiumManager.subscriptionExpirationDate else {
-            return "Lifetime"
+            return String(localized: "Lifetime")
         }
 
         let formatter = DateComponentsFormatter()

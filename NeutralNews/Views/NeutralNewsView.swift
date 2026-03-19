@@ -56,7 +56,7 @@ struct NeutralNewsView: View {
                                                 .scaledToFit()
                                                 .clipShape(.rect(cornerRadius: 16))
                                             
-                                            Text("Image from \(news.imageMedium). Source articles are at the bottom of the page.")
+                                            Text("Image: \(news.imageMedium). Source at the end of the page.")
                                                     .font(.footnote)
                                                     .foregroundStyle(.secondary)
                                         }
