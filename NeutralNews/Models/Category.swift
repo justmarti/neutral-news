@@ -9,43 +9,43 @@ import Foundation
 
 enum Category: String, CaseIterable, Decodable, Hashable {
     case politics
-    case business
     case world
+    case business
     case technology
     case science
     case health
-    case sports
-    case culture
-    case entertainment
     case society
+    case culture
+    case sports
+    case entertainment
 
     var title: LocalizedStringResource {
         switch self {
         case .politics: "Politics"
-        case .business: "Business"
         case .world: "World"
+        case .business: "Business"
         case .technology: "Technology"
         case .science: "Science"
         case .health: "Health"
-        case .sports: "Sports"
-        case .culture: "Culture"
-        case .entertainment: "Entertainment"
         case .society: "Society"
+        case .culture: "Culture"
+        case .sports: "Sports"
+        case .entertainment: "Entertainment"
         }
     }
     
     var systemImageName: String {
         switch self {
         case .politics: return "building.columns"
-        case .business: return "eurosign.circle"
         case .world: return "globe"
+        case .business: return "chart.line.uptrend.xyaxis"
         case .technology: return "cpu"
         case .science: return "atom"
         case .health: return "heart"
-        case .sports: return "sportscourt"
-        case .culture: return "book"
-        case .entertainment: return "popcorn"
         case .society: return "person.2"
+        case .culture: return "book"
+        case .sports: return "sportscourt"
+        case .entertainment: return "popcorn"
         }
     }
 
@@ -81,22 +81,16 @@ enum Category: String, CaseIterable, Decodable, Hashable {
         switch self {
         case .politics:
             return ["politica", "politics", "politic"]
-        case .business:
-            return ["economia", "economy", "business", "finance", "finanzas"]
         case .world:
             return ["internacional", "international", "world"]
+        case .business:
+            return ["economia", "economy", "business", "finance", "finanzas"]
         case .technology:
             return ["tecnologia", "technology", "tech"]
         case .science:
             return ["ciencia", "science", "medio-ambiente", "medioambiente", "environment"]
         case .health:
             return ["salud", "health"]
-        case .sports:
-            return ["deportes", "sports", "sport"]
-        case .culture:
-            return ["cultura", "culture"]
-        case .entertainment:
-            return ["entretenimiento", "entertainment"]
         case .society:
             return [
                 "sociedad", "society", "nacional", "national",
@@ -104,6 +98,12 @@ enum Category: String, CaseIterable, Decodable, Hashable {
                 "opinion", "other", "otros", "sincategoria",
                 "sin-categoria", "uncategorized"
             ]
+        case .culture:
+            return ["cultura", "culture"]
+        case .sports:
+            return ["deportes", "sports", "sport"]
+        case .entertainment:
+            return ["entretenimiento", "entertainment"]
         }
     }
 }
