@@ -27,7 +27,7 @@ struct PaywallView: View {
                 Image(.icon)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 150, height: 150)
+                    .frame(width: 120, height: 120)
                 
                 VStack {
                     Text("Facts Pro")
@@ -41,7 +41,7 @@ struct PaywallView: View {
                 
                 VStack(spacing: 16) {
                     ProFeatureRow(icon: "calendar", text: "Read news from the last 7 days")
-                    ProFeatureRow(icon: "bookmark.fill", text: "Save stories")
+                    ProFeatureRow(icon: "bookmark.fill", text: "Save stories for later")
                     ProFeatureRow(icon: "heart.fill", text: "Support an independent app")
                 }
                 .padding(.vertical, 16)
@@ -69,6 +69,7 @@ struct PaywallView: View {
                     .disabled(isRestoringPurchases)
 
                     // Redeem Code button commented out - only works with Offer Codes, not Promotional Codes
+                    // TODO: Use this since offer codes are the new promo codes
 //                    Text("•")
 //                        .foregroundColor(.secondary)
 //

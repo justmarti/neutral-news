@@ -311,7 +311,7 @@ struct HomeView: View {
             HStack {
                 Image(systemName: "sparkles")
                     .font(.title)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(.accent.gradient)
                 
                 VStack(alignment: .leading) {
                     Text("Top results")
@@ -328,7 +328,7 @@ struct HomeView: View {
             .background(.accent.quinary.opacity(0.5), in: .rect(cornerRadius: 16))
             .overlay(
                 RoundedRectangle(cornerRadius: 16)
-                    .stroke(.quinary, lineWidth: 2)
+                    .stroke(.quaternary, lineWidth: 1)
             )
         }
         .buttonStyle(.plain)

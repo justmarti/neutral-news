@@ -253,7 +253,7 @@ struct SettingsView: View {
 
     private var premiumBanner: some View {
         VStack(alignment: .leading, spacing: 32) {
-            Image("icon")
+            Image(.icon)
                 .resizable()
                 .scaledToFit()
                 .frame(width: 64, height: 64)
@@ -269,20 +269,17 @@ struct SettingsView: View {
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.accentColor.opacity(0.6), Color("nn-background")],
-                        startPoint: .bottomTrailing,
-                        endPoint: .topLeading
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(Color.white.opacity(0.06), lineWidth: 2)
-                )
-        }
+        .background(
+            LinearGradient(
+                colors: [.accent.opacity(0.6), .nnBackground],
+                startPoint: .bottomTrailing,
+                endPoint: .topLeading
+            )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 26)
+                .stroke(.primary.opacity(0.1), lineWidth: 2)
+        )
     }
 
 //    private var premiumThanksBanner: some View {
