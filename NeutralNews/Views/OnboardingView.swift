@@ -7,25 +7,9 @@
 
 import SwiftUI
 
-// MARK: - Models
-
-struct OnboardingPageData {
-    let title: LocalizedStringResource
-    let subtitle: LocalizedStringResource
-    let image: ImageResource?
-    let customContent: (() -> AnyView)?
-
-    init(title: LocalizedStringResource, subtitle: LocalizedStringResource, image: ImageResource? = nil, customContent: (() -> AnyView)? = nil) {
-        self.title = title
-        self.subtitle = subtitle
-        self.image = image
-        self.customContent = customContent
-    }
-}
-
 // MARK: - Reusable Components
 
-struct ChatBubble: View {
+private struct ChatBubble: View {
     let text: LocalizedStringResource
     let alignment: Alignment
     let maxWidth: CGFloat
@@ -81,91 +65,81 @@ struct ChatBubble: View {
     }
 }
 
-// MARK: - Individual Page Views
+private struct OnboardingPage {
+    let title: LocalizedStringResource
+    let subtitle: LocalizedStringResource
+    let content: Content
 
-struct OnboardingPageOne: View {
-    private let chatMessages: [(LocalizedStringResource, Alignment)] = [
-        ("Lakers cruise past Celtics in dominant home win", Alignment.leading),
-        ("White House deflects blame for higher prices", Alignment.trailing),
-        ("U.S. growth holds firm despite mounting recession concerns", Alignment.leading)
-    ]
+    enum Content {
+        case chatPreview([(LocalizedStringResource, Alignment)])
+        case image(ImageResource, topPadding: CGFloat)
+    }
+}
+
+private struct OnboardingPageView: View {
+    let page: OnboardingPage
+
+    private enum Constants {
+        static let horizontalPadding: CGFloat = 24
+        static let contentSpacing: CGFloat = 24
+        static let bottomPadding: CGFloat = 48
+        static let chatTopPadding: CGFloat = 8
+        static let chatSpacing: CGFloat = 16
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            OnboardingPageHeader(
-                title: "Media Noise",
-                subtitle: "Between bias and opinion, it’s hard to see what matters"
-            )
+        VStack(alignment: .leading, spacing: Constants.contentSpacing) {
+            OnboardingPageHeader(title: page.title, subtitle: page.subtitle)
 
-            VStack(spacing: 16) {
-                ForEach(Array(chatMessages.enumerated()), id: \.offset) { _, message in
-                    ChatBubble(message.0, alignment: message.1)
+            pageContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .padding(.horizontal, Constants.horizontalPadding)
+        .padding(.bottom, Constants.bottomPadding)
+    }
+
+    @ViewBuilder
+    private var pageContent: some View {
+        switch page.content {
+        case .chatPreview(let chatMessages):
+            VStack(spacing: 0) {
+                VStack(spacing: Constants.chatSpacing) {
+                    ForEach(Array(chatMessages.enumerated()), id: \.offset) { _, message in
+                        ChatBubble(message.0, alignment: message.1)
+                    }
                 }
+                .padding(.top, Constants.chatTopPadding)
+
+                Spacer(minLength: 0)
             }
-            .padding(.top)
-
-            Spacer()
-        }
-        .padding(.horizontal)
-    }
-}
-
-struct OnboardingPageTwo: View {
-    let image: ImageResource
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            OnboardingPageHeader(
-                title: "Neutral Summary",
-                subtitle: "Key facts, clear and straight to the point"
-            )
-
+        case .image(let image, let topPadding):
             Image(image)
                 .resizable()
                 .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.top, topPadding)
+                .accessibilityHidden(true)
         }
-        .padding(.horizontal)
-        .padding(.bottom, 64)
     }
 }
 
-struct OnboardingPageThree: View {
-    let image: ImageResource
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            OnboardingPageHeader(
-                title: "Multiple Perspectives",
-                subtitle: "Different angles on the same story"
-            )
-
-            Image(image)
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.top, 16)
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 48)
-    }
-}
-
-struct OnboardingPageHeader: View {
+private struct OnboardingPageHeader: View {
     let title: LocalizedStringResource
     let subtitle: LocalizedStringResource
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.title)
                 .fontWeight(.bold)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
 
             Text(subtitle)
                 .font(.headline)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
         }
     }
 }
@@ -173,20 +147,56 @@ struct OnboardingPageHeader: View {
 // MARK: - Main View
 
 struct OnboardingView: View {
-    @Binding var isPresented: Bool
-    @State private var currentPage = 1
-    @Environment(\.locale) private var appLocale
     let onComplete: () -> Void
+    @State private var currentPage = 0
 
     private enum Constants {
-        static let totalPages = 3
-        static let iconSize: CGFloat = 80
+        static let iconSize: CGFloat = 64
         static let animationDuration: TimeInterval = 0.3
-        static let buttonVerticalPadding: CGFloat = 8
+        static let buttonVerticalPadding: CGFloat = 10
+        static let horizontalPadding: CGFloat = 24
+        static let topPadding: CGFloat = 20
+        static let headerBottomPadding: CGFloat = 12
+    }
+
+    private let pages: [OnboardingPage] = [
+        OnboardingPage(
+            title: "Media Noise",
+            subtitle: "Between bias and opinion, it’s hard to see what matters",
+            content: .chatPreview([
+                ("Lakers cruise past Celtics in dominant home win", .leading),
+                ("White House deflects blame for higher prices", .trailing),
+                ("U.S. growth holds firm despite mounting recession concerns", .leading)
+            ])
+        ),
+        OnboardingPage(
+            title: "Neutral Summary",
+            subtitle: "Key facts, clear and straight to the point",
+            content: .image(.onboarding01, topPadding: 0)
+        ),
+        OnboardingPage(
+            title: "Multiple Perspectives",
+            subtitle: "Different angles on the same story",
+            content: .image(.onboarding02, topPadding: 16)
+        )
+    ]
+
+    private var brandHeader: some View {
+        HStack(spacing: 8) {
+            Image(.icon)
+                .resizable()
+                .scaledToFit()
+                .frame(width: Constants.iconSize, height: Constants.iconSize)
+
+            Text("Facts")
+                .font(.largeTitle)
+                .fontWeight(.black)
+                .foregroundStyle(.secondary)
+        }
     }
 
     private var isLastPage: Bool {
-        currentPage >= Constants.totalPages
+        currentPage == pages.count - 1
     }
 
     private var buttonTitle: LocalizedStringResource {
@@ -194,34 +204,33 @@ struct OnboardingView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading) {
-            HStack(spacing: 0) {
-                Image(.icon)
-                    .resizable()
-                    .frame(width: Constants.iconSize, height: Constants.iconSize)
-                    .scaledToFit()
-                
-                Text("Facts")
-                    .font(.largeTitle)
-                    .fontWeight(.black)
-                    .foregroundStyle(.secondary)
-                    
+        VStack(spacing: 0) {
+            HStack {
+                brandHeader
+
+                Spacer()
             }
-            
+            .padding(.horizontal, Constants.horizontalPadding)
+            .padding(.top, Constants.topPadding)
+            .padding(.bottom, Constants.headerBottomPadding)
+
             TabView(selection: $currentPage) {
-                OnboardingPageOne().tag(1)
-                OnboardingPageTwo(image: .onboarding01).tag(2)
-                OnboardingPageThree(image: .onboarding02).tag(3)
+                ForEach(Array(pages.enumerated()), id: \.offset) { index, page in
+                    OnboardingPageView(page: page)
+                        .tag(index)
+                }
             }
 
-            Button(action: handleButtonTap) {
+            Button(action: handlePrimaryAction) {
                 Text(buttonTitle)
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Constants.buttonVerticalPadding)
             }
             .buttonStyle(.borderedProminent)
-            .padding()
+            .padding(.horizontal, Constants.horizontalPadding)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
         }
         .background(Color.nnBackground.ignoresSafeArea())
         .tabViewStyle(.page)
@@ -231,18 +240,21 @@ struct OnboardingView: View {
 
     // MARK: - Private Methods
 
-    private func handleButtonTap() {
+    private func handlePrimaryAction() {
         if isLastPage {
-            isPresented = false
-            onComplete()
+            completeOnboarding()
         } else {
             withAnimation(.easeInOut(duration: Constants.animationDuration)) {
                 currentPage += 1
             }
         }
     }
+
+    private func completeOnboarding() {
+        onComplete()
+    }
 }
 
 #Preview {
-    OnboardingView(isPresented: .constant(true)) { }
+    OnboardingView { }
 }

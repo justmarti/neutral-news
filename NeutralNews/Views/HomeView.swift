@@ -54,6 +54,13 @@ struct HomeView: View {
         }
     }
 
+    private var onboardingPresentation: Binding<Bool> {
+        Binding(
+            get: { !hasSeenOnboarding },
+            set: { _ in }
+        )
+    }
+
     var body: some View {
         let relatedNewsRefreshToken = newsDataManager.allNews.count
 
@@ -102,12 +109,8 @@ struct HomeView: View {
                         }
                         .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
                 }
-                .fullScreenCover(isPresented: .constant(!hasSeenOnboarding)) {
-                    OnboardingView(isPresented: .constant(true)) {
-                        hasSeenOnboarding = true
-                        pushNotificationService.handleCompletedOnboarding()
-                        showingPaywall = true
-                    }
+                .fullScreenCover(isPresented: onboardingPresentation) {
+                    OnboardingView(onComplete: handleOnboardingCompletion)
                 }
                 .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
                     if let news = newValue {
@@ -329,6 +332,12 @@ struct HomeView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private func handleOnboardingCompletion() {
+        hasSeenOnboarding = true
+        pushNotificationService.handleCompletedOnboarding()
+        showingPaywall = true
     }
 }
 
