@@ -1,0 +1,25 @@
+{
+  "images" : [
+    {
+      "filename" : "onboarding-us-01.png",
+      "idiom" : "universal"
+    },
+    {
+      "filename" : "onboarding-es-01.png",
+      "idiom" : "universal",
+      "locale" : "es"
+    },
+    {
+      "filename" : "onboarding-us-01 1.png",
+      "idiom" : "universal",
+      "locale" : "en"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "localizable" : true
+  }
+}

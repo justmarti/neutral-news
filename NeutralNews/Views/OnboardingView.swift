@@ -193,18 +193,6 @@ struct OnboardingView: View {
         isLastPage ? "Get Started" : "Next"
     }
 
-    private var isSpanishLocale: Bool {
-        appLocale.language.languageCode?.identifier == "es"
-    }
-
-    private var imageOne: ImageResource {
-        isSpanishLocale ? .onboarding01EsES : .onboarding01EnUS
-    }
-
-    private var imageTwo: ImageResource {
-        isSpanishLocale ? .onboarding02EsES : .onboarding02EnUS
-    }
-
     var body: some View {
         VStack(alignment: .leading) {
             HStack(spacing: 0) {
@@ -222,8 +210,8 @@ struct OnboardingView: View {
             
             TabView(selection: $currentPage) {
                 OnboardingPageOne().tag(1)
-                OnboardingPageTwo(image: imageOne).tag(2)
-                OnboardingPageThree(image: imageTwo).tag(3)
+                OnboardingPageTwo(image: .onboarding01).tag(2)
+                OnboardingPageThree(image: .onboarding02).tag(3)
             }
 
             Button(action: handleButtonTap) {
