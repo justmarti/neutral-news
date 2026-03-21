@@ -1457,22 +1457,6 @@
         }
       }
     },
-    "Select the type of problem that best describes the issue." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Select the type of problem that best describes the issue."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Selecciona el tipo de problema que mejor describe la situación."
-          }
-        }
-      }
-    },
     "Send report" : {
       "localizations" : {
         "en" : {

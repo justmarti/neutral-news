@@ -29,7 +29,7 @@ struct FirestoreServiceTests {
     func testDayInfoToDateString() async throws {
         let calendar = Calendar.current
         let testDate = calendar.date(from: DateComponents(year: 2024, month: 1, day: 15))!
-        let dayInfo = DayInfo(dayName: "Test", dayNumber: 15, monthName: "Enero", date: testDate)
+        let dayInfo = DayInfo(dayNumber: 15, monthName: "Enero", date: testDate)
         
         // This tests the internal date processing logic
         // We can verify the dayInfo contains correct date information
@@ -113,7 +113,7 @@ struct FirestoreServiceTests {
             "pubDate": Timestamp(date: Date()),
             "createdAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-            "sourceMedium": "elPais",
+            "publisher": "El Pais",
             "neutralScore": 0,
             "group": 456,
             "embedding": [0.1, 0.2, 0.3, 0.4, 0.5]
@@ -125,7 +125,7 @@ struct FirestoreServiceTests {
         #expect(news?.id == documentID)
         #expect(news?.title == "Test News Article")
         #expect(news?.category == "Tecnología")
-        #expect(news?.sourceMedium == .elPais)
+        #expect(news?.publisher == "El Pais")
         #expect(news?.group == 456)
         #expect(news?.embedding.count == 5)
     }
@@ -142,7 +142,7 @@ struct FirestoreServiceTests {
             "pubDate": Timestamp(date: Date()),
             "createdAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-            "sourceMedium": "invalidMedium", // Invalid source
+            "publisher": 123, // Invalid publisher type
             "neutralScore": 0,
             "group": 1,
             "embedding": [0.1, 0.2]
@@ -166,7 +166,7 @@ struct FirestoreServiceTests {
             "pubDate": Timestamp(date: Date()),
             "createdAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-            "sourceMedium": "elPais",
+            "publisher": "El Pais",
             "neutralScore": 0,
             "group": 1
             // Missing embedding
@@ -203,7 +203,7 @@ struct FirestoreServiceTests {
             "pubDate": Timestamp(date: Date()),
             "createdAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-            "sourceMedium": "elPais",
+            "publisher": "El Pais",
             "neutralScore": 0,
             "group": 1,
             "embedding": [0.1, 0.2, 0.3] as [Double]
@@ -235,6 +235,14 @@ struct FirestoreServiceTests {
         
         #expect(neutralNews?.relevance == 7)
         #expect(neutralNews?.group == 999)
+    }
+
+    @Test("Problem report values are Firestore-safe strings")
+    func testProblemReportValuesAreFirestoreSafeStrings() async throws {
+        let problem = Problem.newsRepeated
+
+        #expect(problem.firestoreValue == "news_repeated")
+        #expect(problem.localizedTitle == "Duplicate article")
     }
     
     // MARK: - Error Handling Tests
@@ -282,7 +290,7 @@ struct FirestoreServiceTests {
             "pubDate": Timestamp(date: Date()),
             "createdAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-            "sourceMedium": "elPais",
+            "publisher": "El Pais",
             "neutralScore": 0,
             "group": 1,
             "embedding": [0.1]
@@ -325,7 +333,7 @@ struct FirestoreServiceTests {
             "pubDate": Timestamp(date: Date()),
             "createdAt": Timestamp(date: Date()),
             "updatedAt": Timestamp(date: Date()),
-            "sourceMedium": "elMundo",
+            "publisher": "El Mundo",
             "neutralScore": 2,
             "group": 555,
             "embedding": Array(0..<100).map { Double($0) / 100.0 } // 100-dimensional embedding
@@ -341,7 +349,7 @@ struct FirestoreServiceTests {
         #expect(neutralNews?.group == news?.group) // Same group
         #expect(news?.embedding.count == 100)
         #expect(neutralNews?.neutralTitle == "Complete Test News")
-        #expect(news?.sourceMedium == .elMundo)
+        #expect(news?.publisher == "El Mundo")
     }
 }
 
@@ -388,8 +396,7 @@ extension FirestoreService {
               let pubDateTimestamp = data["pubDate"] as? Timestamp,
               let createdAtTimestamp = data["createdAt"] as? Timestamp,
               let updatedAtTimestamp = data["updatedAt"] as? Timestamp,
-              let sourceMediumRaw = data["sourceMedium"] as? String,
-              let sourceMedium = Media(rawValue: sourceMediumRaw),
+              let publisher = data["publisher"] as? String,
               let neutralScore = data["neutralScore"] as? Int,
               let group = data["group"] as? Int else {
             return nil
@@ -410,7 +417,7 @@ extension FirestoreService {
             pubDate: pubDateTimestamp.dateValue(),
             createdAt: createdAtTimestamp.dateValue(),
             updatedAt: updatedAtTimestamp.dateValue(),
-            sourceMedium: sourceMedium,
+            publisher: publisher,
             neutralScore: neutralScore,
             group: group,
             embedding: embedding

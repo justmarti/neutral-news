@@ -100,7 +100,7 @@ struct NeutralNewsView: View {
             .scrollIndicators(.hidden)
             .sheet(isPresented: $isShowingReportProblemSheet) {
                 ReportProblemView(news: news)
-                    .presentationDetents([.height(200), .large])
+                    .presentationDetents([.height(200)])
             }
             .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
             .toolbar {

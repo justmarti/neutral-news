@@ -81,7 +81,8 @@ final class FirestoreService {
             "news_id": news.id,
             "news_title": news.neutralTitle,
             "group": news.group,
-            "problem_type": problemType.title,
+            "problem_type": problemType.firestoreValue,
+            "problem_title": problemType.localizedTitle,
             "date": Timestamp(date: Date.now)
         ]
         

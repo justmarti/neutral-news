@@ -12,6 +12,10 @@ enum Problem: String, CaseIterable {
     case notRelatedNews = "not_related_news"
     case wrongInformation = "wrong_information"
     case offensiveLanguage = "offensive_language"
+
+    var firestoreValue: String {
+        rawValue
+    }
     
     var title: LocalizedStringResource {
         switch self {
@@ -29,6 +33,10 @@ enum Problem: String, CaseIterable {
         case .wrongInformation: "The displayed information contains errors"
         case .offensiveLanguage: "The content includes inappropriate language"
         }
+    }
+
+    var localizedTitle: String {
+        String(localized: title)
     }
     
     var systemImage: String {
