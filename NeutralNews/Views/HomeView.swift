@@ -22,7 +22,6 @@ struct HomeView: View {
     private let pushNotificationService = PushNotificationService.shared
 
     @Namespace private var animationNamespace
-    @Namespace private var settingsTransitionNamespace
     var config: AppConfig
 
     // Premium manager for UI state
@@ -85,7 +84,6 @@ struct HomeView: View {
                             HomeToolbar(
                                 vm: vm,
                                 showingSettings: $showingSettingsSheet,
-                                settingsTransitionNamespace: settingsTransitionNamespace
                             ).content
                         }
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
@@ -153,9 +151,7 @@ struct HomeView: View {
                     SettingsView(
                         vm: vm,
                         systemColorScheme: colorScheme,
-                        settingsTransitionNamespace: settingsTransitionNamespace
                     )
-                    .presentationDragIndicator(.hidden)
                 }
             }
         }

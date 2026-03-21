@@ -10,7 +10,6 @@ import SwiftUI
 struct HomeToolbar {
     let vm: NewsListViewModel
     @Binding var showingSettings: Bool
-    let settingsTransitionNamespace: Namespace.ID
     private let premiumManager = PremiumManager.shared
     
     @ToolbarContentBuilder
@@ -49,7 +48,6 @@ struct HomeToolbar {
             showingSettings = true
         } label: {
             Label("Settings", systemImage: "gearshape")
-                .matchedTransitionSource(id: "settings-sheet", in: settingsTransitionNamespace)
         }
     }
     

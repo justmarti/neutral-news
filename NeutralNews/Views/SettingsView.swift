@@ -25,7 +25,6 @@ struct SettingsView: View {
     @Environment(\.openURL) private var openURL
     
     private let premiumManager = PremiumManager.shared
-    let settingsTransitionNamespace: Namespace.ID
 
     var body: some View {
         NavigationStack {
@@ -51,7 +50,6 @@ struct SettingsView: View {
             await pushNotificationService.refreshAuthorizationStatus()
         }
         .preferredColorScheme(isDarkModeForced ? .dark : systemColorScheme)
-        .settingsSheetZoomTransition(namespace: settingsTransitionNamespace)
     }
 
     private var settingsList: some View {
@@ -398,21 +396,9 @@ struct SettingsView: View {
 
 }
 
-private extension View {
-    @ViewBuilder
-    func settingsSheetZoomTransition(namespace: Namespace.ID) -> some View {
-        if #available(iOS 18.0, *) {
-            self.navigationTransition(.zoom(sourceID: "settings-sheet", in: namespace))
-        } else {
-            self
-        }
-    }
-}
-
 #Preview {
     SettingsView(
         vm: NewsListViewModel.shared,
         systemColorScheme: .dark,
-        settingsTransitionNamespace: Namespace().wrappedValue
     )
 }
