@@ -33,3 +33,20 @@ Keywords: noticia,news,apple news,ia,summary,truth,common,neutral,media,españa,
 Title: Facts - Noticias Neutrales IA
 Subtitle: Lee resúmenes, compara fuentes
 Keywords: periodico,sesgo,medios,fuentes,resumen,actualidad,prensa,portada,titular,politica,guardar,24h,espana
+
+
+
+# 1.1.0
+
+## ES
+
+Title: Facts - Noticias Neutrales IA
+Subtitle: Lee resúmenes y compara medios
+Keywords: periodicos,sesgo,politica,actualidad,titulares,neutral,imparcial,espana,24h,bulos,fuentes
+
+
+## US
+
+Title: Facts: Unbiased News
+Subtitle: Compare headlines by source
+Keywords: summary,coverage,politics,today,ai summarize,neutral,objective,media bias,fact,bias
