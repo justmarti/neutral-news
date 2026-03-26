@@ -75,6 +75,10 @@ class CoreDataManager {
 
     // Monitor CloudKit sync events for debugging
     private func handleCloudKitEvent(_ event: NSPersistentCloudKitContainer.Event) {
+        if event.type == .import, event.endDate != nil, event.error == nil {
+            SavedNewsService.shared.invalidatePreparedStore()
+        }
+
 #if DEBUG
         let eventType: String
         switch event.type {

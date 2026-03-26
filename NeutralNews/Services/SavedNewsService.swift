@@ -22,13 +22,13 @@ final class SavedNewsService {
     static let shared = SavedNewsService()
     private let newsDataManager = NewsDataManager.shared
     private let regionProvider: ContentRegionProviding
-    private let defaults: UserDefaults
 
     private var modelContainer: ModelContainer?
-    private let migrationFlagKey = "SavedNewsService.swiftDataMigrationV1Completed"
     private let preparationLock = NSLock()
+    private let migrationLock = NSLock()
     private var hasPreparedStore = false
     private var isPreparingStore = false
+    private let migrationBatchSize = 20
 
     private static func makeModelContainer() throws -> ModelContainer {
         let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
@@ -60,32 +60,23 @@ final class SavedNewsService {
                 migrationPlan: SavedNewsMigrationPlan.self,
                 configurations: [cloudConfiguration]
             )
-        } catch let firstError {
-            print("⚠️ SavedNews CloudKit container failed on first attempt: \(firstError)")
-            clearSQLiteArtifacts(at: cloudStoreURL)
-            do {
+        } catch let error {
+            print("⚠️ SavedNews CloudKit container failed: \(error)")
+            if !isICloudAccountAvailable() {
+                print("⚠️ iCloud account unavailable. Using local SavedNews store until iCloud is enabled.")
+                let localConfiguration = ModelConfiguration(
+                    schema: Schema([SavedNewsItem.self]),
+                    url: URL.documentsDirectory.appending(path: "SavedNewsLocal.store"),
+                    cloudKitDatabase: .none
+                )
                 return try ModelContainer(
                     for: versionedSchema,
                     migrationPlan: SavedNewsMigrationPlan.self,
-                    configurations: [cloudConfiguration]
+                    configurations: [localConfiguration]
                 )
-            } catch let secondError {
-                if !isICloudAccountAvailable() {
-                    print("⚠️ iCloud account unavailable. Using local SavedNews store until iCloud is enabled.")
-                    let localConfiguration = ModelConfiguration(
-                        schema: Schema([SavedNewsItem.self]),
-                        url: URL.documentsDirectory.appending(path: "SavedNewsLocal.store"),
-                        cloudKitDatabase: .none
-                    )
-                    return try ModelContainer(
-                        for: versionedSchema,
-                        migrationPlan: SavedNewsMigrationPlan.self,
-                        configurations: [localConfiguration]
-                    )
-                }
-
-                fatalError("Failed to create SavedNews iCloud SwiftData container: \(secondError)")
             }
+
+            fatalError("Failed to create SavedNews iCloud SwiftData container: \(error)")
         }
     }
 
@@ -110,27 +101,8 @@ final class SavedNewsService {
         return status == .available
     }
 
-    private static func clearSQLiteArtifacts(at storeURL: URL) {
-        let fileManager = FileManager.default
-        let candidateURLs = [
-            storeURL,
-            URL(fileURLWithPath: storeURL.path + "-shm"),
-            URL(fileURLWithPath: storeURL.path + "-wal")
-        ]
-
-        for url in candidateURLs {
-            if fileManager.fileExists(atPath: url.path) {
-                try? fileManager.removeItem(at: url)
-            }
-        }
-    }
-
-    private init(
-        regionProvider: ContentRegionProviding = ContentRegionProvider(),
-        defaults: UserDefaults = .standard
-    ) {
+    private init(regionProvider: ContentRegionProviding = ContentRegionProvider()) {
         self.regionProvider = regionProvider
-        self.defaults = defaults
         self.modelContainer = nil
     }
 
@@ -138,6 +110,12 @@ final class SavedNewsService {
         preparationLock.lock()
         self.modelContainer = modelContainer
         self.hasPreparedStore = false
+        preparationLock.unlock()
+    }
+
+    func invalidatePreparedStore() {
+        preparationLock.lock()
+        hasPreparedStore = false
         preparationLock.unlock()
     }
 
@@ -182,14 +160,12 @@ final class SavedNewsService {
     }
 
     private func migrateCoreDataSavedNewsIfNeeded(coreDataContext: NSManagedObjectContext?) {
-        guard !defaults.bool(forKey: migrationFlagKey) else { return }
+        migrationLock.lock()
+        defer { migrationLock.unlock() }
 
         let sourceContext = coreDataContext ?? CoreDataManager.shared.viewContext
         let coreDataItems = fetchCoreDataSavedNews(context: sourceContext)
-        guard !coreDataItems.isEmpty else {
-            defaults.set(true, forKey: migrationFlagKey)
-            return
-        }
+        guard !coreDataItems.isEmpty else { return }
 
         let context = createContext()
 
@@ -224,6 +200,10 @@ final class SavedNewsService {
                 context.insert(migratedItem)
                 existingStorageKeys.insert(storageKey)
                 insertedCount += 1
+
+                if insertedCount.isMultiple(of: migrationBatchSize) {
+                    try context.save()
+                }
             }
 
             if context.hasChanges {
@@ -233,7 +213,6 @@ final class SavedNewsService {
 #if DEBUG
             print("✅ Core Data -> SwiftData migration completed. Inserted: \(insertedCount)")
 #endif
-            defaults.set(true, forKey: migrationFlagKey)
         } catch {
             print("❌ Failed to migrate saved news to SwiftData: \(error)")
         }
@@ -289,6 +268,68 @@ final class SavedNewsService {
         return try context.fetch(descriptor).first
     }
 
+    private func fetchSwiftDataSavedNeutralNewsEntries(context: ModelContext) throws -> [SavedNeutralNewsEntry] {
+        let descriptor = FetchDescriptor<SavedNewsItem>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+
+        return try context.fetch(descriptor)
+            .filter { $0.newsType == SavedNewsType.neutralNews.rawValue }
+            .map { item in
+                SavedNeutralNewsEntry(
+                    neutralNews: item.toNeutralNews(),
+                    relatedNews: item.savedRelatedNews(),
+                    regionRaw: item.regionRaw,
+                    createdAt: item.createdAt
+                )
+            }
+    }
+
+    private func fetchCoreDataSavedNeutralNewsEntries(context: NSManagedObjectContext) -> [SavedNeutralNewsEntry] {
+        fetchCoreDataSavedNews(context: context).compactMap { coreDataItem in
+            guard coreDataItem.newsType == SavedNewsType.neutralNews.rawValue,
+                  let neutralNews = coreDataItem.toNeutralNews() else {
+                return nil
+            }
+
+            return SavedNeutralNewsEntry(
+                neutralNews: neutralNews,
+                relatedNews: coreDataItem.savedRelatedNews(),
+                regionRaw: legacyRegionRaw(),
+                createdAt: coreDataItem.createdAt ?? Date.distantPast
+            )
+        }
+    }
+
+    static func mergeSavedNeutralNewsEntries(
+        primary: [SavedNeutralNewsEntry],
+        fallback: [SavedNeutralNewsEntry]
+    ) -> [SavedNeutralNewsEntry] {
+        var mergedByStorageKey: [String: SavedNeutralNewsEntry] = [:]
+
+        for entry in primary {
+            let storageKey = SavedNewsItem.storageKey(
+                newsId: entry.neutralNews.id,
+                regionRaw: entry.regionRaw
+            )
+            mergedByStorageKey[storageKey] = entry
+        }
+
+        for entry in fallback {
+            let storageKey = SavedNewsItem.storageKey(
+                newsId: entry.neutralNews.id,
+                regionRaw: entry.regionRaw
+            )
+            if mergedByStorageKey[storageKey] == nil {
+                mergedByStorageKey[storageKey] = entry
+            }
+        }
+
+        return mergedByStorageKey.values.sorted { lhs, rhs in
+            lhs.createdAt > rhs.createdAt
+        }
+    }
+
     func prepareSavedNewsStore(coreDataContext: NSManagedObjectContext? = nil) {
         prepareStoreIfNeeded(coreDataContext: coreDataContext)
     }
@@ -323,7 +364,8 @@ final class SavedNewsService {
 
         let hasActiveSavedItem = try fetchSwiftItem(storageKey: activeStorageKey, context: modelContext) != nil
         let hasLegacySavedItem = try fetchSwiftItem(storageKey: legacyStorageKey, context: modelContext) != nil
-        if hasActiveSavedItem || hasLegacySavedItem {
+        let hasLegacyCoreDataItem = isCoreDataNewsSaved(newsId: newsId, context: context)
+        if hasActiveSavedItem || hasLegacySavedItem || hasLegacyCoreDataItem {
 #if DEBUG
             print("⚠️ News already saved: \(newsId)")
 #endif
@@ -429,43 +471,25 @@ final class SavedNewsService {
 
     func getSavedNeutralNews(context: NSManagedObjectContext?) throws -> [SavedNeutralNewsEntry] {
         prepareStoreIfNeeded(coreDataContext: context)
+        migrateCoreDataSavedNewsIfNeeded(coreDataContext: context)
 
         let modelContext = createContext()
-        let descriptor = FetchDescriptor<SavedNewsItem>(
-            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        let swiftDataEntries: [SavedNeutralNewsEntry]
+
+        do {
+            swiftDataEntries = try fetchSwiftDataSavedNeutralNewsEntries(context: modelContext)
+        } catch {
+            print("❌ Failed to fetch SwiftData saved news. Falling back to Core Data merge: \(error)")
+            swiftDataEntries = []
+        }
+
+        guard let context else { return swiftDataEntries }
+
+        let coreDataEntries = fetchCoreDataSavedNeutralNewsEntries(context: context)
+        return Self.mergeSavedNeutralNewsEntries(
+            primary: swiftDataEntries,
+            fallback: coreDataEntries
         )
-
-        let savedItems = try modelContext.fetch(descriptor)
-            .filter { $0.newsType == SavedNewsType.neutralNews.rawValue }
-
-        if !savedItems.isEmpty {
-            return savedItems.map { item in
-                SavedNeutralNewsEntry(
-                    neutralNews: item.toNeutralNews(),
-                    relatedNews: item.savedRelatedNews(),
-                    regionRaw: item.regionRaw,
-                    createdAt: item.createdAt
-                )
-            }
-        }
-
-        // TODO(migration): Remove Core Data fallback after one stable release with
-        // no saved-news migration incidents in Crashlytics.
-        // Fallback path for safety if migration couldn't run yet.
-        guard let context else { return [] }
-        return fetchCoreDataSavedNews(context: context).compactMap { coreDataItem in
-            guard coreDataItem.newsType == SavedNewsType.neutralNews.rawValue,
-                  let neutralNews = coreDataItem.toNeutralNews() else {
-                return nil
-            }
-
-            return SavedNeutralNewsEntry(
-                neutralNews: neutralNews,
-                relatedNews: coreDataItem.savedRelatedNews(),
-                regionRaw: legacyRegionRaw(),
-                createdAt: coreDataItem.createdAt ?? Date.distantPast
-            )
-        }
     }
 
     func getSavedNews(context: NSManagedObjectContext) throws -> [SavedNews] {

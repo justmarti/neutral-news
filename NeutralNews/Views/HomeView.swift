@@ -138,7 +138,11 @@ struct HomeView: View {
                 .onChange(of: scenePhase) { oldValue, newValue in
                     guard oldValue == .background, newValue == .active else { return }
                     Task {
-                        await vm.preloadTodayOnResume()
+                        if vm.isShowingSavedNews {
+                            await vm.loadSavedNews()
+                        } else {
+                            await vm.preloadTodayOnResume()
+                        }
                     }
                 }
                 .onChange(of: premiumManager.paywallPresentationToken) { _, _ in

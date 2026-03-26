@@ -72,4 +72,54 @@ struct SavedNewsSourcesPayloadTests {
         #expect(decodedSwiftDataRelated.count == 1)
         #expect(decodedSwiftDataRelated.first?.id == "related-1")
     }
+
+    @Test("Merge keeps legacy saved news visible when new SwiftData items exist")
+    func mergeSavedNewsEntriesKeepsLegacyItemsVisible() {
+        let legacyEntry = makeSavedEntry(
+            newsId: "legacy-1",
+            regionRaw: SavedNewsRegionScope.legacy.rawValue,
+            createdAt: Date(timeIntervalSince1970: 100)
+        )
+        let newSwiftDataEntry = makeSavedEntry(
+            newsId: "swiftdata-1",
+            regionRaw: "ES",
+            createdAt: Date(timeIntervalSince1970: 200)
+        )
+
+        let mergedEntries = SavedNewsService.mergeSavedNeutralNewsEntries(
+            primary: [newSwiftDataEntry],
+            fallback: [legacyEntry]
+        )
+
+        #expect(mergedEntries.count == 2)
+        #expect(mergedEntries.map(\.neutralNews.id) == ["swiftdata-1", "legacy-1"])
+    }
+
+    private func makeSavedEntry(
+        newsId: String,
+        regionRaw: String,
+        createdAt: Date
+    ) -> SavedNewsService.SavedNeutralNewsEntry {
+        let neutralNews = NeutralNews(
+            id: newsId,
+            neutralTitle: "Title \(newsId)",
+            neutralDescription: "Description \(newsId)",
+            category: Category.business.rawValue,
+            relevance: 10,
+            imageUrl: "https://example.com/\(newsId).jpg",
+            imageMedium: "Example",
+            date: createdAt,
+            createdAt: createdAt,
+            updatedAt: createdAt,
+            group: 1,
+            sourceIds: [newsId]
+        )
+
+        return SavedNewsService.SavedNeutralNewsEntry(
+            neutralNews: neutralNews,
+            relatedNews: [],
+            regionRaw: regionRaw,
+            createdAt: createdAt
+        )
+    }
 }
