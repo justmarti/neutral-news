@@ -16,7 +16,13 @@ struct NewsFilterViewModelTests {
     @Test("Day-selected scope only returns stories from the selected date")
     func daySelectedScopeOnlyReturnsStoriesFromTheSelectedDate() {
         let sut = NewsFilterViewModel()
-        let selectedDate = Calendar.current.date(byAdding: .day, value: -2, to: Date())!
+        let calendar = Calendar.current
+        let selectedDate = calendar.date(
+            bySettingHour: 12,
+            minute: 0,
+            second: 0,
+            of: calendar.date(byAdding: .day, value: -2, to: Date())!
+        )!
         let selectedDay = DayInfo(date: selectedDate)
         let laterStory = makeNeutralNews(
             id: "filter-day-later",
