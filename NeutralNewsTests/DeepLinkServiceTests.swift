@@ -11,7 +11,7 @@ struct DeepLinkServiceTests {
 
         let deepLinkData = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == .init(newsId: "story-123"))
+        #expect(deepLinkData == .init(newsId: "story-123", region: .es))
     }
 
     @Test("Parses country-scoped share URL")
@@ -20,7 +20,39 @@ struct DeepLinkServiceTests {
 
         let deepLinkData = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == .init(newsId: "story-456"))
+        #expect(deepLinkData == .init(newsId: "story-456", region: .us))
+    }
+
+    @Test("Parses custom scheme deep link")
+    func parsesCustomSchemeDeepLink() {
+        let url = URL(string: "neutralnews://story-789")!
+
+        let deepLinkData = DeepLinkService.parseDeepLink(url)
+
+        #expect(deepLinkData == .init(newsId: "story-789", region: nil))
+    }
+
+    @Test("Parses notification payload with deep link")
+    func parsesNotificationPayloadWithDeepLink() {
+        let payload: [AnyHashable: Any] = [
+            "deep_link": "https://share.getfacts.app/us/news/story-456"
+        ]
+
+        let deepLinkData = DeepLinkService.parseNotificationPayload(payload)
+
+        #expect(deepLinkData == .init(newsId: "story-456", region: .us))
+    }
+
+    @Test("Parses notification payload with news ID and region")
+    func parsesNotificationPayloadWithNewsIdAndRegion() {
+        let payload: [AnyHashable: Any] = [
+            "news_id": "story-987",
+            "region": "es"
+        ]
+
+        let deepLinkData = DeepLinkService.parseNotificationPayload(payload)
+
+        #expect(deepLinkData == .init(newsId: "story-987", region: .es))
     }
 
     @Test("Rejects unsupported host")

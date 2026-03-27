@@ -15,7 +15,7 @@ struct HomeView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
-    @State private var targetNews: NeutralNews?
+    @State private var targetNews: NewsListViewModel.DeepLinkNavigationTarget?
     @State private var showingPaywall = false
     @State private var showingSettingsSheet = false
     @State private var savedNewsState = SavedNewsState.shared
@@ -89,10 +89,10 @@ struct HomeView: View {
                         .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                         .animation(.default, value: vm.isShowingSavedNews)
                         .animation(.default, value: relatedNewsRefreshToken)
-                        .navigationDestination(item: $targetNews) { news in
+                        .navigationDestination(item: $targetNews) { target in
                             NeutralNewsView(
-                                news: news,
-                                relatedNews: vm.getRelatedNews(from: news),
+                                news: target.news,
+                                relatedNews: target.relatedNews,
                                 namespace: animationNamespace
                             )
                                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
@@ -111,11 +111,11 @@ struct HomeView: View {
                     OnboardingView(onComplete: handleOnboardingCompletion)
                 }
                 .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
-                    if let news = newValue {
+                    if let target = newValue {
 #if DEBUG
-                        print("🎯 View received target news: \(news.neutralTitle)")
+                        print("🎯 View received target news: \(target.news.neutralTitle)")
 #endif
-                        targetNews = news
+                        targetNews = target
                         
                         // Retrasar limpieza para asegurar navegación
                         Task {

@@ -7,6 +7,12 @@ import Foundation
 import Observation
 
 extension NewsListViewModel {
+    private enum DeepLinkLookupResult: Sendable, Equatable {
+        case found
+        case notFound
+        case timedOut
+    }
+
     // MARK: - Reactive News Updates Stream
 
     /// Creates an AsyncStream that emits whenever news data is updated
@@ -53,7 +59,7 @@ extension NewsListViewModel {
     func handleDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
         isLoadingNeutralNews = true
 
-        if !newsDataManager.neutralNews.isEmpty {
+        if hasCompletedInitialLaunchLoad || !newsDataManager.neutralNews.isEmpty {
             processDeepLink(deepLinkData)
         } else {
             pendingDeepLink = deepLinkData
@@ -61,24 +67,25 @@ extension NewsListViewModel {
     }
 
     func checkPendingDeepLink() {
-        guard let pendingDeepLink = pendingDeepLink,
-              !newsDataManager.neutralNews.isEmpty else { return }
+        guard let pendingDeepLink = pendingDeepLink else { return }
         processDeepLink(pendingDeepLink)
     }
 
     private func processDeepLink(_ deepLinkData: DeepLinkService.DeepLinkData) {
 #if DEBUG
-        print("🔄 Processing deep link in ViewModel - newsId: \(deepLinkData.newsId)")
+        print("🔄 Processing deep link in ViewModel - newsId: \(deepLinkData.newsId), region: \(deepLinkData.region?.rawValue ?? "current")")
 #endif
 
-        if let news = findNews(newsId: deepLinkData.newsId) {
+        let currentRegion = ContentRegionProvider().currentRegion
+        let targetRegion = deepLinkData.region ?? currentRegion
+        let shouldUseCurrentRegionState = targetRegion == currentRegion
+
+        if shouldUseCurrentRegionState,
+           let news = findNews(newsId: deepLinkData.newsId) {
 #if DEBUG
             print("✅ News found immediately: \(news.neutralTitle)")
 #endif
-            deepLinkTargetNews = news
-            pendingDeepLink = nil
-            isLoadingNeutralNews = false
-            hasCompletedInitialLaunchLoad = true
+            completeDeepLinkLookup(with: makeDeepLinkTarget(from: news))
             return
         }
 
@@ -86,76 +93,136 @@ extension NewsListViewModel {
         print("⏳ News not loaded yet, listening for updates...")
 #endif
 
-        Task {
-            await withTaskGroup(of: Bool.self) { group in
-                group.addTask {
-                    for await newsArray in self.newsUpdatesStream {
-                        if let news = newsArray.first(where: { $0.id == deepLinkData.newsId }) {
+        let newsId = deepLinkData.newsId
+        let newsUpdatesStream = shouldUseCurrentRegionState ? self.newsUpdatesStream : nil
+
+        deepLinkLookupTask?.cancel()
+        deepLinkLookupTask = Task {
+            await withTaskGroup(of: DeepLinkLookupResult.self) { group in
+                if let newsUpdatesStream {
+                    group.addTask { [newsId, newsUpdatesStream] in
+                        for await newsArray in newsUpdatesStream {
+                            if let news = newsArray.first(where: { $0.id == newsId }) {
 #if DEBUG
-                            print("✅ News found reactively: \(news.neutralTitle)")
+                                print("✅ News found reactively: \(news.neutralTitle)")
 #endif
-                            await MainActor.run {
-                                self.deepLinkTargetNews = news
-                                self.pendingDeepLink = nil
-                                self.isLoadingNeutralNews = false
-                                self.hasCompletedInitialLaunchLoad = true
+                                await MainActor.run {
+                                    NewsListViewModel.shared.completeDeepLinkLookup(
+                                        with: NewsListViewModel.shared.makeDeepLinkTarget(from: news)
+                                    )
+                                }
+                                return .found
                             }
-                            return true
                         }
+                        return .notFound
                     }
-                    return false
                 }
 
-                group.addTask {
+                group.addTask { [newsId, targetRegion] in
                     do {
-                        guard let news = try await FirestoreService.shared.fetchNeutralNews(newsId: deepLinkData.newsId) else {
-                            return false
+                        guard let news = try await FirestoreService.shared.fetchNeutralNews(
+                            newsId: newsId,
+                            region: targetRegion
+                        ) else {
+                            return .notFound
                         }
 
+                        let relatedNews: [News]
+                        do {
+                            relatedNews = try await FirestoreService.shared.fetchNews(
+                                newsIds: news.sourceIds,
+                                region: targetRegion
+                            )
+                        } catch {
 #if DEBUG
-                        print("✅ News fetched directly from Firestore: \(news.neutralTitle)")
+                            print("⚠️ Related news fetch failed for deep link \(newsId): \(error)")
+#endif
+                            relatedNews = []
+                        }
+
+                        let target = DeepLinkNavigationTarget(news: news, relatedNews: relatedNews)
+
+#if DEBUG
+                        print("✅ News fetched directly from Firestore: \(target.news.neutralTitle)")
 #endif
 
                         await MainActor.run {
-                            self.deepLinkTargetNews = news
-                            self.pendingDeepLink = nil
-                            self.isLoadingNeutralNews = false
-                            self.hasCompletedInitialLaunchLoad = true
+                            NewsListViewModel.shared.completeDeepLinkLookup(with: target)
                         }
-                        return true
+                        return .found
                     } catch {
 #if DEBUG
-                        print("❌ Direct Firestore fetch failed for deep link \(deepLinkData.newsId): \(error)")
+                        print("❌ Direct Firestore fetch failed for deep link \(newsId): \(error)")
 #endif
-                        return false
+                        return .notFound
                     }
                 }
 
                 group.addTask {
                     try? await Task.sleep(for: .seconds(10))
-                    return false
+                    return .timedOut
                 }
 
-                if let found = await group.next(), found {
-                    group.cancelAll()
-                } else {
-#if DEBUG
-                    print("❌ News not found within timeout - newsId: \(deepLinkData.newsId)")
-#endif
-                    await MainActor.run {
-                        self.pendingDeepLink = nil
-                        self.isLoadingNeutralNews = false
-                        self.hasCompletedInitialLaunchLoad = true
+                var didFindNews = false
+
+                while let result = await group.next() {
+                    switch result {
+                    case .found:
+                        didFindNews = true
+                        group.cancelAll()
+                    case .timedOut:
+                        group.cancelAll()
+                    case .notFound:
+                        break
                     }
+
+                    guard !didFindNews, result != .timedOut else {
+                        break
+                    }
+                }
+
+                if !didFindNews {
+#if DEBUG
+                    print("❌ News not found within timeout - newsId: \(newsId)")
+#endif
+                    clearPendingDeepLinkLookup()
                     group.cancelAll()
                 }
             }
+
+            await MainActor.run {
+                NewsListViewModel.shared.deepLinkLookupTask = nil
+            }
         }
+    }
+
+    private func completeDeepLinkLookup(with target: DeepLinkNavigationTarget) {
+        deepLinkLookupTask?.cancel()
+        deepLinkLookupTask = nil
+        deepLinkTargetNews = target
+        pendingDeepLink = nil
+        isLoadingNeutralNews = false
+        hasCompletedInitialLaunchLoad = true
+    }
+
+    private func clearPendingDeepLinkLookup() {
+        deepLinkLookupTask?.cancel()
+        deepLinkLookupTask = nil
+        pendingDeepLink = nil
+        isLoadingNeutralNews = false
+        hasCompletedInitialLaunchLoad = true
     }
 
     private func findNews(newsId: String) -> NeutralNews? {
         newsDataManager.neutralNews.first { news in
             news.id == newsId
         }
+    }
+
+    private func makeDeepLinkTarget(from news: NeutralNews) -> DeepLinkNavigationTarget {
+        DeepLinkNavigationTarget(
+            news: news,
+            relatedNews: getRelatedNews(from: news)
+        )
     }
 }

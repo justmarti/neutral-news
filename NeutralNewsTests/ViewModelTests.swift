@@ -39,6 +39,7 @@ struct DataModelTests {
     }
 
     @Test("Related news falls back to saved snapshots when live sources are missing")
+    @MainActor
     func testRelatedNewsSavedFallback() async throws {
         let viewModel = NewsListViewModel.shared
         let neutralNewsId = "saved-\(UUID().uuidString)"

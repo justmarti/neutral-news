@@ -30,7 +30,7 @@ struct PushNotificationTests {
 
         let deepLink = DeepLinkService.parseNotificationPayload(payload)
 
-        #expect(deepLink == DeepLinkService.DeepLinkData(newsId: "abc123"))
+        #expect(deepLink == DeepLinkService.DeepLinkData(newsId: "abc123", region: nil))
     }
 
     @Test("Notification payload falls back to news identifier")
@@ -41,6 +41,6 @@ struct PushNotificationTests {
 
         let deepLink = DeepLinkService.parseNotificationPayload(payload)
 
-        #expect(deepLink == DeepLinkService.DeepLinkData(newsId: "story-42"))
+        #expect(deepLink == DeepLinkService.DeepLinkData(newsId: "story-42", region: nil))
     }
 }

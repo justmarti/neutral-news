@@ -12,6 +12,7 @@ final class FirestoreService {
     static let shared = FirestoreService()
     private let db = Firestore.firestore()
     private let regionProvider: ContentRegionProviding
+    private let inQueryChunkSize = 10
     
     private enum Collection {
         #if DEBUG
@@ -48,7 +49,7 @@ final class FirestoreService {
     func fetchNeutralNews(for day: DayInfo) async throws -> [NeutralNews] {
         let start = Calendar.current.startOfDay(for: day.date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
-        let region = regionProvider.currentRegion
+        let region = resolvedRegion(from: nil)
         
         let snapshot = try await db.collection(Collection.neutralNews(for: region))
             .whereField("date", isGreaterThanOrEqualTo: Timestamp(date: start))
@@ -60,8 +61,8 @@ final class FirestoreService {
         }
     }
 
-    func fetchNeutralNews(newsId: String) async throws -> NeutralNews? {
-        let region = regionProvider.currentRegion
+    func fetchNeutralNews(newsId: String, region: ContentRegion? = nil) async throws -> NeutralNews? {
+        let region = resolvedRegion(from: region)
         let document = try await db.collection(Collection.neutralNews(for: region))
             .document(newsId)
             .getDocument()
@@ -100,7 +101,7 @@ final class FirestoreService {
     func fetchNews(for day: DayInfo) async throws -> [News] {
         let start = Calendar.current.startOfDay(for: day.date)
         let end = Calendar.current.date(byAdding: .day, value: 1, to: start)!
-        let region = regionProvider.currentRegion
+        let region = resolvedRegion(from: nil)
         
         let snapshot = try await db.collection(Collection.news(for: region))
             .whereField("pub_date", isGreaterThanOrEqualTo: Timestamp(date: start))
@@ -112,8 +113,37 @@ final class FirestoreService {
             parseNews(from: doc.data(), documentID: doc.documentID)
         }
     }
+
+    func fetchNews(newsIds: [String], region: ContentRegion? = nil) async throws -> [News] {
+        var seenIds = Set<String>()
+        let orderedIds = newsIds.filter { seenIds.insert($0).inserted }
+        guard !orderedIds.isEmpty else { return [] }
+
+        let resolvedRegion = resolvedRegion(from: region)
+        let chunks = orderedIds.chunked(into: inQueryChunkSize)
+        var fetchedNewsById: [String: News] = [:]
+
+        for chunk in chunks {
+            let snapshot = try await db.collection(Collection.news(for: resolvedRegion))
+                .whereField(FieldPath.documentID(), in: chunk)
+                .getDocuments()
+
+            for document in snapshot.documents {
+                guard let news = parseNews(from: document.data(), documentID: document.documentID) else {
+                    continue
+                }
+                fetchedNewsById[news.id] = news
+            }
+        }
+
+        return orderedIds.compactMap { fetchedNewsById[$0] }
+    }
     
     // MARK: - Private Parsing Methods
+
+    private func resolvedRegion(from region: ContentRegion?) -> ContentRegion {
+        region ?? regionProvider.currentRegion
+    }
     
     private func parseNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
         guard let neutralTitle = data["neutral_title"] as? String,
@@ -178,5 +208,23 @@ final class FirestoreService {
             group: group,
             embedding: embedding
         )
+    }
+}
+
+private extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        guard size > 0 else { return [self] }
+
+        var chunks: [[Element]] = []
+        chunks.reserveCapacity((count + size - 1) / size)
+
+        var index = startIndex
+        while index < endIndex {
+            let end = self.index(index, offsetBy: size, limitedBy: endIndex) ?? endIndex
+            chunks.append(Array(self[index..<end]))
+            index = end
+        }
+
+        return chunks
     }
 }

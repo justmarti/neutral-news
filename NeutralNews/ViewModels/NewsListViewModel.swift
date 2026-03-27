@@ -25,6 +25,13 @@ final class NewsListViewModel {
         }
     }
 
+    struct DeepLinkNavigationTarget: Identifiable, Hashable {
+        let news: NeutralNews
+        let relatedNews: [News]
+
+        var id: String { news.id }
+    }
+
     static let shared = NewsListViewModel()
     
     // MARK: - Init
@@ -196,6 +203,7 @@ final class NewsListViewModel {
     private var lastNewsDataHash: Int = 0
     private var isObservingNewsDataChanges = false
     private var allDaysLoadingTask: Task<Void, Never>?
+    var deepLinkLookupTask: Task<Void, Never>?
     var savedNewsPrefetchTask: Task<Void, Never>?
     private var dayFeedPrefetchTask: Task<Void, Never>?
     private var selectedDayLoadTask: Task<Void, Never>?
@@ -438,10 +446,11 @@ final class NewsListViewModel {
             // Today is empty - handle differently based on deep link
             if pendingDeepLink != nil {
                 // Load all days in parallel to find the deep link target quickly
+                let daysToLoad = Array(lastSevenDays.dropFirst())
                 await withTaskGroup(of: Void.self) { group in
-                    for day in lastSevenDays.dropFirst() { // Skip today (already loaded)
-                        group.addTask {
-                            await self.newsDataManager.loadNews(for: day)
+                    for day in daysToLoad { // Skip today (already loaded)
+                        group.addTask { [day] in
+                            await NewsDataManager.shared.loadNews(for: day)
                         }
                     }
                 }
@@ -473,7 +482,7 @@ final class NewsListViewModel {
     }
     
     var pendingDeepLink: DeepLinkService.DeepLinkData?
-    var deepLinkTargetNews: NeutralNews?
+    var deepLinkTargetNews: DeepLinkNavigationTarget?
     
     // MARK: - Pagination Methods
     
@@ -585,24 +594,37 @@ final class NewsListViewModel {
     }
 
     private func loadMissingLastSevenDays(showLoading: Bool) async {
+        let daysToLoad = lastSevenDays.filter { !newsDataManager.isDayLoaded($0) }
+
+        guard !daysToLoad.isEmpty else {
+            if showLoading {
+                isLoadingForSearch = false
+            }
+            return
+        }
+
         if showLoading {
-            await MainActor.run { isLoadingForSearch = true }
+            isLoadingForSearch = true
         }
 
         defer {
             if showLoading {
-                Task { @MainActor in
-                    self.isLoadingForSearch = false
-                }
+                isLoadingForSearch = false
             }
         }
 
-        // Incremental, cache-first loading to avoid spikes and keep UI responsive.
-        for day in lastSevenDays {
-            if Task.isCancelled { return }
-            guard !newsDataManager.isDayLoaded(day) else { continue }
-            await newsDataManager.loadNews(for: day)
+        await withTaskGroup(of: Void.self) { group in
+            for day in daysToLoad {
+                group.addTask { [day] in
+                    await NewsDataManager.shared.loadNews(for: day)
+                }
+            }
+
+            await group.waitForAll()
         }
+
+        guard !Task.isCancelled else { return }
+        refreshPaginationIfNeeded()
     }
     
     private func findNews(newsId: String) -> NeutralNews? {

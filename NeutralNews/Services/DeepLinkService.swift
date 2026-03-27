@@ -10,8 +10,9 @@ import Foundation
 struct DeepLinkService {
     private static let shareHost = "share.getfacts.app"
 
-    struct DeepLinkData: Equatable {
+    struct DeepLinkData: Equatable, Sendable {
         let newsId: String
+        let region: ContentRegion?
     }
 
     static func parseDeepLink(_ url: URL) -> DeepLinkData? {
@@ -19,17 +20,15 @@ struct DeepLinkService {
         print("🔍 Processing deep link: \(url)")
 #endif
 
-        guard let newsId = extractNewsId(from: url), !newsId.isEmpty else {
+        guard let deepLinkData = extractDeepLinkData(from: url) else {
 #if DEBUG
             print("❌ No news ID found in: \(url)")
 #endif
             return nil
         }
 
-        let deepLinkData = DeepLinkData(newsId: newsId)
-
 #if DEBUG
-        print("✅ Valid deep link - newsId: \(deepLinkData.newsId)")
+        print("✅ Valid deep link - newsId: \(deepLinkData.newsId), region: \(deepLinkData.region?.rawValue ?? "current")")
 #endif
         return deepLinkData
     }
@@ -43,16 +42,16 @@ struct DeepLinkService {
 
         if let newsId = userInfo["news_id"] as? String,
            !newsId.isEmpty {
-            return DeepLinkData(newsId: newsId)
+            let region = normalizedRegion(userInfo["region"] as? String)
+            return DeepLinkData(newsId: newsId, region: region)
         }
 
         return nil
     }
 
-    private static func extractNewsId(from url: URL) -> String? {
+    private static func extractDeepLinkData(from url: URL) -> DeepLinkData? {
         if url.scheme == "neutralnews" {
-            // Custom scheme: neutralnews://abc123
-            return normalizedNewsId(url.host)
+            return extractCustomSchemeDeepLinkData(from: url)
         }
 
         guard url.scheme?.lowercased() == "https",
@@ -65,13 +64,36 @@ struct DeepLinkService {
 
         if pathComponents.count == 2,
            pathComponents[0] == "news" {
-            return normalizedNewsId(pathComponents[1])
+            guard let newsId = normalizedNewsId(pathComponents[1]) else { return nil }
+            return DeepLinkData(newsId: newsId, region: .es)
         }
 
         if pathComponents.count == 3,
            pathComponents[0] == "us",
            pathComponents[1] == "news" {
-            return normalizedNewsId(pathComponents[2])
+            guard let newsId = normalizedNewsId(pathComponents[2]) else { return nil }
+            return DeepLinkData(newsId: newsId, region: .us)
+        }
+
+        return nil
+    }
+
+    private static func extractCustomSchemeDeepLinkData(from url: URL) -> DeepLinkData? {
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+
+        if let host = normalizedRegion(url.host),
+           pathComponents.count == 2,
+           pathComponents[0] == "news",
+           let newsId = normalizedNewsId(pathComponents[1]) {
+            return DeepLinkData(newsId: newsId, region: host)
+        }
+
+        if let newsId = normalizedNewsId(url.host) {
+            let region = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+                .queryItems?
+                .first(where: { $0.name == "region" })
+                .flatMap { normalizedRegion($0.value) }
+            return DeepLinkData(newsId: newsId, region: region)
         }
 
         return nil
@@ -81,6 +103,11 @@ struct DeepLinkService {
         guard let value else { return nil }
         let decodedValue = value.removingPercentEncoding ?? value
         return decodedValue.isEmpty ? nil : decodedValue
+    }
+
+    private static func normalizedRegion(_ value: String?) -> ContentRegion? {
+        guard let value else { return nil }
+        return ContentRegion(rawValue: value.uppercased())
     }
 
     static func generateShareURL(
