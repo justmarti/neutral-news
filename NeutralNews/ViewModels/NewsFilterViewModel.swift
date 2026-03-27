@@ -12,6 +12,7 @@ enum SearchScope: CaseIterable {
     case lastSevenDays
 }
 
+@MainActor
 @Observable
 final class NewsFilterViewModel {
     static let shared = NewsFilterViewModel()

@@ -10,8 +10,13 @@ import RevenueCat
 import StoreKit
 import Observation
 
+@MainActor
 @Observable
 final class PremiumManager {
+    private enum PremiumManagerError: Error {
+        case missingCustomerInfo
+    }
+
     static let shared = PremiumManager()
 
     private(set) var isPremium = false
@@ -27,10 +32,6 @@ final class PremiumManager {
     private init() {
         checkPremiumStatus()
         setupCustomerInfoStream()
-    }
-
-    deinit {
-        customerInfoTask?.cancel()
     }
 
     // MARK: - Premium Features Access
@@ -61,22 +62,21 @@ final class PremiumManager {
 
         isLoading = true
 
-        Purchases.shared.getCustomerInfo { [weak self] info, error in
-            DispatchQueue.main.async {
-                self?.isLoading = false
+        Task { [weak self] in
+            guard let self else { return }
 
-                if let error = error {
-                    print("❌ Error checking premium status: \(error)")
-                    return
-                }
+            defer {
+                self.isLoading = false
+            }
 
-                self?.isPremium = !(info?.entitlements.active.isEmpty ?? true)
-                if let info {
-                    self?.updateEntitlementInfo(from: info)
-                }
+            do {
+                let customerInfo = try await self.fetchCustomerInfo()
+                self.apply(customerInfo: customerInfo)
 #if DEBUG
-                print("✅ Premium status: \(self?.isPremium ?? false)")
+                print("✅ Premium status: \(self.isPremium)")
 #endif
+            } catch {
+                print("❌ Error checking premium status: \(error)")
             }
         }
     }
@@ -84,21 +84,11 @@ final class PremiumManager {
     private func setupCustomerInfoStream() {
         customerInfoTask = Task { [weak self] in
             for await customerInfo in Purchases.shared.customerInfoStream {
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-
-                    self.isPremium = !customerInfo.entitlements.active.isEmpty
-                    self.updateEntitlementInfo(from: customerInfo)
+                guard let self else { return }
+                self.apply(customerInfo: customerInfo)
 #if DEBUG
-                    print("📱 CustomerInfo updated. Premium: \(self.isPremium)")
+                print("📱 CustomerInfo updated. Premium: \(self.isPremium)")
 #endif
-
-                    // Execute pending action if user became premium
-                    if self.isPremium, let action = self.pendingAction {
-                        self.pendingAction = nil
-                        action()
-                    }
-                }
             }
         }
     }
@@ -109,9 +99,7 @@ final class PremiumManager {
     func requirePremium(for feature: String = "", onPurchaseComplete: (() -> Void)? = nil) {
         if !isPremium {
             pendingAction = onPurchaseComplete
-            Task { @MainActor in
-                self.paywallPresentationToken = UUID()
-            }
+            paywallPresentationToken = UUID()
         }
     }
 
@@ -123,18 +111,10 @@ final class PremiumManager {
 #endif
         do {
             let customerInfo = try await Purchases.shared.syncPurchases()
-            await MainActor.run {
-                self.isPremium = !customerInfo.entitlements.active.isEmpty
+            apply(customerInfo: customerInfo)
 #if DEBUG
-                print("✅ Purchases synced. Premium: \(self.isPremium)")
+            print("✅ Purchases synced. Premium: \(self.isPremium)")
 #endif
-
-                // Execute pending action if user became premium
-                if self.isPremium, let action = self.pendingAction {
-                    self.pendingAction = nil
-                    action()
-                }
-            }
         } catch {
             print("❌ Error syncing purchases: \(error)")
         }
@@ -155,38 +135,22 @@ final class PremiumManager {
     // MARK: - Subscription Management
 
     func checkSubscriptionStatus() async {
-        await MainActor.run {
-            self.isLoading = true
+        guard !isLoading else { return }
+
+        isLoading = true
+
+        defer {
+            isLoading = false
         }
 
-        await withCheckedContinuation { continuation in
-            Purchases.shared.getCustomerInfo { customerInfo, error in
-                Task {
-                    await MainActor.run {
-                        self.isLoading = false
-
-                        if let error = error {
-                            print("❌ Error checking subscription status: \(error)")
-                        } else {
-                            self.isPremium = !(customerInfo?.entitlements.active.isEmpty ?? true)
-                            if let customerInfo {
-                                self.updateEntitlementInfo(from: customerInfo)
-                            }
+        do {
+            let customerInfo = try await fetchCustomerInfo()
+            apply(customerInfo: customerInfo)
 #if DEBUG
-                            print("✅ Subscription status checked. Premium: \(self.isPremium)")
+            print("✅ Subscription status checked. Premium: \(self.isPremium)")
 #endif
-
-                            // Execute pending action if user became premium
-                            if self.isPremium, let action = self.pendingAction {
-                                self.pendingAction = nil
-                                action()
-                            }
-                        }
-
-                        continuation.resume()
-                    }
-                }
-            }
+        } catch {
+            print("❌ Error checking subscription status: \(error)")
         }
     }
 
@@ -215,18 +179,37 @@ final class PremiumManager {
     // MARK: - Internal Methods
 
     func updatePremiumStatus(_ customerInfo: CustomerInfo) async {
-        await MainActor.run {
-            self.isPremium = !customerInfo.entitlements.active.isEmpty
-            self.updateEntitlementInfo(from: customerInfo)
+        apply(customerInfo: customerInfo)
 #if DEBUG
-            print("✅ Premium status force updated: \(self.isPremium)")
+        print("✅ Premium status force updated: \(self.isPremium)")
 #endif
+    }
 
-            // Execute pending action if user became premium
-            if self.isPremium, let action = self.pendingAction {
-                self.pendingAction = nil
-                action()
+    private func fetchCustomerInfo() async throws -> CustomerInfo {
+        try await withCheckedThrowingContinuation { continuation in
+            Purchases.shared.getCustomerInfo { customerInfo, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                guard let customerInfo else {
+                    continuation.resume(throwing: PremiumManagerError.missingCustomerInfo)
+                    return
+                }
+
+                continuation.resume(returning: customerInfo)
             }
+        }
+    }
+
+    private func apply(customerInfo: CustomerInfo) {
+        isPremium = !customerInfo.entitlements.active.isEmpty
+        updateEntitlementInfo(from: customerInfo)
+
+        if isPremium, let action = pendingAction {
+            pendingAction = nil
+            action()
         }
     }
 

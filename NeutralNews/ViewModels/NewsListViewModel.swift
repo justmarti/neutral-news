@@ -10,6 +10,7 @@ import SwiftData
 import CoreData
 import Observation
 
+@MainActor
 @Observable
 final class NewsListViewModel {
     actor ObservationStreamState {

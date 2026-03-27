@@ -7,6 +7,7 @@
 
 import SwiftUI
 
+@MainActor
 struct HomeToolbar {
     let vm: NewsListViewModel
     @Binding var showingSettings: Bool

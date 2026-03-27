@@ -8,6 +8,7 @@
 import Foundation
 import Observation
 
+@MainActor
 @Observable
 final class SavedNewsState {
     static let shared = SavedNewsState()
@@ -34,13 +35,11 @@ final class SavedNewsState {
         return savedById[key] != nil
     }
 
-    @MainActor
     func setSaved(_ isSaved: Bool, for newsId: String, regionRaw: String? = nil) {
         let key = scopedKey(newsId: newsId, regionRaw: regionRaw)
         savedById[key] = isSaved
     }
 
-    @MainActor
     func markSaved(newsIds: [String], regionRaw: String? = nil) {
         guard !newsIds.isEmpty else { return }
 
