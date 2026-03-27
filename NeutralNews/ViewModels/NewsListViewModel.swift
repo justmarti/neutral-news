@@ -28,6 +28,7 @@ final class NewsListViewModel {
     struct DeepLinkNavigationTarget: Identifiable, Hashable {
         let news: NeutralNews
         let relatedNews: [News]
+        let region: ContentRegion
 
         var id: String { news.id }
     }

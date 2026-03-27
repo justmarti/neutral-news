@@ -85,7 +85,7 @@ extension NewsListViewModel {
 #if DEBUG
             print("✅ News found immediately: \(news.neutralTitle)")
 #endif
-            completeDeepLinkLookup(with: makeDeepLinkTarget(from: news))
+            completeDeepLinkLookup(with: makeDeepLinkTarget(from: news, region: targetRegion))
             return
         }
 
@@ -108,7 +108,7 @@ extension NewsListViewModel {
 #endif
                                 await MainActor.run {
                                     NewsListViewModel.shared.completeDeepLinkLookup(
-                                        with: NewsListViewModel.shared.makeDeepLinkTarget(from: news)
+                                        with: NewsListViewModel.shared.makeDeepLinkTarget(from: news, region: targetRegion)
                                     )
                                 }
                                 return .found
@@ -140,7 +140,11 @@ extension NewsListViewModel {
                             relatedNews = []
                         }
 
-                        let target = DeepLinkNavigationTarget(news: news, relatedNews: relatedNews)
+                        let target = DeepLinkNavigationTarget(
+                            news: news,
+                            relatedNews: relatedNews,
+                            region: targetRegion
+                        )
 
 #if DEBUG
                         print("✅ News fetched directly from Firestore: \(target.news.neutralTitle)")
@@ -219,10 +223,11 @@ extension NewsListViewModel {
         }
     }
 
-    private func makeDeepLinkTarget(from news: NeutralNews) -> DeepLinkNavigationTarget {
+    private func makeDeepLinkTarget(from news: NeutralNews, region: ContentRegion) -> DeepLinkNavigationTarget {
         DeepLinkNavigationTarget(
             news: news,
-            relatedNews: getRelatedNews(from: news)
+            relatedNews: getRelatedNews(from: news),
+            region: region
         )
     }
 }

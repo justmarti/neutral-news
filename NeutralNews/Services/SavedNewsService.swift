@@ -334,7 +334,12 @@ final class SavedNewsService {
         prepareStoreIfNeeded(coreDataContext: coreDataContext)
     }
 
-    func saveNews(_ news: Any, context: NSManagedObjectContext? = nil, regionRaw: String? = nil) throws {
+    func saveNews(
+        _ news: Any,
+        context: NSManagedObjectContext? = nil,
+        regionRaw: String? = nil,
+        relatedNews: [News]? = nil
+    ) throws {
         prepareStoreIfNeeded(coreDataContext: context)
 #if DEBUG
         print("🔄 SavedNewsService.saveNews called")
@@ -378,11 +383,11 @@ final class SavedNewsService {
 
         // Create the object ONLY if not already saved
         if let neutralNews = news as? NeutralNews {
-            let relatedNews = newsDataManager.getRelatedNews(from: neutralNews)
+            let resolvedRelatedNews = relatedNews ?? newsDataManager.getRelatedNews(from: neutralNews)
             modelContext.insert(
                 SavedNewsItem(
                     from: neutralNews,
-                    relatedNews: relatedNews,
+                    relatedNews: resolvedRelatedNews,
                     regionRaw: activeRegionRaw
                 )
             )
@@ -444,10 +449,10 @@ final class SavedNewsService {
         }
     }
 
-    func isNewsSaved(newsId: String, context: NSManagedObjectContext? = nil) -> Bool {
+    func isNewsSaved(newsId: String, context: NSManagedObjectContext? = nil, regionRaw: String? = nil) -> Bool {
         prepareStoreIfNeeded(coreDataContext: context)
 
-        let activeRegionRaw = currentRegionRaw()
+        let activeRegionRaw = regionRaw ?? currentRegionRaw()
         let activeStorageKey = SavedNewsItem.storageKey(newsId: newsId, regionRaw: activeRegionRaw)
         let legacyStorageKey = SavedNewsItem.storageKey(newsId: newsId, regionRaw: legacyRegionRaw())
         let modelContext = createContext()

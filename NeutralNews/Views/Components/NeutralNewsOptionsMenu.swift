@@ -10,6 +10,7 @@ import SwiftUI
 struct NeutralNewsOptionsMenu: View {
     let news: NeutralNews
     let relatedNews: [News]
+    let region: ContentRegion?
     @Binding var isShowingReportProblemSheet: Bool
 
     private let premiumManager = PremiumManager.shared
@@ -62,15 +63,20 @@ struct NeutralNewsOptionsMenu: View {
 
     private func ensureSavedStatusLoadedIfNeeded() async {
         if savedRegionRawSnapshot == nil {
-            savedRegionRawSnapshot = NewsListViewModel.shared.savedRegionRaw(for: news.id)
+            savedRegionRawSnapshot = NewsListViewModel.shared.savedRegionRaw(for: news.id) ?? region?.rawValue
         }
 
         guard !NewsListViewModel.shared.isShowingSavedNews else { return }
-        guard !savedNewsState.hasStatus(for: news.id) else { return }
+        let regionRaw = currentSavedRegionRaw
+        guard !savedNewsState.hasStatus(for: news.id, regionRaw: regionRaw) else { return }
 
-        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: NewsListViewModel.shared.coreDataContext)
+        let isSaved = SavedNewsService.shared.isNewsSaved(
+            newsId: news.id,
+            context: NewsListViewModel.shared.coreDataContext,
+            regionRaw: regionRaw
+        )
         await MainActor.run {
-            savedNewsState.setSaved(isSaved, for: news.id)
+            savedNewsState.setSaved(isSaved, for: news.id, regionRaw: regionRaw)
         }
     }
 
@@ -106,7 +112,12 @@ struct NeutralNewsOptionsMenu: View {
                 print("💾 Saving article...")
 #endif
                 let savedRegionRaw = currentSavedRegionRaw ?? ContentRegionProvider().currentRegion.rawValue
-                try SavedNewsService.shared.saveNews(news, context: context, regionRaw: savedRegionRaw)
+                try SavedNewsService.shared.saveNews(
+                    news,
+                    context: context,
+                    regionRaw: savedRegionRaw,
+                    relatedNews: relatedNews
+                )
                 await MainActor.run {
                     savedNewsState.setSaved(true, for: news.id, regionRaw: savedRegionRaw)
                     savedRegionRawSnapshot = savedRegionRaw
@@ -131,7 +142,7 @@ struct NeutralNewsOptionsMenu: View {
     }
     
     private func generateShareURL() -> URL {
-        return DeepLinkService.generateShareURL(for: news)
+        return DeepLinkService.generateShareURL(for: news, region: shareRegion)
     }
 
     private var currentSavedStatus: Bool {
@@ -145,6 +156,15 @@ struct NeutralNewsOptionsMenu: View {
             return vm.savedRegionRaw(for: news.id) ?? savedRegionRawSnapshot
         }
 
-        return savedRegionRawSnapshot
+        return savedRegionRawSnapshot ?? region?.rawValue
+    }
+
+    private var shareRegion: ContentRegion {
+        if let regionRaw = currentSavedRegionRaw,
+           let resolvedRegion = ContentRegion(rawValue: regionRaw) {
+            return resolvedRegion
+        }
+
+        return region ?? ContentRegionProvider().currentRegion
     }
 }

@@ -93,6 +93,7 @@ struct HomeView: View {
                             NeutralNewsView(
                                 news: target.news,
                                 relatedNews: target.relatedNews,
+                                region: target.region,
                                 namespace: animationNamespace
                             )
                                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
@@ -421,7 +422,7 @@ private struct HomeNewsCard: View {
 
     var body: some View {
         NavigationLink {
-            NeutralNewsView(news: news, relatedNews: relatedNews, namespace: namespace)
+            NeutralNewsView(news: news, relatedNews: relatedNews, region: nil, namespace: namespace)
                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                 .navigationTransition(.zoom(sourceID: news.id, in: namespace))
                 .onAppear {
@@ -447,7 +448,7 @@ private struct HomeNewsCard: View {
                 )
             }
 
-            ShareLink(item: DeepLinkService.generateShareURL(for: news)) {
+            ShareLink(item: DeepLinkService.generateShareURL(for: news, region: shareRegion)) {
                 Label("Share", systemImage: "square.and.arrow.up")
             }
 
@@ -497,10 +498,12 @@ private struct HomeNewsCard: View {
                     saveFeedbackTrigger &+= 1
                 }
             } else {
-                try SavedNewsService.shared.saveNews(news, context: context)
+                try SavedNewsService.shared.saveNews(
+                    news,
+                    context: context,
+                    relatedNews: relatedNews
+                )
                 await MainActor.run {
-                    RatingManager.shared.incrementSavedNewsCount()
-                    RatingManager.shared.requestRatingAfterPositiveInteraction()
                     savedNewsState.setSaved(true, for: news.id)
                     saveFeedbackTrigger &+= 1
                 }
@@ -523,5 +526,14 @@ private struct HomeNewsCard: View {
     private var currentSavedStatus: Bool {
         let regionRaw = vm.isShowingSavedNews ? vm.savedRegionRaw(for: news.id) : nil
         return savedNewsState.isSaved(news.id, regionRaw: regionRaw)
+    }
+
+    private var shareRegion: ContentRegion {
+        if let regionRaw = vm.savedRegionRaw(for: news.id),
+           let resolvedRegion = ContentRegion(rawValue: regionRaw) {
+            return resolvedRegion
+        }
+
+        return ContentRegionProvider().currentRegion
     }
 }

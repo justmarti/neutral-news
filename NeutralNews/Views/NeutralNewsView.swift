@@ -10,6 +10,7 @@ import SwiftUI
 struct NeutralNewsView: View {
     let news: NeutralNews
     let relatedNews: [News]
+    let region: ContentRegion?
     var namespace: Namespace.ID
     @Environment(\.isBackgroundColorEnabled) private var isBackgroundColorEnabled
 
@@ -108,6 +109,7 @@ struct NeutralNewsView: View {
                     NeutralNewsOptionsMenu(
                         news: news,
                         relatedNews: relatedNews,
+                        region: region,
                         isShowingReportProblemSheet: $isShowingReportProblemSheet
                     )
                 }
@@ -118,6 +120,6 @@ struct NeutralNewsView: View {
 
 #Preview {
     let namespace = Namespace().wrappedValue
-    return NeutralNewsView(news: .mock, relatedNews: [.mock, .mock, .mock], namespace: namespace)
+    return NeutralNewsView(news: .mock, relatedNews: [.mock, .mock, .mock], region: nil, namespace: namespace)
         .environment(\.isBackgroundColorEnabled, true)
 }
