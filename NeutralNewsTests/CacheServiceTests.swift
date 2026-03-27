@@ -6,203 +6,127 @@
 //
 
 import Foundation
-import SwiftData
 import Testing
 @testable import NeutralNews
 
 @Suite("CacheService Tests")
 struct CacheServiceTests {
-    
-    // MARK: - TTL Tests
-    
-    @Test("Cache service basic functionality")
-    func testCacheServiceBasics() async throws {
-        let cacheService = CacheService.shared
-        
-        // Just verify cache service works without crashing
-        let stats = cacheService.getCacheStats()
-        #expect(stats.neutralNews >= 0)
-        #expect(stats.news >= 0)
-        
-        // Test with current date to avoid any TTL issues
-        let dayInfo = DayInfo.today
-        let isValid = cacheService.isCacheValid(for: dayInfo)
-        
-        // Either true or false is fine, just shouldn't crash
-        #expect(isValid || !isValid)
+    private let cacheService = CacheService.shared
+
+    @Test("Unknown day has no valid cache entries")
+    func unknownDayHasNoValidCacheEntries() {
+        let day = makeDay(daysFromNow: -45)
+
+        #expect(cacheService.isCacheValid(for: day) == false)
+        #expect(cacheService.getCachedNeutralNews(for: day).isEmpty == true)
+        #expect(cacheService.getCachedNews(for: day).isEmpty == true)
     }
-    
-    @Test("Cache validity with expired TTL")
-    func testExpiredCacheValidity() async throws {
-        let cacheService = CacheService.shared
-        
-        // Use a completely unique date/time that no other test could possibly use
-        let uniqueDate = Calendar.current.date(byAdding: .second, value: -87654321, to: Date())! // ~2.7 years ago
-        let dayInfo = DayInfo(dayName: "ExpiredTest_\(UUID().uuidString)", dayNumber: 99, monthName: "ExpiredMonth", date: uniqueDate)
-        
-        // This test verifies that cache validation works for completely uncached dates
-        let isValid = cacheService.isCacheValid(for: dayInfo)
-        let cachedItems = cacheService.getCachedNeutralNews(for: dayInfo)
-        
-        // Should return false for truly uncached dates
-        #expect(!isValid)
-        #expect(cachedItems.isEmpty)
-    }
-    
-    // MARK: - Neutral News Cache Tests
-    
-    @Test("Cache and retrieve neutral news")
-    func testCacheNeutralNews() async throws {
-        let cacheService = CacheService.shared
-        let testId = UUID().uuidString
-        let uniqueDate = Calendar.current.date(byAdding: .second, value: Int.random(in: 10000...99999), to: Date())!
-        let dayInfo = DayInfo(dayName: "CacheTest_\(testId)", dayNumber: 99, monthName: "TestMonth", date: uniqueDate)
-        
-        let mockNews = [
-            createMockNeutralNews(for: uniqueDate, id: "1_\(testId)", title: "Test News"),
-            createMockNeutralNews(for: uniqueDate, id: "2_\(testId)", title: "Second News")
+
+    @Test("Caching neutral news replaces previous entries for the same day")
+    func cachingNeutralNewsReplacesPreviousEntriesForTheSameDay() {
+        let day = makeDay(daysFromNow: -46)
+        let firstBatch = [
+            makeNeutralNews(id: "cache-neutral-old", title: "Old cached story", date: day.date)
         ]
-        
-        // Cache the news
-        cacheService.cacheNeutralNews(mockNews, for: dayInfo)
-        
-        // Retrieve and verify - should contain our specific items
-        let cachedNews = cacheService.getCachedNeutralNews(for: dayInfo)
-        
-        // Check that our specific items are present (may have additional items from parallel tests)
-        #expect(cachedNews.contains { $0.neutralTitle == "Test News" && $0.id == "1_\(testId)" })
-        #expect(cachedNews.contains { $0.neutralTitle == "Second News" && $0.id == "2_\(testId)" })
-    }
-    
-    // MARK: - Regular News Cache Tests
-    
-    @Test("Cache and retrieve regular news")
-    func testCacheRegularNews() async throws {
-        let cacheService = CacheService.shared
-        let testId = UUID().uuidString
-        let uniqueDate = Calendar.current.date(byAdding: .second, value: Int.random(in: 100000...999999), to: Date())!
-        let dayInfo = DayInfo(dayName: "RegularTest_\(testId)", dayNumber: 98, monthName: "TestMonth", date: uniqueDate)
-        
-        let mockNews = [
-            createMockNews(for: uniqueDate, id: "reg1_\(testId)", title: "Test News"),
-            createMockNews(for: uniqueDate, id: "reg2_\(testId)", title: "Second Regular News")
+        let replacementBatch = [
+            makeNeutralNews(id: "cache-neutral-newer", title: "Newer story", date: day.date.addingTimeInterval(7_200)),
+            makeNeutralNews(id: "cache-neutral-older", title: "Older story", date: day.date.addingTimeInterval(3_600))
         ]
-        
-        // Cache the news
-        cacheService.cacheNews(mockNews, for: dayInfo)
-        
-        // Retrieve and verify - should contain our specific items
-        let cachedNews = cacheService.getCachedNews(for: dayInfo)
-        
-        // Check that our specific items are present (may have additional items from parallel tests)
-        #expect(cachedNews.contains { $0.title == "Test News" && $0.id == "reg1_\(testId)" })
-        #expect(cachedNews.contains { $0.title == "Second Regular News" && $0.id == "reg2_\(testId)" })
+
+        cacheService.cacheNeutralNews(firstBatch, for: day)
+        cacheService.cacheNeutralNews(replacementBatch, for: day)
+
+        let cached = cacheService.getCachedNeutralNews(for: day)
+
+        #expect(cached.map(\.id) == ["cache-neutral-newer", "cache-neutral-older"])
+        #expect(cached.contains { $0.id == "cache-neutral-old" } == false)
     }
-    
-    // MARK: - Cache Management Tests
-    
-    @Test("Cache stats calculation")
-    func testCacheStats() async throws {
-        let cacheService = CacheService.shared
-        let testId = UUID().uuidString
-        let uniqueDate = Calendar.current.date(byAdding: .second, value: Int.random(in: 300000...399999), to: Date())!
-        let dayInfo = DayInfo(dayName: "StatsTest_\(testId)", dayNumber: 95, monthName: "TestMonth", date: uniqueDate)
-        
-        // Add some cached items
-        cacheService.cacheNeutralNews([createMockNeutralNews(for: uniqueDate, id: "stats_\(testId)")], for: dayInfo)
-        cacheService.cacheNews([createMockNews(for: uniqueDate, id: "stats_news_\(testId)")], for: dayInfo)
-        
-        let stats = cacheService.getCacheStats()
-        
-        #expect(stats.neutralNews >= 1)
-        #expect(stats.news >= 1)
+
+    @Test("Caching regular news returns entries sorted by publication date")
+    func cachingRegularNewsReturnsEntriesSortedByPublicationDate() {
+        let day = makeDay(daysFromNow: -47)
+        let older = makeNews(id: "cache-news-older", title: "Older source", pubDate: day.date)
+        let newer = makeNews(id: "cache-news-newer", title: "Newer source", pubDate: day.date.addingTimeInterval(7_200))
+
+        cacheService.cacheNews([older, newer], for: day)
+
+        let cached = cacheService.getCachedNews(for: day)
+
+        #expect(cached.map(\.id) == [newer.id, older.id])
+        #expect(cached.first?.publisher == "Example Publisher")
     }
-    
-    @Test("Clear all cache")
-    func testClearAllCache() async throws {
-        let cacheService = CacheService.shared
-        let testId = UUID().uuidString
-        let uniqueDate = Calendar.current.date(byAdding: .second, value: Int.random(in: 500000...599999), to: Date())!
-        let dayInfo = DayInfo(dayName: "ClearTest_\(testId)", dayNumber: 91, monthName: "TestMonth", date: uniqueDate)
-        
-        // Add some cached items
-        cacheService.cacheNeutralNews([createMockNeutralNews(for: uniqueDate, id: "clear_\(testId)")], for: dayInfo)
-        cacheService.cacheNews([createMockNews(for: uniqueDate, id: "clear_news_\(testId)")], for: dayInfo)
-        
-        // Clear cache
-        cacheService.clearAllCache()
-        
-        // Verify our specific items are cleared (don't check total count due to parallel tests)
-        let cachedNeutralNews = cacheService.getCachedNeutralNews(for: dayInfo)
-        let cachedNews = cacheService.getCachedNews(for: dayInfo)
-        
-        #expect(!cachedNeutralNews.contains { $0.id == "clear_\(testId)" })
-        #expect(!cachedNews.contains { $0.id == "clear_news_\(testId)" })
+
+    @Test("Caching an empty neutral news batch preserves the existing cache")
+    func cachingAnEmptyNeutralNewsBatchPreservesTheExistingCache() {
+        let day = makeDay(daysFromNow: -48)
+        let existing = makeNeutralNews(id: "cache-neutral-existing", title: "Existing story", date: day.date)
+
+        cacheService.cacheNeutralNews([existing], for: day)
+        cacheService.cacheNeutralNews([], for: day)
+
+        #expect(cacheService.getCachedNeutralNews(for: day).map(\.id) == [existing.id])
     }
-    
-    @Test("Cache cleanup removes old items")
-    func testCacheCleanup() async throws {
-        let cacheService = CacheService.shared
-        let testId = UUID().uuidString
-        
-        let oldDate = Calendar.current.date(byAdding: .day, value: -8, to: Date())!
-        let oldDayInfo = DayInfo(dayName: "OldCleanup_\(testId)", dayNumber: 93, monthName: "TestMonth", date: oldDate)
-        
-        // Cache old news (should be cleaned up)
-        cacheService.cacheNeutralNews([createMockNeutralNews(for: oldDate, id: "old_\(testId)")], for: oldDayInfo)
-        cacheService.cacheNews([createMockNews(for: oldDate, id: "old_news_\(testId)")], for: oldDayInfo)
-        
-        // Cache recent news (should remain) - use 30 minutes ago, which is within TTL for today (45 min)
-        let recentDate = Calendar.current.date(byAdding: .minute, value: -30, to: Date())!
-        let recentDayInfo = DayInfo(dayName: "RecentCleanup_\(testId)", dayNumber: 92, monthName: "TestMonth", date: recentDate)
-        cacheService.cacheNeutralNews([createMockNeutralNews(for: recentDate, id: "recent_\(testId)")], for: recentDayInfo)
-        
-        // Run cleanup
-        cacheService.cleanExpiredCache()
-        
-        // Verify old items are removed, recent items remain
-        let oldCachedNews = cacheService.getCachedNeutralNews(for: oldDayInfo)
-        let recentCachedNews = cacheService.getCachedNeutralNews(for: recentDayInfo)
-        
-        #expect(oldCachedNews.isEmpty)
-        #expect(!recentCachedNews.isEmpty)
+
+    @Test("Expired cache cleanup removes entries older than seven days and keeps recent ones")
+    func expiredCacheCleanupRemovesOldEntriesAndKeepsRecentOnes() async {
+        let oldDay = makeDay(daysFromNow: -15)
+        let recentDay = makeDay(daysFromNow: -1)
+        let oldNeutral = makeNeutralNews(id: "cache-cleanup-old-neutral", title: "Old neutral", date: oldDay.date)
+        let oldRegular = makeNews(id: "cache-cleanup-old-news", title: "Old source", pubDate: oldDay.date)
+        let recentNeutral = makeNeutralNews(id: "cache-cleanup-recent-neutral", title: "Recent neutral", date: recentDay.date)
+        let recentRegular = makeNews(id: "cache-cleanup-recent-news", title: "Recent source", pubDate: recentDay.date)
+
+        cacheService.cacheNeutralNews([oldNeutral], for: oldDay)
+        cacheService.cacheNews([oldRegular], for: oldDay)
+        cacheService.cacheNeutralNews([recentNeutral], for: recentDay)
+        cacheService.cacheNews([recentRegular], for: recentDay)
+
+        await cacheService.cleanExpiredCache()
+
+        #expect(cacheService.getCachedNeutralNews(for: oldDay).contains { $0.id == oldNeutral.id } == false)
+        #expect(cacheService.getCachedNews(for: oldDay).contains { $0.id == oldRegular.id } == false)
+        #expect(cacheService.getCachedNeutralNews(for: recentDay).contains { $0.id == recentNeutral.id })
+        #expect(cacheService.getCachedNews(for: recentDay).contains { $0.id == recentRegular.id })
     }
-    
-    // MARK: - Helper Methods
-    
-    private func createMockNeutralNews(for date: Date, id: String = "1", title: String = "Test News") -> NeutralNews {
-        return NeutralNews(
+
+    private func makeDay(daysFromNow: Int) -> DayInfo {
+        let date = Calendar.current.date(byAdding: .day, value: daysFromNow, to: Date())!
+        return DayInfo(date: date)
+    }
+
+    private func makeNeutralNews(id: String, title: String, date: Date) -> NeutralNews {
+        NeutralNews(
             id: id,
             neutralTitle: title,
-            neutralDescription: "Test description",
-            category: "Test",
+            neutralDescription: "\(title) summary",
+            category: Category.business.rawValue,
             relevance: 5,
-            imageUrl: "https://example.com/image.jpg",
-            imageMedium: "https://example.com/medium.jpg",
+            imageUrl: "https://example.com/\(id).jpg",
+            imageMedium: "Example",
             date: date,
             createdAt: date,
             updatedAt: date,
             group: 1,
-            sourceIds: ["test-news-1", "test-news-2"]
+            sourceIds: ["\(id)-source-a", "\(id)-source-b"]
         )
     }
-    
-    private func createMockNews(for date: Date, id: String = "1", title: String = "Test News") -> News {
-        return News(
+
+    private func makeNews(id: String, title: String, pubDate: Date) -> News {
+        News(
             id: id,
             title: title,
-            description: "Test description",
+            description: "\(title) description",
             scrappedDescription: nil,
-            category: "Test",
-            imageUrl: "https://example.com/image.jpg",
-            link: "https://example.com/news",
-            pubDate: date,
-            createdAt: date,
-            updatedAt: date,
-            sourceMedium: .elPais,
-            neutralScore: 0,
+            category: Category.business.rawValue,
+            imageUrl: "https://example.com/\(id).jpg",
+            link: "https://example.com/\(id)",
+            pubDate: pubDate,
+            createdAt: pubDate,
+            updatedAt: pubDate,
+            publisher: "Example Publisher",
+            neutralScore: 55,
             group: 1,
-            embedding: [0.1, 0.2, 0.3]
+            embedding: [0.3, 0.7]
         )
     }
 }

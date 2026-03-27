@@ -57,7 +57,7 @@ final class FirestoreService {
             .getDocuments()
         
         return snapshot.documents.compactMap { doc -> NeutralNews? in
-            parseNeutralNews(from: doc.data(), documentID: doc.documentID)
+            Self.decodeNeutralNews(from: doc.data(), documentID: doc.documentID)
         }
     }
 
@@ -71,7 +71,7 @@ final class FirestoreService {
             return nil
         }
 
-        return parseNeutralNews(from: data, documentID: document.documentID)
+        return Self.decodeNeutralNews(from: data, documentID: document.documentID)
     }
     
     
@@ -110,7 +110,7 @@ final class FirestoreService {
             .getDocuments()
         
         return snapshot.documents.compactMap { doc -> News? in
-            parseNews(from: doc.data(), documentID: doc.documentID)
+            Self.decodeNews(from: doc.data(), documentID: doc.documentID)
         }
     }
 
@@ -129,7 +129,7 @@ final class FirestoreService {
                 .getDocuments()
 
             for document in snapshot.documents {
-                guard let news = parseNews(from: document.data(), documentID: document.documentID) else {
+                guard let news = Self.decodeNews(from: document.data(), documentID: document.documentID) else {
                     continue
                 }
                 fetchedNewsById[news.id] = news
@@ -145,7 +145,7 @@ final class FirestoreService {
         region ?? regionProvider.currentRegion
     }
     
-    private func parseNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
+    static func decodeNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
         guard let neutralTitle = data["neutral_title"] as? String,
               let neutralDescription = data["neutral_description"] as? String,
               let category = (data["category_id"] as? String) ?? (data["category"] as? String),
@@ -175,7 +175,7 @@ final class FirestoreService {
         )
     }
     
-    private func parseNews(from data: [String: Any], documentID: String) -> News? {
+    static func decodeNews(from data: [String: Any], documentID: String) -> News? {
         guard let title = data["title"] as? String,
               let description = data["description_short"] as? String,
               let group = data["group"] as? Int,

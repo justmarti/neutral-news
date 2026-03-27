@@ -82,7 +82,7 @@ struct DayInfo: Identifiable, Hashable {
     }
     
     func hash(into hasher: inout Hasher) {
-        hasher.combine(date)
+        hasher.combine(Calendar.current.startOfDay(for: date))
     }
     
     static func == (lhs: DayInfo, rhs: DayInfo) -> Bool {

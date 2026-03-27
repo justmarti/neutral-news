@@ -11,291 +11,141 @@ import Testing
 
 @Suite("NewsDataManager Tests")
 struct NewsDataManagerTests {
-    
-    // MARK: - Initialization Tests
-    
-    @Test("NewsDataManager initialization")
-    func testInitialization() async throws {
-        let manager = NewsDataManager.shared
-        
-        // Test that manager initializes without crashing
-        #expect(manager.lastSevenDays.count == 7)
-        #expect(manager.lastSevenDays.first?.dayName == "Hoy")
-    }
-    
-    @Test("Last seven days calculation")
-    func testLastSevenDays() async throws {
-        let manager = NewsDataManager.shared
+    private let manager = NewsDataManager.shared
+    private let cacheService = CacheService.shared
+
+    @Test("Last seven days contains seven unique dates in descending order")
+    func lastSevenDaysContainsSevenUniqueDescendingDates() {
         let days = manager.lastSevenDays
-        
+
         #expect(days.count == 7)
-        #expect(days.first?.dayName == "Hoy")
-        #expect(days[1].dayName == "Ayer")
-        
-        // Verify dates are in descending order (today to 6 days ago)
-        for i in 0..<(days.count - 1) {
-            #expect(days[i].date >= days[i + 1].date)
+        #expect(Set(days).count == 7)
+
+        for (current, next) in zip(days, days.dropFirst()) {
+            #expect(current.date > next.date)
         }
     }
-    
-    // MARK: - Day Loading Tests
-    
-    @Test("isDayLoaded tracking")  
-    func testDayLoadedTracking() async throws {
-        let manager = NewsDataManager.shared
-        
-        // Use a unique test date that won't conflict with other tests
-        let testDate = Calendar.current.date(byAdding: .day, value: -100, to: Date())! // 100 days ago
-        let dayInfo = DayInfo(dayName: "TrackingTest", dayNumber: 1, monthName: "Test", date: testDate)
-        
-        // Initially not loaded
-        #expect(!manager.isDayLoaded(dayInfo))
-        
-        // After loading should be marked as loaded
-        await manager.loadNews(for: dayInfo)
-        #expect(manager.isDayLoaded(dayInfo))
+
+    @Test("Load news uses a valid cache entry and marks the day as loaded")
+    func loadNewsUsesCacheAndMarksDayAsLoaded() async {
+        let day = makeDay(daysFromNow: 30)
+        let newerStory = makeNeutralNews(
+            id: "manager-cache-newer",
+            title: "Cached newer story",
+            date: day.date.addingTimeInterval(3_600)
+        )
+        let olderStory = makeNeutralNews(
+            id: "manager-cache-older",
+            title: "Cached older story",
+            date: day.date
+        )
+
+        cacheService.cacheNeutralNews([olderStory, newerStory], for: day)
+
+        #expect(cacheService.isCacheValid(for: day) == true)
+
+        await manager.loadNews(for: day)
+
+        #expect(manager.isDayLoaded(day) == true)
+        #expect(manager.getNewsArrayForDay(day).map(\.id) == [newerStory.id, olderStory.id])
     }
-    
-    @Test("Skip loading already loaded day")
-    func testSkipAlreadyLoadedDay() async throws {
-        let manager = NewsDataManager.shared
-        let uniqueDate = Calendar.current.date(byAdding: .day, value: Int.random(in: -2000...(-1000)), to: Date())!
-        let dayInfo = DayInfo(dayName: "Test_\(UUID().uuidString)", dayNumber: 1, monthName: "Test", date: uniqueDate)
-        
-        // Load once
-        await manager.loadNews(for: dayInfo)
-        let initialCount = manager.getNewsArrayForDay(dayInfo).count
-        
-        // Load again (should skip)
-        await manager.loadNews(for: dayInfo)
-        let afterSecondLoad = manager.getNewsArrayForDay(dayInfo).count
-        
-        #expect(initialCount == afterSecondLoad)
+
+    @Test("Related news resolves cached source identifiers in source order")
+    func relatedNewsResolvesCachedSourceIdentifiersInSourceOrder() async {
+        let day = makeDay(daysFromNow: 31)
+        let sourceOne = makeNews(
+            id: "manager-related-1",
+            title: "Publisher one",
+            pubDate: day.date.addingTimeInterval(1_800)
+        )
+        let sourceTwo = makeNews(
+            id: "manager-related-2",
+            title: "Publisher two",
+            pubDate: day.date.addingTimeInterval(3_600)
+        )
+        let neutral = makeNeutralNews(
+            id: "manager-related-neutral",
+            title: "Neutral bundle",
+            date: day.date,
+            sourceIds: [sourceTwo.id, "manager-related-missing", sourceOne.id]
+        )
+
+        cacheService.cacheNeutralNews([neutral], for: day)
+        cacheService.cacheNews([sourceOne, sourceTwo], for: day)
+
+        await manager.loadNews(for: day)
+
+        #expect(manager.getRelatedNews(from: neutral).map(\.id) == [sourceTwo.id, sourceOne.id])
     }
-    
-    @Test("Force refresh bypasses loaded check")
-    func testForceRefresh() async throws {
-        let manager = NewsDataManager.shared
-        let uniqueDate = Calendar.current.date(byAdding: .day, value: Int.random(in: -2000...(-1000)), to: Date())!
-        let dayInfo = DayInfo(dayName: "Test_\(UUID().uuidString)", dayNumber: 1, monthName: "Test", date: uniqueDate)
-        
-        // Load once
-        await manager.loadNews(for: dayInfo)
-        #expect(manager.isDayLoaded(dayInfo))
-        
-        // Force refresh should complete without errors
-        await manager.refreshNews(for: dayInfo)
-        
-        // After refresh, we should be able to get news for this day (main functionality test)
-        let newsAfterRefresh = manager.getNewsArrayForDay(dayInfo)
-        #expect(newsAfterRefresh.count >= 0) // Should not crash and return valid array
-        
-        // The day should be marked as loaded after refresh (or refresh should work correctly)
-        let isLoadedAfterRefresh = manager.isDayLoaded(dayInfo)
-        #expect(isLoadedAfterRefresh || !isLoadedAfterRefresh) // Either state is acceptable, main thing is no crash
+
+    @Test("Loading the same cached day twice does not duplicate entries")
+    func loadingTheSameCachedDayTwiceDoesNotDuplicateEntries() async {
+        let day = makeDay(daysFromNow: 32)
+        let neutral = makeNeutralNews(
+            id: "manager-dedup-neutral",
+            title: "Deduplicated story",
+            date: day.date,
+            sourceIds: ["manager-dedup-source"]
+        )
+        let source = makeNews(
+            id: "manager-dedup-source",
+            title: "Deduplicated source",
+            pubDate: day.date
+        )
+
+        cacheService.cacheNeutralNews([neutral], for: day)
+        cacheService.cacheNews([source], for: day)
+
+        await manager.loadNews(for: day)
+        await manager.loadNews(for: day)
+
+        #expect(manager.getNewsArrayForDay(day).map(\.id) == [neutral.id])
+        #expect(manager.allNews.filter { $0.id == source.id }.count == 1)
     }
-    
-    // MARK: - News Retrieval Tests
-    
-    @Test("Get news for specific day")
-    func testGetNewsForDay() async throws {
-        let manager = NewsDataManager.shared
-        
-        // Use unique date far in past to avoid threading issues with cleanup
-        let uniqueDate = Calendar.current.date(byAdding: .day, value: -1000, to: Date())!
-        let dayInfo = DayInfo(dayName: "GetNewsTest_\(UUID().uuidString)", dayNumber: 1, monthName: "Test", date: uniqueDate)
-        
-        // Initially should be empty for this unique date
-        let initialNews = manager.getNewsForDay(dayInfo)
-        #expect(initialNews.isEmpty)
-        
-        // After loading, should have news (mocked by cache or network)
-        await manager.loadNews(for: dayInfo)
-        let loadedNews = manager.getNewsForDay(dayInfo)
-        
-        // Should have some news after loading (or empty if no mock data)
-        #expect(loadedNews.count >= 0)
+
+    private func makeDay(daysFromNow: Int) -> DayInfo {
+        let date = Calendar.current.date(byAdding: .day, value: daysFromNow, to: Date())!
+        return DayInfo(date: date)
     }
-    
-    @Test("Get news array for day is sorted")
-    func testGetNewsArrayForDaySorted() async throws {
-        let manager = NewsDataManager.shared
-        let uniqueDate = Calendar.current.date(byAdding: .day, value: Int.random(in: -2000...(-1000)), to: Date())!
-        let dayInfo = DayInfo(dayName: "Test_\(UUID().uuidString)", dayNumber: 1, monthName: "Test", date: uniqueDate)
-        
-        await manager.loadNews(for: dayInfo)
-        let newsArray = manager.getNewsArrayForDay(dayInfo)
-        
-        // Should be sorted by date (newest first)
-        if newsArray.count > 1 {
-            for i in 0..<(newsArray.count - 1) {
-                #expect(newsArray[i].date >= newsArray[i + 1].date)
-            }
-        }
-    }
-    
-    @Test("Get related news by group")
-    func testGetRelatedNews() async throws {
-        let manager = NewsDataManager.shared
-        
-        // Create mock neutral news with specific group
-        let mockNeutralNews = createMockNeutralNews(group: 123)
-        
-        let relatedNews = manager.getRelatedNews(from: mockNeutralNews)
-        
-        // Should return an array (even if empty) without crashing
-        #expect(relatedNews.count >= 0)
-    }
-    
-    // MARK: - Cache Integration Tests
-    
-    @Test("Cache stats retrieval")
-    func testCacheStats() async throws {
-        let manager = NewsDataManager.shared
-        let stats = manager.getCacheStats()
-        
-        #expect(stats.memory >= 0)
-        #expect(stats.persistent.neutralNews >= 0)
-        #expect(stats.persistent.news >= 0)
-    }
-    
-    @Test("Preload cache functionality")
-    func testPreloadCache() async throws {
-        let manager = NewsDataManager.shared
-        
-        // Should not throw and complete successfully
-        await manager.preloadCache()
-        
-        // Today should be loaded or attempted to load
-        _ = DayInfo.today
-        // Note: In real app, this might load from Firebase or cache
-        // In tests, we just verify it doesn't crash
-    }
-    
-    // MARK: - Memory Management Tests
-    
-    @Test("News deduplication in addNewNewsForDay")
-    func testNewsDeduplication() async throws {
-        let manager = NewsDataManager.shared
-        let uniqueDate = Calendar.current.date(byAdding: .day, value: Int.random(in: -2000...(-1000)), to: Date())!
-        let dayInfo = DayInfo(dayName: "Test_\(UUID().uuidString)", dayNumber: 1, monthName: "Test", date: uniqueDate)
-        
-        // Test that loading the same day twice doesn't duplicate
-        await manager.loadNews(for: dayInfo)
-        let firstLoad = manager.getNewsArrayForDay(dayInfo).count
-        
-        await manager.loadNews(for: dayInfo) // Should skip because already loaded
-        let secondLoad = manager.getNewsArrayForDay(dayInfo).count
-        
-        #expect(firstLoad == secondLoad) // Should be same count
-    }
-    
-    @Test("Merge news for day updates existing items")
-    func testMergeNewsForDay() async throws {
-        let manager = NewsDataManager.shared
-        let uniqueDate = Calendar.current.date(byAdding: .day, value: Int.random(in: -2000...(-1000)), to: Date())!
-        let dayInfo = DayInfo(dayName: "Test_\(UUID().uuidString)", dayNumber: 1, monthName: "Test", date: uniqueDate)
-        
-        // Test force refresh (merge functionality)
-        await manager.loadNews(for: dayInfo)
-        _ = manager.getNewsArrayForDay(dayInfo).count
-        
-        await manager.refreshNews(for: dayInfo) // This uses merge functionality
-        let afterRefresh = manager.getNewsArrayForDay(dayInfo).count
-        
-        // Should handle refresh without crashing
-        #expect(afterRefresh >= 0)
-    }
-    
-    // MARK: - Edge Cases Tests
-    
-    @Test("Handle empty news arrays")
-    func testHandleEmptyArrays() async throws {
-        let manager = NewsDataManager.shared
-        let dayInfo = DayInfo(dayName: "Empty", dayNumber: 1, monthName: "Test", date: Date())
-        
-        // Test loading for a day that might have no news
-        await manager.loadNews(for: dayInfo)
-        let newsArray = manager.getNewsArrayForDay(dayInfo)
-        
-        // Should handle empty results gracefully
-        #expect(newsArray.count >= 0)
-    }
-    
-    @Test("Date boundary handling")
-    func testDateBoundaryHandling() async throws {
-        let manager = NewsDataManager.shared
-        let calendar = Calendar.current
-        
-        // Test with date at exact day boundary
-        var components = DateComponents()
-        components.year = 2024
-        components.month = 1
-        components.day = 1
-        components.hour = 0
-        components.minute = 0
-        components.second = 0
-        
-        let exactDate = calendar.date(from: components)!
-        let dayInfo = DayInfo(dayName: "Test", dayNumber: 1, monthName: "Enero", date: exactDate)
-        
-        await manager.loadNews(for: dayInfo)
-        
-        // Should handle boundary dates without issues
-        #expect(manager.isDayLoaded(dayInfo))
-    }
-    
-    // MARK: - Multiple Day Loading Tests  
-    
-    @Test("Load multiple days without crashes")
-    func testLoadMultipleDays() async throws {
-        let manager = NewsDataManager.shared
-        
-        // Test loading multiple days in sequence - focus on stability, not performance
-        for dayOffset in 0..<5 {
-            let uniqueDate = Calendar.current.date(byAdding: .day, value: -dayOffset - 1000, to: Date())!
-            let dayInfo = DayInfo(dayName: "MultiDay_\(UUID().uuidString)", dayNumber: dayOffset, monthName: "Test", date: uniqueDate)
-            
-            await manager.loadNews(for: dayInfo)
-            #expect(manager.isDayLoaded(dayInfo))
-        }
-    }
-    
-    // MARK: - Helper Methods
-    
-    private func createMockNeutralNews(id: String = "test", title: String = "Test News", group: Int = 1) -> NeutralNews {
-        return NeutralNews(
+
+    private func makeNeutralNews(
+        id: String,
+        title: String,
+        date: Date,
+        sourceIds: [String] = ["source-a", "source-b"]
+    ) -> NeutralNews {
+        NeutralNews(
             id: id,
             neutralTitle: title,
-            neutralDescription: "Test description",
-            category: "Test",
+            neutralDescription: "\(title) summary",
+            category: Category.technology.rawValue,
             relevance: 5,
-            imageUrl: "https://example.com/image.jpg",
-            imageMedium: "https://example.com/medium.jpg",
-            date: Date(),
-            createdAt: Date(),
-            updatedAt: Date(),
-            group: group,
-            sourceIds: ["test-news-1", "test-news-2"]
+            imageUrl: "https://example.com/\(id).jpg",
+            imageMedium: "Example",
+            date: date,
+            createdAt: date,
+            updatedAt: date,
+            group: 1,
+            sourceIds: sourceIds
         )
     }
-    
-    private func createMockNews(id: String = "test", title: String = "Test News", group: Int = 1) -> News {
-        return News(
+
+    private func makeNews(id: String, title: String, pubDate: Date) -> News {
+        News(
             id: id,
             title: title,
-            description: "Test description",
-            scrappedDescription: nil,
-            category: "Test",
-            imageUrl: "https://example.com/image.jpg",
-            link: "https://example.com/news",
-            pubDate: Date(),
-            createdAt: Date(),
-            updatedAt: Date(),
-            sourceMedium: .elPais,
-            neutralScore: 0,
-            group: group,
-            embedding: [0.1, 0.2, 0.3]
+            description: "\(title) description",
+            scrappedDescription: "\(title) body",
+            category: Category.technology.rawValue,
+            imageUrl: "https://example.com/\(id).jpg",
+            link: "https://example.com/\(id)",
+            pubDate: pubDate,
+            createdAt: pubDate,
+            updatedAt: pubDate,
+            publisher: "Example Publisher",
+            neutralScore: 50,
+            group: 1,
+            embedding: [0.1, 0.2]
         )
     }
 }

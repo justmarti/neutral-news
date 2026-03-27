@@ -2,75 +2,117 @@ import Foundation
 import Testing
 @testable import NeutralNews
 
-@Suite("DeepLinkService Tests")
+@Suite("Deep Link Service Tests")
 struct DeepLinkServiceTests {
 
-    @Test("Parses legacy share URL")
-    func parsesLegacyShareURL() {
+    @Test("Parses legacy Spain share URL")
+    func parsesLegacySpainShareURL() {
         let url = URL(string: "https://share.getfacts.app/news/story-123")!
 
-        let deepLinkData = DeepLinkService.parseDeepLink(url)
+        let deepLink = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == .init(newsId: "story-123", region: .es))
+        #expect(deepLink == .init(newsId: "story-123", region: .es))
     }
 
     @Test("Parses country-scoped share URL")
     func parsesCountryScopedShareURL() {
         let url = URL(string: "https://share.getfacts.app/us/news/story-456")!
 
-        let deepLinkData = DeepLinkService.parseDeepLink(url)
+        let deepLink = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == .init(newsId: "story-456", region: .us))
+        #expect(deepLink == .init(newsId: "story-456", region: .us))
     }
 
-    @Test("Parses custom scheme deep link")
-    func parsesCustomSchemeDeepLink() {
-        let url = URL(string: "neutralnews://story-789")!
+    @Test("Parses percent-encoded identifiers")
+    func parsesPercentEncodedIdentifiers() {
+        let url = URL(string: "https://share.getfacts.app/news/story%20with%20spaces")!
 
-        let deepLinkData = DeepLinkService.parseDeepLink(url)
+        let deepLink = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == .init(newsId: "story-789", region: nil))
+        #expect(deepLink == .init(newsId: "story with spaces", region: .es))
     }
 
-    @Test("Parses notification payload with deep link")
-    func parsesNotificationPayloadWithDeepLink() {
-        let payload: [AnyHashable: Any] = [
-            "deep_link": "https://share.getfacts.app/us/news/story-456"
-        ]
+    @Test("Parses custom-scheme deep link with region in host")
+    func parsesCustomSchemeRegionHost() {
+        let url = URL(string: "neutralnews://us/news/story-789")!
 
-        let deepLinkData = DeepLinkService.parseNotificationPayload(payload)
+        let deepLink = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == .init(newsId: "story-456", region: .us))
+        #expect(deepLink == .init(newsId: "story-789", region: .us))
     }
 
-    @Test("Parses notification payload with news ID and region")
-    func parsesNotificationPayloadWithNewsIdAndRegion() {
+    @Test("Parses custom-scheme deep link with region query parameter")
+    func parsesCustomSchemeRegionQueryParameter() {
+        let url = URL(string: "neutralnews://story-789?region=us")!
+
+        let deepLink = DeepLinkService.parseDeepLink(url)
+
+        #expect(deepLink == .init(newsId: "story-789", region: .us))
+    }
+
+    @Test("Parses notification payload with lowercase region")
+    func parsesNotificationPayloadWithLowercaseRegion() {
         let payload: [AnyHashable: Any] = [
             "news_id": "story-987",
-            "region": "es"
+            "region": "us"
         ]
 
-        let deepLinkData = DeepLinkService.parseNotificationPayload(payload)
+        let deepLink = DeepLinkService.parseNotificationPayload(payload)
 
-        #expect(deepLinkData == .init(newsId: "story-987", region: .es))
+        #expect(deepLink == .init(newsId: "story-987", region: .us))
+    }
+
+    @Test("Notification payload prefers deep link over fallback fields")
+    func notificationPayloadPrefersDeepLink() {
+        let payload: [AnyHashable: Any] = [
+            "deep_link": "https://share.getfacts.app/news/story-456",
+            "news_id": "story-987",
+            "region": "us"
+        ]
+
+        let deepLink = DeepLinkService.parseNotificationPayload(payload)
+
+        #expect(deepLink == .init(newsId: "story-456", region: .es))
+    }
+
+    @Test("Notification payload falls back to news identifier when deep link is invalid")
+    func notificationPayloadFallsBackToNewsIdentifierWhenDeepLinkIsInvalid() {
+        let payload: [AnyHashable: Any] = [
+            "deep_link": "not a valid url",
+            "news_id": "story-987",
+            "region": "us"
+        ]
+
+        let deepLink = DeepLinkService.parseNotificationPayload(payload)
+
+        #expect(deepLink == .init(newsId: "story-987", region: .us))
     }
 
     @Test("Rejects unsupported host")
     func rejectsUnsupportedHost() {
         let url = URL(string: "https://example.com/us/news/story-456")!
 
-        let deepLinkData = DeepLinkService.parseDeepLink(url)
+        let deepLink = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == nil)
+        #expect(deepLink == nil)
     }
 
-    @Test("Rejects unsupported path")
-    func rejectsUnsupportedPath() {
+    @Test("Rejects unsupported path shape")
+    func rejectsUnsupportedPathShape() {
         let url = URL(string: "https://share.getfacts.app/us/news/story-456/extra")!
 
-        let deepLinkData = DeepLinkService.parseDeepLink(url)
+        let deepLink = DeepLinkService.parseDeepLink(url)
 
-        #expect(deepLinkData == nil)
+        #expect(deepLink == nil)
+    }
+
+    @Test("Rejects empty custom-scheme identifier")
+    func rejectsEmptyCustomSchemeIdentifier() {
+        let url = URL(string: "neutralnews://")!
+
+        let deepLink = DeepLinkService.parseDeepLink(url)
+
+        #expect(deepLink == nil)
     }
 
     @Test("Generates Spain share URL without country prefix")
