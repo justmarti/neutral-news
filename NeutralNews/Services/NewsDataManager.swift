@@ -51,6 +51,64 @@ private final class RegularNewsLoadCoordinator {
     }
 }
 
+private actor DayLoadGate {
+    struct Handle: Sendable {
+        let token: UUID
+        let task: Task<Void, Never>
+        let isNew: Bool
+    }
+
+    private var loadedDays: Set<Date> = []
+    private var tasksByDay: [Date: (token: UUID, task: Task<Void, Never>)] = [:]
+
+    func handleForLoad(
+        for date: Date,
+        forceRefresh: Bool,
+        createTask: @Sendable () -> Task<Void, Never>
+    ) -> Handle? {
+        if !forceRefresh {
+            if loadedDays.contains(date) {
+                return nil
+            }
+
+            if let existing = tasksByDay[date] {
+                return Handle(token: existing.token, task: existing.task, isNew: false)
+            }
+        }
+
+        if forceRefresh {
+            loadedDays.remove(date)
+            tasksByDay[date]?.task.cancel()
+        }
+
+        let token = UUID()
+        let task = createTask()
+        tasksByDay[date] = (token, task)
+        return Handle(token: token, task: task, isNew: true)
+    }
+
+    func clearIfCurrent(for date: Date, token: UUID) {
+        guard tasksByDay[date]?.token == token else { return }
+        tasksByDay.removeValue(forKey: date)
+    }
+
+    func markLoaded(_ date: Date) {
+        loadedDays.insert(date)
+    }
+
+    func removeLoadedDates(_ dates: [Date]) {
+        for date in dates {
+            loadedDays.remove(date)
+        }
+    }
+
+    func reset() {
+        tasksByDay.values.forEach { $0.task.cancel() }
+        tasksByDay.removeAll()
+        loadedDays.removeAll()
+    }
+}
+
 @Observable
 final class NewsDataManager {
     static let shared = NewsDataManager()
@@ -71,20 +129,13 @@ final class NewsDataManager {
     // MARK: - Optimized News by Day Storage
     private(set) var newsByDay: [Date: Set<NeutralNews>] = [:]
     
-    // MARK: - Optimized Cache Management
-    private var loadedDays: Set<Date> = Set<Date>()
-    
-    // Helper functions to avoid bridging issues with Date in Set and Dictionary operations
+    // Helper functions to avoid bridging issues with Date in dictionary operations
     private func isDateLoaded(_ date: Date) -> Bool {
-        return (loadedDays as Set<Date>).contains(date)
+        newsByDay[date] != nil
     }
     
     private func markDateAsLoaded(_ date: Date) {
-        loadedDays.insert(date)
-    }
-    
-    private func removeDateFromLoaded(_ date: Date) {
-        loadedDays.remove(date)
+        ensureNewsSetExists(for: date)
     }
     
     private func removeNewsForDate(_ date: Date) {
@@ -112,6 +163,7 @@ final class NewsDataManager {
     
     // MARK: - Background Loading
     private var backgroundLoadingTask: Task<Void, Never>?
+    private let dayLoadGate = DayLoadGate()
     private let regularNewsLoadCoordinator = RegularNewsLoadCoordinator()
     
     // MARK: - Computed Properties
@@ -127,6 +179,9 @@ final class NewsDataManager {
         backgroundLoadingTask?.cancel()
         Task { @MainActor [regularNewsLoadCoordinator] in
             regularNewsLoadCoordinator.cancelAll()
+        }
+        Task { [dayLoadGate] in
+            await dayLoadGate.reset()
         }
     }
     
@@ -148,15 +203,51 @@ final class NewsDataManager {
     func loadNews(for day: DayInfo, forceRefresh: Bool = false) async {
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: day.date)
+
+        guard !isDateLoaded(startOfDay) || forceRefresh else { return }
+
         let dayDate = day.date
         let dayName = day.dayName
+
+        let handle = await dayLoadGate.handleForLoad(
+            for: startOfDay,
+            forceRefresh: forceRefresh,
+            createTask: { [weak self] in
+                Task { [weak self] in
+                    guard let self else { return }
+                    await self.performLoadNews(
+                        for: day,
+                        startOfDay: startOfDay,
+                        dayDate: dayDate,
+                        dayName: dayName,
+                        forceRefresh: forceRefresh
+                    )
+                }
+            }
+        )
+
+        guard let handle else {
+            return
+        }
+
+        await handle.task.value
+
+        if handle.isNew {
+            await dayLoadGate.clearIfCurrent(for: startOfDay, token: handle.token)
+        }
+    }
+
+    private func performLoadNews(
+        for day: DayInfo,
+        startOfDay: Date,
+        dayDate: Date,
+        dayName: String,
+        forceRefresh: Bool
+    ) async {
         let sessionID = await MainActor.run {
             self.regularNewsLoadCoordinator.currentSessionID()
         }
-        
-        // Skip if already loaded unless forced refresh
-        guard !isDateLoaded(startOfDay) || forceRefresh else { return }
-        
+
         // Step 1: Try cache first (unless force refresh)
         if !forceRefresh && cacheService.isCacheValid(for: day) {
 #if DEBUG
@@ -174,6 +265,7 @@ final class NewsDataManager {
                 )
                 self.markDateAsLoaded(startOfDay)
             }
+            await dayLoadGate.markLoaded(startOfDay)
             return
         }
         
@@ -209,6 +301,7 @@ final class NewsDataManager {
                 }
 
                 if shouldCache {
+                    await dayLoadGate.markLoaded(startOfDay)
                     let dayInfo = DayInfo(date: dayDate)
                     Task(priority: .utility) { [cacheService] in
                         cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
@@ -236,6 +329,7 @@ final class NewsDataManager {
                         )
                         self.markDateAsLoaded(startOfDay)
                     }
+                    await dayLoadGate.markLoaded(startOfDay)
                 }
             }
             return
@@ -262,6 +356,7 @@ final class NewsDataManager {
             }
 
             if shouldCache {
+                await dayLoadGate.markLoaded(startOfDay)
                 let dayInfo = DayInfo(date: dayDate)
                 Task(priority: .utility) { [cacheService] in
                     cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
@@ -287,6 +382,7 @@ final class NewsDataManager {
                     )
                     self.markDateAsLoaded(startOfDay)
                 }
+                await dayLoadGate.markLoaded(startOfDay)
             }
         }
 
@@ -367,13 +463,13 @@ final class NewsDataManager {
     ///
     /// Clears all cached news to avoid mixing regions.
     func resetForRegionChange() async {
+        await dayLoadGate.reset()
         await cacheService.clearAllCache()
         await MainActor.run {
             self.regularNewsLoadCoordinator.invalidateSession()
             allNews = []
             neutralNews = []
             newsByDay = [:]
-            loadedDays = Set<Date>()
         }
     }
 
@@ -421,7 +517,7 @@ final class NewsDataManager {
     ///   - `memory`: Number of days currently loaded in memory
     ///   - `persistent`: Tuple with counts of cached neutral news and regular news in SwiftData
     func getCacheStats() -> (memory: Int, persistent: (neutralNews: Int, news: Int)) {
-        let memoryCount = loadedDays.count
+        let memoryCount = newsByDay.count
         let persistentStats = cacheService.getCacheStats()
         return (memory: memoryCount, persistent: persistentStats)
     }
@@ -589,7 +685,10 @@ final class NewsDataManager {
         
         oldDates.forEach { date in
             removeNewsForDate(date)
-            removeDateFromLoaded(date)
+        }
+
+        Task { [dayLoadGate] in
+            await dayLoadGate.removeLoadedDates(oldDates)
         }
         
         // Also clean old news from arrays

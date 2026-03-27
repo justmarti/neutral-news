@@ -8,10 +8,25 @@
 import Foundation
 import SwiftData
 
+private actor CacheCleanupGate {
+    private var isRunning = false
+
+    func reserve() -> Bool {
+        guard !isRunning else { return false }
+        isRunning = true
+        return true
+    }
+
+    func clear() {
+        isRunning = false
+    }
+}
+
 final class CacheService {
     static let shared = CacheService()
 
     private var modelContainer: ModelContainer
+    private let cleanupGate = CacheCleanupGate()
     private static let lastCleanupKey = "CacheService.lastCleanupDate"
 
     // TTL Configuration (more aggressive for better performance)
@@ -71,20 +86,9 @@ final class CacheService {
             }
         }
 
-#if DEBUG
-        print("🧹 Starting cache cleanup...")
-#endif
-
-        // Perform cleanup in background to avoid blocking UI
-        Task.detached(priority: .utility) { [weak self] in
-            await self?.cleanExpiredCache()
-
-            await MainActor.run { [weak self] in
-                self?.lastCleanupDate = now
-#if DEBUG
-                print("✅ Cache cleanup completed")
-#endif
-            }
+        Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+            await self.runCleanupIfNeeded(startedAt: now)
         }
     }
     
@@ -420,6 +424,22 @@ final class CacheService {
         } catch {
             print("Error saving cache context: \(error)")
         }
+    }
+
+    private func runCleanupIfNeeded(startedAt date: Date) async {
+        guard await cleanupGate.reserve() else { return }
+
+#if DEBUG
+        print("🧹 Starting cache cleanup...")
+#endif
+
+        await cleanExpiredCache()
+        lastCleanupDate = date
+        await cleanupGate.clear()
+
+#if DEBUG
+        print("✅ Cache cleanup completed")
+#endif
     }
     
     // MARK: - Debug Methods
