@@ -8,12 +8,34 @@
 import Foundation
 import SwiftUI
 
-final class ImageService: @unchecked Sendable {
+private actor DominantColorCache {
+    struct Components: Sendable {
+        let red: Double
+        let green: Double
+        let blue: Double
+
+        var color: Color {
+            Color(red: red, green: green, blue: blue)
+        }
+    }
+
+    private var storage: [String: Components] = [:]
+
+    func color(for key: String) -> Components? {
+        storage[key]
+    }
+
+    func set(_ color: Components, for key: String) {
+        storage[key] = color
+    }
+}
+
+final class ImageService {
     static let shared = ImageService()
     private static let dominantColorDownsamplePixelSize: Double = 128
     
-    private var colorCache = [String: Color]()
-    private let cacheQueue = DispatchQueue(label: "imageservice.cache", qos: .utility)
+    private let colorCache = DominantColorCache()
+    private let processingQueue = DispatchQueue(label: "imageservice.processing", qos: .utility)
     private let urlSession: URLSession
     
     private init() {
@@ -22,73 +44,67 @@ final class ImageService: @unchecked Sendable {
         self.urlSession = URLSession(configuration: configuration)
     }
     
-    @MainActor
     func getDominantColor(from urlString: String?) async -> Color {
         guard let urlString = urlString else { return .nnBackground }
         
-        let cachedColor = await getCachedColor(for: urlString)
-        if let cached = cachedColor {
-            return cached
+        if let cachedColor = await colorCache.color(for: urlString) {
+            return cachedColor.color
         }
         
         if let cachedImageColor = await extractColorFromCachedImage(urlString: urlString) {
-            await setCachedColor(cachedImageColor, for: urlString)
-            return cachedImageColor
+            await colorCache.set(cachedImageColor, for: urlString)
+            return cachedImageColor.color
         }
         
         guard let url = URL(string: urlString) else { return .nnBackground }
         
         do {
             let (data, _) = try await urlSession.data(from: url)
-            guard let image = data.downsampledImage(maxPixelSize: Self.dominantColorDownsamplePixelSize),
-                  let cgImage = image.cgImage else { return .nnBackground }
+            guard let color = await extractColorComponents(from: data) else { return .nnBackground }
 
-            let color = extractDominantColor(from: cgImage)
-            await setCachedColor(color, for: urlString)
-            return color
+            await colorCache.set(color, for: urlString)
+            return color.color
         } catch {
             return .nnBackground
         }
     }
     
-    private func extractColorFromCachedImage(urlString: String) async -> Color? {
+    private func extractColorFromCachedImage(urlString: String) async -> DominantColorCache.Components? {
         guard let url = URL(string: urlString) else { return nil }
 
         let request = URLRequest(url: url)
-        if let cachedResponse = CachedAsyncImageHelper.urlSession.configuration.urlCache?.cachedResponse(for: request),
-           let image = cachedResponse.data.downsampledImage(maxPixelSize: Self.dominantColorDownsamplePixelSize),
-           let cgImage = image.cgImage {
-            return extractDominantColor(from: cgImage)
+        if let cachedResponse = CachedAsyncImageHelper.urlSession.configuration.urlCache?.cachedResponse(for: request) {
+            return await extractColorComponents(from: cachedResponse.data)
         }
 
         return nil
     }
     
-    private func getCachedColor(for urlString: String) async -> Color? {
-        return await withCheckedContinuation { continuation in
-            cacheQueue.async {
-                continuation.resume(returning: self.colorCache[urlString])
-            }
-        }
-    }
-    
-    private func setCachedColor(_ color: Color, for urlString: String) async {
+    private func extractColorComponents(from data: Data) async -> DominantColorCache.Components? {
         await withCheckedContinuation { continuation in
-            cacheQueue.async {
-                self.colorCache[urlString] = color
-                continuation.resume()
+            processingQueue.async {
+                continuation.resume(returning: Self.processDominantColor(from: data))
             }
         }
     }
     
-    private func extractDominantColor(from cgImage: CGImage) -> Color {
+    private static func processDominantColor(from data: Data) -> DominantColorCache.Components? {
+        guard let image = data.downsampledImage(maxPixelSize: Self.dominantColorDownsamplePixelSize),
+              let cgImage = image.cgImage else {
+            return nil
+        }
+
+        return extractDominantColor(from: cgImage)
+    }
+
+    private static func extractDominantColor(from cgImage: CGImage) -> DominantColorCache.Components? {
         let originalWidth = cgImage.width
         let originalHeight = cgImage.height
         
         let width = min(10, originalWidth)
         let height = min(10, originalHeight)
         
-        guard width > 0, height > 0 else { return .nnBackground }
+        guard width > 0, height > 0 else { return nil }
         
         guard let context = CGContext(
             data: nil,
@@ -99,12 +115,12 @@ final class ImageService: @unchecked Sendable {
             space: CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else {
-            return .nnBackground
+            return nil
         }
         
         context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
         
-        guard let data = context.data else { return .nnBackground }
+        guard let data = context.data else { return nil }
         
         var r = 0, g = 0, b = 0
         let pixelCount = width * height
@@ -115,7 +131,7 @@ final class ImageService: @unchecked Sendable {
             b += Int(data.load(fromByteOffset: i + 2, as: UInt8.self))
         }
         
-        return Color(
+        return DominantColorCache.Components(
             red: Double(r) / Double(255 * pixelCount),
             green: Double(g) / Double(255 * pixelCount),
             blue: Double(b) / Double(255 * pixelCount)
