@@ -107,6 +107,7 @@ struct NeutralNewsView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NeutralNewsOptionsMenu(
                         news: news,
+                        relatedNews: relatedNews,
                         isShowingReportProblemSheet: $isShowingReportProblemSheet
                     )
                 }

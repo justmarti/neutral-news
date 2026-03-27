@@ -435,7 +435,7 @@ private struct HomeNewsCard: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            let saved = vm.isShowingSavedNews ? true : savedNewsState.isSaved(news.id)
+            let saved = currentSavedStatus
             Button {
                 handleSaveAction()
             } label: {
@@ -486,7 +486,7 @@ private struct HomeNewsCard: View {
 
     private func toggleSave() async {
         let context = vm.coreDataContext
-        let currentlySaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: context)
+        let currentlySaved = currentSavedStatus
         do {
             if currentlySaved {
                 let unsaveRegionRaw = vm.isShowingSavedNews ? vm.savedRegionRaw(for: news.id) : nil
@@ -518,5 +518,10 @@ private struct HomeNewsCard: View {
         await MainActor.run {
             savedNewsState.setSaved(isSaved, for: news.id)
         }
+    }
+
+    private var currentSavedStatus: Bool {
+        let regionRaw = vm.isShowingSavedNews ? vm.savedRegionRaw(for: news.id) : nil
+        return savedNewsState.isSaved(news.id, regionRaw: regionRaw)
     }
 }

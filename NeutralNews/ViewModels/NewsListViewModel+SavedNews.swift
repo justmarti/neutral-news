@@ -123,6 +123,31 @@ extension NewsListViewModel {
         savedRegionByNewsId.removeValue(forKey: newsId)
     }
 
+    func restoreSavedNews(_ news: NeutralNews, relatedNews: [News], regionRaw: String) {
+        if let existingIndex = savedNews.firstIndex(where: { $0.id == news.id }) {
+            savedNews[existingIndex] = news
+        } else {
+            savedNews.append(news)
+        }
+
+        savedRelatedNewsByNeutralId[news.id] = relatedNews
+        savedRegionByNewsId[news.id] = regionRaw
+
+        let activeRegionRaw = ContentRegionProvider().currentRegion.rawValue
+        savedNews.sort { lhs, rhs in
+            let lhsRegionRaw = savedRegionByNewsId[lhs.id] ?? activeRegionRaw
+            let rhsRegionRaw = savedRegionByNewsId[rhs.id] ?? activeRegionRaw
+            let lhsIsActiveRegion = lhsRegionRaw == activeRegionRaw
+            let rhsIsActiveRegion = rhsRegionRaw == activeRegionRaw
+
+            if lhsIsActiveRegion != rhsIsActiveRegion {
+                return lhsIsActiveRegion
+            }
+
+            return lhs.date > rhs.date
+        }
+    }
+
     func savedRegionRaw(for newsId: String) -> String? {
         savedRegionByNewsId[newsId]
     }

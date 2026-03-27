@@ -9,11 +9,13 @@ import SwiftUI
 
 struct NeutralNewsOptionsMenu: View {
     let news: NeutralNews
+    let relatedNews: [News]
     @Binding var isShowingReportProblemSheet: Bool
 
     private let premiumManager = PremiumManager.shared
     @State private var savedNewsState = SavedNewsState.shared
     @State private var saveFeedbackTrigger = 0
+    @State private var savedRegionRawSnapshot: String?
 
     var body: some View {
         Menu {
@@ -30,7 +32,7 @@ struct NeutralNewsOptionsMenu: View {
                     }
                 }
             } label: {
-                let saved = NewsListViewModel.shared.isShowingSavedNews ? true : savedNewsState.isSaved(news.id)
+                let saved = currentSavedStatus
                 Label(
                     saved ? "Saved" : "Save",
                     systemImage: !premiumManager.canSaveNews
@@ -59,6 +61,10 @@ struct NeutralNewsOptionsMenu: View {
     }
 
     private func ensureSavedStatusLoadedIfNeeded() async {
+        if savedRegionRawSnapshot == nil {
+            savedRegionRawSnapshot = NewsListViewModel.shared.savedRegionRaw(for: news.id)
+        }
+
         guard !NewsListViewModel.shared.isShowingSavedNews else { return }
         guard !savedNewsState.hasStatus(for: news.id) else { return }
 
@@ -74,16 +80,14 @@ struct NeutralNewsOptionsMenu: View {
         print("🔄 Attempting to save article: \(news.id)")
 #endif
         do {
-            let currentlySaved = NewsListViewModel.shared.isShowingSavedNews
-                ? true
-                : savedNewsState.isSaved(news.id)
+            let currentlySaved = currentSavedStatus
 
             if currentlySaved {
 #if DEBUG
                 print("🗑️ Unsaving article...")
 #endif
                 let unsaveRegionRaw = NewsListViewModel.shared.isShowingSavedNews
-                    ? NewsListViewModel.shared.savedRegionRaw(for: news.id)
+                    ? currentSavedRegionRaw
                     : nil
                 try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context, regionRaw: unsaveRegionRaw)
                 await MainActor.run {
@@ -101,9 +105,20 @@ struct NeutralNewsOptionsMenu: View {
 #if DEBUG
                 print("💾 Saving article...")
 #endif
-                try SavedNewsService.shared.saveNews(news, context: context)
+                let savedRegionRaw = currentSavedRegionRaw ?? ContentRegionProvider().currentRegion.rawValue
+                try SavedNewsService.shared.saveNews(news, context: context, regionRaw: savedRegionRaw)
                 await MainActor.run {
-                    savedNewsState.setSaved(true, for: news.id)
+                    savedNewsState.setSaved(true, for: news.id, regionRaw: savedRegionRaw)
+                    savedRegionRawSnapshot = savedRegionRaw
+
+                    if NewsListViewModel.shared.isShowingSavedNews {
+                        NewsListViewModel.shared.restoreSavedNews(
+                            news,
+                            relatedNews: relatedNews,
+                            regionRaw: savedRegionRaw
+                        )
+                    }
+
                     saveFeedbackTrigger &+= 1
                 }
 #if DEBUG
@@ -117,5 +132,19 @@ struct NeutralNewsOptionsMenu: View {
     
     private func generateShareURL() -> URL {
         return DeepLinkService.generateShareURL(for: news)
+    }
+
+    private var currentSavedStatus: Bool {
+        let regionRaw = currentSavedRegionRaw
+        return savedNewsState.isSaved(news.id, regionRaw: regionRaw)
+    }
+
+    private var currentSavedRegionRaw: String? {
+        let vm = NewsListViewModel.shared
+        if vm.isShowingSavedNews {
+            return vm.savedRegionRaw(for: news.id) ?? savedRegionRawSnapshot
+        }
+
+        return savedRegionRawSnapshot
     }
 }

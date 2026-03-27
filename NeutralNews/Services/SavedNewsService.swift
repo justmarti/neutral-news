@@ -334,7 +334,7 @@ final class SavedNewsService {
         prepareStoreIfNeeded(coreDataContext: coreDataContext)
     }
 
-    func saveNews(_ news: Any, context: NSManagedObjectContext? = nil) throws {
+    func saveNews(_ news: Any, context: NSManagedObjectContext? = nil, regionRaw: String? = nil) throws {
         prepareStoreIfNeeded(coreDataContext: context)
 #if DEBUG
         print("🔄 SavedNewsService.saveNews called")
@@ -357,7 +357,7 @@ final class SavedNewsService {
             throw SavedNewsError.invalidNewsType
         }
 
-        let activeRegionRaw = currentRegionRaw()
+        let activeRegionRaw = regionRaw ?? currentRegionRaw()
         let activeStorageKey = SavedNewsItem.storageKey(newsId: newsId, regionRaw: activeRegionRaw)
         let legacyStorageKey = SavedNewsItem.storageKey(newsId: newsId, regionRaw: legacyRegionRaw())
         let modelContext = createContext()
