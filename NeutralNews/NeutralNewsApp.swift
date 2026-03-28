@@ -78,6 +78,7 @@ struct NeutralNewsApp: App {
                 .onAppear {
                     // Inject Core Data context
                     NewsListViewModel.shared.coreDataContext = CoreDataManager.shared.viewContext
+                    SavedNewsService.shared.prewarmStore()
                     config.startFetching()
 
                     // Perform cache cleanup if needed (runs in background)
@@ -90,6 +91,7 @@ struct NeutralNewsApp: App {
 
                     // Also cleanup when app returns from background
                     CacheService.shared.cleanExpiredCacheIfNeeded()
+                    SavedNewsService.shared.prewarmStore()
 
                     // Refresh subscription state and capture external redemptions
                     // without forcing a user-facing restore flow.
