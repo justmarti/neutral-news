@@ -32,6 +32,62 @@ struct FirestoreServiceTests {
         #expect(news?.group == 42)
     }
 
+    @Test("Decodes story focus point metadata when present")
+    func decodesNeutralNewsStoryFocusPointMetadata() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let payload: [String: Any] = [
+            "neutral_title": "Neutral title",
+            "neutral_description": "Neutral description",
+            "category_id": "technology",
+            "relevance": 8,
+            "image_url": "https://example.com/image.jpg",
+            "image_medium": "Example",
+            "story_focus_point": [
+                "x": 0.62,
+                "y": 0.44,
+            ],
+            "date": Timestamp(date: now),
+            "created_at": Timestamp(date: now),
+            "updated_at": Timestamp(date: now),
+            "group": 42,
+            "source_ids": ["source-1", "source-2"]
+        ]
+
+        let news = FirestoreService.decodeNeutralNews(from: payload, documentID: "neutral-1")
+
+        #expect(news?.storyFocusPoint?.x == 0.62)
+        #expect(news?.storyFocusPoint?.y == 0.44)
+    }
+
+    @Test("Falls back to legacy story crop metadata when focus point is absent")
+    func decodesNeutralNewsLegacyStoryCropAsFocusPoint() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let payload: [String: Any] = [
+            "neutral_title": "Neutral title",
+            "neutral_description": "Neutral description",
+            "category_id": "technology",
+            "relevance": 8,
+            "image_url": "https://example.com/image.jpg",
+            "image_medium": "Example",
+            "story_crop": [
+                "x": 0.1,
+                "y": 0.1,
+                "width": 0.5,
+                "height": 0.7,
+            ],
+            "date": Timestamp(date: now),
+            "created_at": Timestamp(date: now),
+            "updated_at": Timestamp(date: now),
+            "group": 42,
+            "source_ids": ["source-1", "source-2"]
+        ]
+
+        let news = FirestoreService.decodeNeutralNews(from: payload, documentID: "neutral-1")
+
+        #expect(news?.storyFocusPoint?.x == 0.35)
+        #expect(news?.storyFocusPoint?.y == 0.45)
+    }
+
     @Test("Decodes neutral news category from legacy fallback field")
     func decodesNeutralNewsCategoryFallback() {
         let now = Date(timeIntervalSince1970: 1_700_000_000)

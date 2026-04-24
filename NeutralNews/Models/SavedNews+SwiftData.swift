@@ -227,7 +227,8 @@ final class SavedNewsItem {
             createdAt: originalCreatedAt,
             updatedAt: originalUpdatedAt,
             group: group,
-            sourceIds: sourceIds
+            sourceIds: sourceIds,
+            storyFocusPoint: nil
         )
     }
 

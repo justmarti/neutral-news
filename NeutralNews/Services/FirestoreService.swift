@@ -158,6 +158,9 @@ final class FirestoreService {
               let group = data["group"] as? Int,
               let sourceIds = data["source_ids"] as? [String]
         else { return nil }
+
+        let storyFocusPoint = decodeStoryFocusPoint(from: data["story_focus_point"])
+            ?? decodeStoryCrop(from: data["story_crop"])?.focusPoint
         
         return NeutralNews(
             id: documentID,
@@ -171,7 +174,8 @@ final class FirestoreService {
             createdAt: createdAt.dateValue(),
             updatedAt: updatedAt.dateValue(),
             group: group,
-            sourceIds: sourceIds
+            sourceIds: sourceIds,
+            storyFocusPoint: storyFocusPoint
         )
     }
     
@@ -208,6 +212,55 @@ final class FirestoreService {
             group: group,
             embedding: embedding
         )
+    }
+
+    private static func decodeStoryCrop(from value: Any?) -> StoryCrop? {
+        guard let dictionary = value as? [String: Any],
+              let x = decodeDouble(from: dictionary["x"]),
+              let y = decodeDouble(from: dictionary["y"]),
+              let width = decodeDouble(from: dictionary["width"]),
+              let height = decodeDouble(from: dictionary["height"]) else {
+            return nil
+        }
+
+        guard x >= 0, y >= 0, width > 0, height > 0,
+              x + width <= 1,
+              y + height <= 1 else {
+            return nil
+        }
+
+        let storyRatio = 5.0 / 7.0
+        guard abs((width / height) - storyRatio) <= 0.06 else {
+            return nil
+        }
+
+        return StoryCrop(x: x, y: y, width: width, height: height)
+    }
+
+    private static func decodeStoryFocusPoint(from value: Any?) -> StoryFocusPoint? {
+        guard let dictionary = value as? [String: Any],
+              let x = decodeDouble(from: dictionary["x"]),
+              let y = decodeDouble(from: dictionary["y"]) else {
+            return nil
+        }
+
+        guard x >= 0, x <= 1, y >= 0, y <= 1 else {
+            return nil
+        }
+
+        return StoryFocusPoint(x: x, y: y)
+    }
+
+    private static func decodeDouble(from value: Any?) -> Double? {
+        if let number = value as? Double {
+            return number
+        }
+
+        if let number = value as? NSNumber {
+            return number.doubleValue
+        }
+
+        return nil
     }
 }
 

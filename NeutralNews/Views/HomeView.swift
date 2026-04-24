@@ -6,18 +6,58 @@
 //
 
 import SwiftUI
-import UIKit
+
+struct StoryCollection: Identifiable, Hashable {
+    let coverNews: NeutralNews
+    let items: [NeutralNews]
+
+    let id = "briefing"
+}
+
+struct StoryArticleNavigationTarget: Identifiable, Hashable {
+    let news: NeutralNews
+    let relatedNews: [News]
+    let region: ContentRegion?
+
+    var id: String { news.id }
+}
+
+enum StoryCollectionBuilder {
+    static func buildBriefingCollection(dayNews: [NeutralNews]) -> StoryCollection? {
+        guard !dayNews.isEmpty else { return nil }
+        let briefingItems = Array(dayNews.sorted { $0.relevance > $1.relevance }.prefix(6))
+
+        guard let coverNews = briefingItems.first else {
+            return nil
+        }
+
+        return StoryCollection(
+            coverNews: coverNews,
+            items: briefingItems
+        )
+    }
+}
 
 struct HomeView: View {
     @State private var vm = NewsListViewModel.shared
     @State private var newsDataManager = NewsDataManager.shared
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
+    @AppStorage("viewedStoryCollectionKeys") private var viewedStoryCollectionKeysStorage = ""
     @State private var targetNews: NewsListViewModel.DeepLinkNavigationTarget?
+    @State private var storyArticleTarget: StoryArticleNavigationTarget?
+    @State private var isStoryOverlayHiddenForArticle = false
     @State private var showingPaywall = false
     @State private var showingSettingsSheet = false
+    @State private var storyPresentation: StoryCollection?
+    @State private var storyInitialNewsID: String?
+    @State private var isStoryArticleExpanded = false
+    @State private var currentStoryOverlayNews: NeutralNews?
+    @State private var currentStoryOverlayRelatedNews: [News] = []
+    @State private var currentStoryOverlayRegion: ContentRegion?
     @State private var savedNewsState = SavedNewsState.shared
     private let pushNotificationService = PushNotificationService.shared
 
@@ -60,134 +100,192 @@ struct HomeView: View {
         )
     }
 
+    private var isShowingPrimaryDayHome: Bool {
+        Calendar.current.isDateInToday(vm.daySelected.date)
+            && !vm.isShowingSavedNews
+            && !vm.isShowingAllDays
+            && vm.searchText.isEmpty
+            && vm.searchScope == .daySelected
+            && !vm.isAnyFilterEnabled
+    }
+
+    private var briefingCollection: StoryCollection? {
+        guard isShowingPrimaryDayHome else { return nil }
+
+        let dayNews = newsDataManager.getNewsArrayForDay(vm.daySelected)
+
+        return StoryCollectionBuilder.buildBriefingCollection(dayNews: dayNews)
+    }
+
     var body: some View {
         let relatedNewsRefreshToken = newsDataManager.allNews.count
 
-        Group {
-            if config.isInMaintenance {
-                MaintenanceView(config: config)
-            } else {
-                NavigationStack {
-                    newsContentView
-                        .navigationTitle(navigationTitleText)
-                        // TODO: Mirar que opción es mejor para el title
-//                        .toolbarTitleDisplayMode(.inlineLarge)
-                        .myNavigationSubtitle(navigationSubtitleText)
-                        .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Search")
-                        .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
-                            if !vm.isShowingAllDays && !vm.isShowingSavedNews {
-                                Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
-                                Text("Last 7 days").tag(SearchScope.lastSevenDays)
+        ZStack {
+            Group {
+                if config.isInMaintenance {
+                    MaintenanceView(config: config)
+                } else {
+                    NavigationStack {
+                        navigationContent(relatedNewsRefreshToken: relatedNewsRefreshToken)
+                    }
+                    .allowsHitTesting(storyPresentation == nil || isStoryOverlayHiddenForArticle)
+                    .fullScreenCover(isPresented: onboardingPresentation) {
+                        OnboardingView(onComplete: handleOnboardingCompletion)
+                    }
+                    .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
+                        if let target = newValue {
+#if DEBUG
+                            print("🎯 View received target news: \(target.news.neutralTitle)")
+#endif
+                            targetNews = target
+
+                            Task {
+                                try? await Task.sleep(nanoseconds: 100_000_000)
+                                vm.deepLinkTargetNews = nil
                             }
                         }
-                        .toolbar {
-                            HomeToolbar(
-                                vm: vm,
-                                showingSettings: $showingSettingsSheet,
-                            ).content
+                    }
+                    .onAppear {
+                        vm.checkPendingDeepLink()
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
+                        guard let deepLink = notification.userInfo?[PushNotificationService.deepLinkUserInfoKey] as? DeepLinkService.DeepLinkData else {
+                            return
                         }
-                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
-                        .animation(.default, value: vm.isShowingSavedNews)
-                        .animation(.default, value: relatedNewsRefreshToken)
-                        .navigationDestination(item: $targetNews) { target in
-                            NeutralNewsView(
-                                news: target.news,
-                                relatedNews: target.relatedNews,
-                                region: target.region,
-                                namespace: animationNamespace
-                            )
-                                .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
-                                .onAppear {
-                                    RatingManager.shared.incrementNewsReadCount()
-                                    RatingManager.shared.requestRatingAfterPositiveInteraction()
 
-                                    if hasSeenOnboarding {
-                                        pushNotificationService.handleOpenedArticle()
-                                    }
-                                }
-                        }
-                        .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
-                }
-                .fullScreenCover(isPresented: onboardingPresentation) {
-                    OnboardingView(onComplete: handleOnboardingCompletion)
-                }
-                .onChange(of: vm.deepLinkTargetNews) { oldValue, newValue in
-                    if let target = newValue {
-#if DEBUG
-                        print("🎯 View received target news: \(target.news.neutralTitle)")
-#endif
-                        targetNews = target
-                        
-                        // Retrasar limpieza para asegurar navegación
+                        vm.isLoadingNeutralNews = true
+                        vm.handleDeepLink(deepLink)
+                    }
+                    .onChange(of: scenePhase) { oldValue, newValue in
+                        guard oldValue == .background, newValue == .active else { return }
                         Task {
-                            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1s
-                            vm.deepLinkTargetNews = nil
+                            if vm.isShowingSavedNews {
+                                await vm.loadSavedNews()
+                            } else {
+                                await vm.preloadTodayOnResume()
+                            }
                         }
                     }
-                }
-                .onAppear {
-                    vm.checkPendingDeepLink()
-                }
-                .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
-                    guard let deepLink = notification.userInfo?[PushNotificationService.deepLinkUserInfoKey] as? DeepLinkService.DeepLinkData else {
-                        return
+                    .onChange(of: premiumManager.paywallPresentationToken) { _, _ in
+                        showingPaywall = true
                     }
+                    .onChange(of: storyArticleTarget) { _, newValue in
+                        if newValue == nil {
+                            isStoryOverlayHiddenForArticle = false
+                        }
+                    }
+                    .sheet(isPresented: $showingPaywall) {
+                        PaywallView(isPresented: $showingPaywall)
+                    }
+                    .sheet(isPresented: $showingSettingsSheet) {
+                        SettingsView(
+                            vm: vm,
+                            systemColorScheme: colorScheme,
+                        )
+                    }
+                }
+            }
 
-                    vm.isLoadingNeutralNews = true
-                    vm.handleDeepLink(deepLink)
-                }
-                .onChange(of: scenePhase) { oldValue, newValue in
-                    guard oldValue == .background, newValue == .active else { return }
-                    Task {
-                        if vm.isShowingSavedNews {
-                            await vm.loadSavedNews()
-                        } else {
-                            await vm.preloadTodayOnResume()
-                        }
-                    }
-                }
-                .onChange(of: premiumManager.paywallPresentationToken) { _, _ in
-                    showingPaywall = true
-                }
-                .sheet(isPresented: $showingPaywall) {
-                    PaywallView(isPresented: $showingPaywall)
-                }
-                .sheet(isPresented: $showingSettingsSheet) {
-                    SettingsView(
-                        vm: vm,
-                        systemColorScheme: colorScheme,
-                    )
-                }
+            if let story = storyPresentation, !isStoryOverlayHiddenForArticle {
+                storyReaderView(for: story)
+                    .zIndex(1)
             }
         }
         .animation(.default, value: config.isInMaintenance)
     }
     
     // MARK: - Content Views
+
+    @ViewBuilder
+    private func navigationContent(relatedNewsRefreshToken: Int) -> some View {
+        let baseContent = newsContentView
+            .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+            .animation(.default, value: vm.isShowingSavedNews)
+            .animation(.default, value: relatedNewsRefreshToken)
+            .navigationDestination(item: $targetNews) { target in
+                NeutralNewsView(
+                    news: target.news,
+                    relatedNews: target.relatedNews,
+                    region: target.region,
+                    namespace: animationNamespace
+                )
+                    .toolbarVisibility(.visible, for: .navigationBar)
+                    .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                    .onAppear {
+                        RatingManager.shared.incrementNewsReadCount()
+                        RatingManager.shared.requestRatingAfterPositiveInteraction()
+
+                        if hasSeenOnboarding {
+                            pushNotificationService.handleOpenedArticle()
+                        }
+                    }
+            }
+            .navigationDestination(item: $storyArticleTarget) { target in
+                NeutralNewsView(
+                    news: target.news,
+                    relatedNews: target.relatedNews,
+                    region: target.region,
+                    namespace: animationNamespace
+                )
+                    .toolbarVisibility(.visible, for: .navigationBar)
+                    .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+            }
+
+        baseContent
+            .navigationTitle(navigationTitleText)
+            .navigationBarTitleDisplayMode(.large)
+            .myNavigationSubtitle(navigationSubtitleText)
+            .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Search")
+            .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
+                if !vm.isShowingAllDays && !vm.isShowingSavedNews {
+                    Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
+                    Text("Last 7 days").tag(SearchScope.lastSevenDays)
+                }
+            }
+            .toolbar {
+                HomeToolbar(
+                    vm: vm,
+                    showingSettings: $showingSettingsSheet
+                ).content
+            }
+            .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
+    }
     
     private var newsContentView: some View {
         let currentNews = vm.newsToShow
 
-        return ScrollView {
-            contentStateView(newsItems: currentNews)
-        }
-        .refreshable {
-            if vm.isShowingSavedNews {
-                await vm.loadSavedNews()
-            } else {
-                await vm.refreshNews()
+        return GeometryReader { geometry in
+            ScrollView {
+                contentStateView(
+                    newsItems: currentNews,
+                    availableSize: geometry.size
+                )
             }
-        }
-        .overlay {
-            // Hidden child view to access isSearching environment
-            SearchableContentView(vm: vm)
+            .scrollIndicators(.automatic)
+            .scrollBounceBehavior(.basedOnSize)
+            .refreshable {
+                if vm.isShowingSavedNews {
+                    await vm.loadSavedNews()
+                } else {
+                    await vm.refreshNews()
+                }
+            }
+            .overlay {
+                SearchableContentView(vm: vm)
+            }
         }
     }
 
     @ViewBuilder
-    private func contentStateView(newsItems: [NeutralNews]) -> some View {
+    private func contentStateView(
+        newsItems: [NeutralNews],
+        availableSize: CGSize
+    ) -> some View {
         if vm.isShowingSavedNews {
-            savedNewsContentView(newsItems: newsItems)
+            savedNewsContentView(
+                newsItems: newsItems,
+                availableSize: availableSize
+            )
         } else if vm.pendingDeepLink != nil {
             // Show loading while processing deep link
             loadingView
@@ -198,51 +296,73 @@ struct HomeView: View {
         } else if vm.searchText.isEmpty && newsItems.isEmpty && !vm.isLoadingNeutralNews && vm.hasCompletedInitialLaunchLoad {
             noNewsYetView
         } else {
-            newsListView(newsItems: newsItems)
+            newsRendererView(
+                newsItems: newsItems,
+                availableSize: availableSize
+            )
         }
+    }
+
+    @ViewBuilder
+    private func newsRendererView(
+        newsItems: [NeutralNews],
+        availableSize: CGSize
+    ) -> some View {
+        newsListView(newsItems: newsItems)
     }
     
     private func newsListView(newsItems: [NeutralNews]) -> some View {
-        LazyVStack {
-            // Premium search results banner
-            if shouldShowPremiumBanner {
-                premiumSearchBanner
-            }
-
-            // Loading indicator for search across 7 days (free users)
-            if vm.isLoadingForSearch {
-                ProgressView()
-                    .scaleEffect(1.2)
-                    .padding(.vertical)
-            }
-
-            ForEach(newsItems) { neutralNews in
-                HomeNewsCard(
-                    news: neutralNews,
-                    relatedNews: vm.getRelatedNews(from: neutralNews),
-                    namespace: animationNamespace,
-                    isBackgroundColorEnabled: isBackgroundColorEnabled,
-                    vm: vm,
-                    premiumManager: premiumManager,
-                    savedNewsState: savedNewsState
-                )
-            }
-            .animation(.default, value: newsItems)
-            
-            // Loading indicator for pagination
-            if vm.isLoadingMore {
-                HStack {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                    Text("Loading more news...")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            if let briefingCollection {
+                StoryBriefingModuleView(collection: briefingCollection) {
+                    selectedNews in
+                    presentStories(briefingCollection, initialNewsID: selectedNews.id)
                 }
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
+                .padding(.horizontal)
+                .padding(.bottom, 12)
             }
+
+            LazyVStack {
+                // Premium search results banner
+                if shouldShowPremiumBanner {
+                    premiumSearchBanner
+                }
+
+                // Loading indicator for search across 7 days (free users)
+                if vm.isLoadingForSearch {
+                    ProgressView()
+                        .scaleEffect(1.2)
+                        .padding(.vertical)
+                }
+
+                ForEach(newsItems) { neutralNews in
+                    HomeNewsCard(
+                        news: neutralNews,
+                        relatedNews: vm.getRelatedNews(from: neutralNews),
+                        namespace: animationNamespace,
+                        isBackgroundColorEnabled: isBackgroundColorEnabled,
+                        vm: vm,
+                        premiumManager: premiumManager,
+                        savedNewsState: savedNewsState
+                    )
+                }
+                .animation(.default, value: newsItems)
+
+                // Loading indicator for pagination
+                if vm.isLoadingMore {
+                    HStack {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Loading more news...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .padding(.horizontal)
         }
-        .padding(.horizontal)
     }
 
     private var noResultsView: some View {
@@ -280,7 +400,10 @@ struct HomeView: View {
         .containerRelativeFrame([.horizontal, .vertical])
     }
 
-    private func savedNewsContentView(newsItems: [NeutralNews]) -> some View {
+    private func savedNewsContentView(
+        newsItems: [NeutralNews],
+        availableSize: CGSize
+    ) -> some View {
         Group {
             if vm.isLoadingSavedNews {
                 ProgressView("Loading saved news...")
@@ -300,7 +423,10 @@ struct HomeView: View {
                 )
                 .containerRelativeFrame([.horizontal, .vertical])
             } else {
-                newsListView(newsItems: newsItems)
+                newsRendererView(
+                    newsItems: newsItems,
+                    availableSize: availableSize
+                )
             }
         }
     }
@@ -340,6 +466,368 @@ struct HomeView: View {
         pushNotificationService.handleCompletedOnboarding()
         showingPaywall = true
     }
+
+    private func presentStories(_ collection: StoryCollection, initialNewsID: String? = nil) {
+        let presentedCollection = reorderedStoryCollection(from: collection, startingAt: initialNewsID)
+        let initialNews = presentedCollection.coverNews
+
+        storyInitialNewsID = initialNews.id
+        isStoryArticleExpanded = false
+        currentStoryOverlayNews = initialNews
+        currentStoryOverlayRelatedNews = vm.getRelatedNews(from: initialNews)
+        currentStoryOverlayRegion = resolvedRegion(for: initialNews)
+        storyPresentation = presentedCollection
+    }
+
+    private func reorderedStoryCollection(
+        from collection: StoryCollection,
+        startingAt initialNewsID: String?
+    ) -> StoryCollection {
+        guard let initialNewsID,
+              let selectedIndex = collection.items.firstIndex(where: { $0.id == initialNewsID }),
+              selectedIndex > 0 else {
+            return collection
+        }
+
+        let reorderedItems = Array(collection.items[selectedIndex...])
+            + Array(collection.items[..<selectedIndex])
+
+        guard let reorderedCoverNews = reorderedItems.first else {
+            return collection
+        }
+
+        return StoryCollection(
+            coverNews: reorderedCoverNews,
+            items: reorderedItems
+        )
+    }
+
+    private func resetStoryPresentationState() {
+        storyPresentation = nil
+        storyInitialNewsID = nil
+        storyArticleTarget = nil
+        isStoryOverlayHiddenForArticle = false
+        isStoryArticleExpanded = false
+        currentStoryOverlayNews = nil
+        currentStoryOverlayRelatedNews = []
+        currentStoryOverlayRegion = nil
+    }
+
+    private func storyReaderView(for collection: StoryCollection) -> some View {
+        StoryReaderModalView(
+            collection: collection,
+            initialNewsID: currentStoryOverlayNews?.id ?? storyInitialNewsID ?? collection.coverNews.id,
+            accessibilityReduceMotion: accessibilityReduceMotion,
+            currentStoryOverlayNews: $currentStoryOverlayNews,
+            currentStoryOverlayRelatedNews: $currentStoryOverlayRelatedNews,
+            currentStoryOverlayRegion: $currentStoryOverlayRegion,
+            isStoryArticleExpanded: $isStoryArticleExpanded,
+            relatedNewsProvider: { news in
+                vm.getRelatedNews(from: news)
+            },
+            regionProvider: { news in
+                resolvedRegion(for: news)
+            },
+            onDismissCollection: { completed in
+                if completed {
+                    markStoryCollectionAsViewed(collection)
+                }
+            },
+            onOpenArticle: { news, relatedNews, region in
+                openStoryArticle(news, relatedNews: relatedNews, region: region)
+            },
+            onCloseStory: {
+                resetStoryPresentationState()
+            }
+        )
+    }
+
+    private func openStoryArticle(
+        _ news: NeutralNews,
+        relatedNews: [News],
+        region: ContentRegion?
+    ) {
+        storyInitialNewsID = news.id
+        isStoryOverlayHiddenForArticle = true
+        storyArticleTarget = StoryArticleNavigationTarget(
+            news: news,
+            relatedNews: relatedNews,
+            region: region ?? ContentRegionProvider().currentRegion
+        )
+    }
+
+    private var viewedStoryCollectionKeys: Set<String> {
+        Set(
+            viewedStoryCollectionKeysStorage
+                .split(separator: "\n")
+                .map(String.init)
+        )
+    }
+
+    private func storyCollectionKey(for collection: StoryCollection) -> String {
+        let dayKey = vm.daySelected.date.formatted(
+            Date.FormatStyle()
+                .year()
+                .month(.twoDigits)
+                .day(.twoDigits)
+        )
+
+        return "\(dayKey)|\(collection.id)"
+    }
+
+    private func markStoryCollectionAsViewed(_ collection: StoryCollection) {
+        var updatedKeys = viewedStoryCollectionKeys
+        updatedKeys.insert(storyCollectionKey(for: collection))
+        viewedStoryCollectionKeysStorage = updatedKeys.sorted().joined(separator: "\n")
+    }
+
+    private func resolvedRegion(for news: NeutralNews) -> ContentRegion? {
+        guard let regionRaw = vm.savedRegionRaw(for: news.id) else {
+            return nil
+        }
+
+        return ContentRegion(rawValue: regionRaw)
+    }
+}
+
+private struct StoryReaderModalView: View {
+    let collection: StoryCollection
+    let initialNewsID: String
+    let accessibilityReduceMotion: Bool
+    @Binding var currentStoryOverlayNews: NeutralNews?
+    @Binding var currentStoryOverlayRelatedNews: [News]
+    @Binding var currentStoryOverlayRegion: ContentRegion?
+    @Binding var isStoryArticleExpanded: Bool
+    let relatedNewsProvider: (NeutralNews) -> [News]
+    let regionProvider: (NeutralNews) -> ContentRegion?
+    let onDismissCollection: (Bool) -> Void
+    let onOpenArticle: (NeutralNews, [News], ContentRegion?) -> Void
+    let onCloseStory: () -> Void
+
+    @State private var isInteractiveDismissInFlight = false
+    @State private var isArticleSheetPresented = true
+    @State private var sheetNews: NeutralNews
+    @State private var collapsedSheetHeight: CGFloat
+    @State private var reservedFeedBottomHeight: CGFloat
+    @State private var selectedSheetDetent: PresentationDetent
+    @State private var pendingStoryDismissCompletion: Bool?
+    @State private var surfaceOffsetY: CGFloat = 24
+    @State private var surfaceOpacity: Double = 0
+    @State private var backdropVisibility: Double = 0
+
+    init(
+        collection: StoryCollection,
+        initialNewsID: String,
+        accessibilityReduceMotion: Bool,
+        currentStoryOverlayNews: Binding<NeutralNews?>,
+        currentStoryOverlayRelatedNews: Binding<[News]>,
+        currentStoryOverlayRegion: Binding<ContentRegion?>,
+        isStoryArticleExpanded: Binding<Bool>,
+        relatedNewsProvider: @escaping (NeutralNews) -> [News],
+        regionProvider: @escaping (NeutralNews) -> ContentRegion?,
+        onDismissCollection: @escaping (Bool) -> Void,
+        onOpenArticle: @escaping (NeutralNews, [News], ContentRegion?) -> Void,
+        onCloseStory: @escaping () -> Void
+    ) {
+        self.collection = collection
+        self.initialNewsID = initialNewsID
+        self.accessibilityReduceMotion = accessibilityReduceMotion
+        self._currentStoryOverlayNews = currentStoryOverlayNews
+        self._currentStoryOverlayRelatedNews = currentStoryOverlayRelatedNews
+        self._currentStoryOverlayRegion = currentStoryOverlayRegion
+        self._isStoryArticleExpanded = isStoryArticleExpanded
+        self.relatedNewsProvider = relatedNewsProvider
+        self.regionProvider = regionProvider
+        self.onDismissCollection = onDismissCollection
+        self.onOpenArticle = onOpenArticle
+        self.onCloseStory = onCloseStory
+
+        let initialSheetNews = collection.items.first(where: { $0.id == initialNewsID }) ?? collection.coverNews
+        let initialCollapsedHeight = StoryArticleSheetView.estimatedCollapsedHeight(for: initialSheetNews)
+        _sheetNews = State(initialValue: initialSheetNews)
+        _collapsedSheetHeight = State(initialValue: initialCollapsedHeight)
+        _reservedFeedBottomHeight = State(initialValue: StoryArticleSheetView.stableReservedHeight(for: initialSheetNews))
+        _selectedSheetDetent = State(initialValue: .height(initialCollapsedHeight))
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                Color.black
+                    .opacity(backdropVisibility)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                ZStack(alignment: .top) {
+                    StoryFeedView(
+                        newsItems: collection.items,
+                        initialNewsID: initialNewsID,
+                        topContentInset: geometry.safeAreaInsets.top + 10,
+                        collapsedSheetHeight: reservedFeedBottomHeight,
+                        isArticleExpanded: isStoryArticleExpanded,
+                        relatedNewsProvider: relatedNewsProvider,
+                        regionProvider: regionProvider,
+                        onCurrentStoryChange: { news, relatedNews, region in
+                            sheetNews = news
+                            if selectedSheetDetent != .large {
+                                let estimatedHeight = StoryArticleSheetView.estimatedCollapsedHeight(for: news)
+                                collapsedSheetHeight = estimatedHeight
+                                selectedSheetDetent = .height(estimatedHeight)
+                            }
+                            currentStoryOverlayNews = news
+                            currentStoryOverlayRelatedNews = relatedNews
+                            currentStoryOverlayRegion = region
+                        },
+                        onCollectionEnd: {
+                            dismissStory(completed: true)
+                        }
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea()
+
+                    if !isStoryArticleExpanded {
+                        StoryHomeOverlayView(
+                            currentNews: currentStoryOverlayNews,
+                            currentRelatedNews: currentStoryOverlayRelatedNews,
+                            currentRegion: currentStoryOverlayRegion,
+                            onClose: {
+                                dismissStory(completed: isCurrentStoryLastInCollection)
+                            }
+                        )
+                        .padding(.horizontal, 16)
+                        .padding(.top, geometry.safeAreaInsets.top + 24)
+                        .transition(.opacity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .offset(y: surfaceOffsetY)
+                .opacity(surfaceOpacity)
+                .ignoresSafeArea()
+            }
+        }
+        .sheet(isPresented: $isArticleSheetPresented, onDismiss: handleArticleSheetDismiss) {
+            StoryArticleSheetView(
+                news: sheetNews,
+                selectedDetent: $selectedSheetDetent,
+                collapsedHeight: $collapsedSheetHeight,
+                visualOffset: surfaceOffsetY,
+                visualOpacity: surfaceOpacity,
+                onOpenArticle: {
+                    onOpenArticle(
+                        sheetNews,
+                        currentStoryOverlayRelatedNews,
+                        currentStoryOverlayRegion
+                    )
+                }
+            )
+            .id(sheetNews.id)
+            .presentationDetents([collapsedSheetDetent, .large], selection: $selectedSheetDetent)
+            .presentationContentInteraction(.scrolls)
+            .presentationBackgroundInteraction(.enabled(upThrough: collapsedSheetDetent))
+            .presentationBackground(.clear)
+            .presentationDragIndicator(.hidden)
+            .interactiveDismissDisabled()
+        }
+        .onChange(of: selectedSheetDetent) { _, newValue in
+            let isExpanded = newValue == .large
+            if accessibilityReduceMotion {
+                isStoryArticleExpanded = isExpanded
+            } else {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    isStoryArticleExpanded = isExpanded
+                }
+            }
+        }
+        .onDisappear {
+            pendingStoryDismissCompletion = nil
+        }
+        .onAppear(perform: animateStoryIn)
+    }
+
+    private var isCurrentStoryLastInCollection: Bool {
+        guard let lastStoryID = collection.items.last?.id else {
+            return false
+        }
+
+        return currentStoryOverlayNews?.id == lastStoryID
+    }
+
+    private func dismissStory(completed: Bool) {
+        guard !isInteractiveDismissInFlight else { return }
+
+        isInteractiveDismissInFlight = true
+
+        if accessibilityReduceMotion {
+            surfaceOffsetY = 24
+            surfaceOpacity = 0
+            backdropVisibility = 0
+            beginStoryDismiss(completed: completed)
+            return
+        }
+
+        withAnimation(
+            .easeInOut(duration: 0.2),
+            completionCriteria: .logicallyComplete
+        ) {
+            surfaceOffsetY = 24
+            surfaceOpacity = 0
+            backdropVisibility = 0
+        } completion: {
+            beginStoryDismiss(completed: completed)
+        }
+    }
+
+    private var collapsedSheetDetent: PresentationDetent {
+        .height(collapsedSheetHeight)
+    }
+
+    private func beginStoryDismiss(completed: Bool) {
+        guard pendingStoryDismissCompletion == nil else { return }
+
+        pendingStoryDismissCompletion = completed
+
+        if isArticleSheetPresented {
+            isArticleSheetPresented = false
+        } else {
+            finishStoryDismiss(completed: completed)
+        }
+    }
+
+    private func finishStoryDismiss(completed: Bool) {
+        pendingStoryDismissCompletion = nil
+        isArticleSheetPresented = false
+        isStoryArticleExpanded = false
+        isInteractiveDismissInFlight = false
+        onDismissCollection(completed)
+        onCloseStory()
+    }
+
+    private func handleArticleSheetDismiss() {
+        isStoryArticleExpanded = false
+        isInteractiveDismissInFlight = false
+
+        guard let completed = pendingStoryDismissCompletion else {
+            onCloseStory()
+            return
+        }
+
+        finishStoryDismiss(completed: completed)
+    }
+
+    private func animateStoryIn() {
+        guard !accessibilityReduceMotion else {
+            surfaceOffsetY = 0
+            surfaceOpacity = 1
+            backdropVisibility = 1
+            return
+        }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            surfaceOffsetY = 0
+            surfaceOpacity = 1
+            backdropVisibility = 1
+        }
+    }
 }
 
 // MARK: - View Extensions
@@ -351,7 +839,11 @@ extension View {
 
     @ViewBuilder
     func myNavigationSubtitle(_ subtitle: String) -> some View {
-        if #available(iOS 26.0, *) { self.navigationSubtitle(subtitle) } else { self }
+        if #available(iOS 26.0, *), !subtitle.isEmpty {
+            self.navigationSubtitle(subtitle)
+        } else {
+            self
+        }
     }
 }
 
@@ -365,13 +857,6 @@ extension EnvironmentValues {
     var isBackgroundColorEnabled: Bool {
         get { self[BackgroundColorEnabledKey.self] }
         set { self[BackgroundColorEnabledKey.self] = newValue }
-    }
-}
-
-extension View {
-    @ViewBuilder
-    func mySearchToolbarMinimize() -> some View {
-        if #available(iOS 26.0, *) { self.searchToolbarBehavior(.minimize) } else { self }
     }
 }
 

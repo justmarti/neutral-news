@@ -7,7 +7,7 @@
 
 import SwiftUI
 
-struct NeutralNewsOptionsMenu: View {
+struct NeutralNewsOptionsActions: View {
     let news: NeutralNews
     let relatedNews: [News]
     let region: ContentRegion?
@@ -19,7 +19,7 @@ struct NeutralNewsOptionsMenu: View {
     @State private var savedRegionRawSnapshot: String?
 
     var body: some View {
-        Menu {
+        Group {
             Button {
                 if premiumManager.canSaveNews {
                     Task {
@@ -51,9 +51,6 @@ struct NeutralNewsOptionsMenu: View {
             } label: {
                 Label("Report a problem", systemImage: "exclamationmark.bubble")
             }
-
-        } label: {
-            Label("Options", systemImage: "ellipsis")
         }
         .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
         .task {
@@ -103,7 +100,6 @@ struct NeutralNewsOptionsMenu: View {
 #if DEBUG
                 print("✅ Article unsaved successfully")
 #endif
-                // Remove from saved news list if currently viewing saved news
                 await MainActor.run {
                     NewsListViewModel.shared.removeFromSavedNews(news.id)
                 }
@@ -140,9 +136,9 @@ struct NeutralNewsOptionsMenu: View {
             print("❌ Error saving/unsaving article: \(error)")
         }
     }
-    
+
     private func generateShareURL() -> URL {
-        return DeepLinkService.generateShareURL(for: news, region: shareRegion)
+        DeepLinkService.generateShareURL(for: news, region: shareRegion)
     }
 
     private var currentSavedStatus: Bool {
@@ -166,5 +162,27 @@ struct NeutralNewsOptionsMenu: View {
         }
 
         return region ?? ContentRegionProvider().currentRegion
+    }
+}
+
+struct NeutralNewsOptionsMenu: View {
+    let news: NeutralNews
+    let relatedNews: [News]
+    let region: ContentRegion?
+    @Binding var isShowingReportProblemSheet: Bool
+
+    var body: some View {
+        Menu {
+            NeutralNewsOptionsActions(
+                news: news,
+                relatedNews: relatedNews,
+                region: region,
+                isShowingReportProblemSheet: $isShowingReportProblemSheet
+            )
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.headline.weight(.semibold))
+                .accessibilityLabel("Options")
+        }
     }
 }

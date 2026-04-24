@@ -59,6 +59,12 @@ enum CachedAsyncImageHelper {
         ImageCacheKey(url: url, maxPixelSize: maxPixelSize)
     }
 
+    static func cachedUIImage(url: URL, maxPixelSize: Double? = nil) -> UIImage? {
+        let targetPixelSize = maxPixelSize ?? defaultPixelSize
+        let key = cacheKey(for: url, maxPixelSize: targetPixelSize)
+        return decodedImageCache.object(forKey: key)
+    }
+
     static func prefetchImages(from urls: [URL], maxPixelSize: Double? = nil) async {
         guard !urls.isEmpty else { return }
         let targetPixelSize = maxPixelSize ?? defaultPixelSize
@@ -72,11 +78,8 @@ enum CachedAsyncImageHelper {
                 let (data, _) = try await urlSession.data(from: url)
                 guard !Task.isCancelled else { return }
 
-                let decodeTask = Task.detached(priority: .utility) { () -> UIImage? in
-                    data.downsampledImage(maxPixelSize: targetPixelSize)
-                }
-
-                if let uiImage = await decodeTask.value {
+                if let uiImage = await decodeUIImage(data, maxPixelSize: targetPixelSize) {
+                    guard !Task.isCancelled else { return }
                     decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
                 }
             } catch {
@@ -84,6 +87,36 @@ enum CachedAsyncImageHelper {
             }
 
             await Task.yield()
+        }
+    }
+
+    static func loadUIImage(url: URL, maxPixelSize: Double? = nil) async throws -> UIImage {
+        let targetPixelSize = maxPixelSize ?? defaultPixelSize
+        let key = cacheKey(for: url, maxPixelSize: targetPixelSize)
+
+        if let cachedImage = decodedImageCache.object(forKey: key) {
+            return cachedImage
+        }
+
+        let (data, _) = try await urlSession.data(from: url)
+        try Task.checkCancellation()
+
+        guard let uiImage = await decodeUIImage(data, maxPixelSize: targetPixelSize) else {
+            throw URLError(.cannotDecodeContentData)
+        }
+        try Task.checkCancellation()
+
+        decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
+        return uiImage
+    }
+
+    fileprivate static func decodeUIImage(_ data: Data, maxPixelSize: Double) async -> UIImage? {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(
+                    returning: data.downsampledImage(maxPixelSize: maxPixelSize)
+                )
+            }
         }
     }
 }
@@ -134,11 +167,11 @@ struct CachedAsyncImage<Content: View>: View {
             let (data, _) = try await CachedAsyncImageHelper.urlSession.data(from: url)
             guard !Task.isCancelled else { return }
 
-            let decodeTask = Task.detached(priority: .utility) { () -> UIImage? in
-                data.downsampledImage(maxPixelSize: targetPixelSize)
-            }
-
-            if let uiImage = await decodeTask.value {
+            if let uiImage = await CachedAsyncImageHelper.decodeUIImage(
+                data,
+                maxPixelSize: targetPixelSize
+            ) {
+                guard !Task.isCancelled else { return }
                 CachedAsyncImageHelper.decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
                 updatePhase(.success(Image(uiImage: uiImage)))
             } else {

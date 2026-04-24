@@ -178,7 +178,8 @@ extension SavedNews {
             createdAt: originalCreatedAt,
             updatedAt: originalUpdatedAt,
             group: Int(group),
-            sourceIds: sourceIdsArray
+            sourceIds: sourceIdsArray,
+            storyFocusPoint: nil
         )
     }
 

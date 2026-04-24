@@ -22,6 +22,8 @@ final class CachedNeutralNews {
     var updatedAt: Date
     var group: Int
     var sourceIds: String // JSON encoded array
+    var storyFocusPointX: Double?
+    var storyFocusPointY: Double?
     
     // Cache metadata
     var cacheDate: Date
@@ -40,6 +42,8 @@ final class CachedNeutralNews {
         self.updatedAt = neutralNews.updatedAt
         self.group = neutralNews.group
         self.sourceIds = (try? JSONEncoder().encode(neutralNews.sourceIds).base64EncodedString()) ?? "[]"
+        self.storyFocusPointX = neutralNews.storyFocusPoint?.x
+        self.storyFocusPointY = neutralNews.storyFocusPoint?.y
         
         self.cacheDate = Date()
         self.dayDate = Calendar.current.startOfDay(for: neutralNews.date)
@@ -47,6 +51,13 @@ final class CachedNeutralNews {
     
     func toNeutralNews() -> NeutralNews {
         let sourceIdsArray = (try? JSONDecoder().decode([String].self, from: Data(base64Encoded: sourceIds) ?? Data())) ?? []
+        let storyFocusPoint: StoryFocusPoint?
+        if let x = storyFocusPointX,
+           let y = storyFocusPointY {
+            storyFocusPoint = StoryFocusPoint(x: x, y: y)
+        } else {
+            storyFocusPoint = nil
+        }
         
         return NeutralNews(
             id: id,
@@ -60,7 +71,8 @@ final class CachedNeutralNews {
             createdAt: createdAt,
             updatedAt: updatedAt,
             group: group,
-            sourceIds: sourceIdsArray
+            sourceIds: sourceIdsArray,
+            storyFocusPoint: storyFocusPoint
         )
     }
 }

@@ -7,6 +7,30 @@
 
 import Foundation
 
+struct StoryCrop: Codable, Hashable, Sendable {
+    let x: Double
+    let y: Double
+    let width: Double
+    let height: Double
+
+    var centerX: Double {
+        x + (width / 2)
+    }
+
+    var centerY: Double {
+        y + (height / 2)
+    }
+
+    var focusPoint: StoryFocusPoint {
+        StoryFocusPoint(x: centerX, y: centerY)
+    }
+}
+
+struct StoryFocusPoint: Codable, Hashable, Sendable {
+    let x: Double
+    let y: Double
+}
+
 struct NeutralNews: Codable, Hashable, Identifiable {
     let id: String
     let neutralTitle: String
@@ -20,6 +44,7 @@ struct NeutralNews: Codable, Hashable, Identifiable {
     let updatedAt: Date
     let group: Int
     let sourceIds: [String]
+    let storyFocusPoint: StoryFocusPoint?
     
     static func == (lhs: NeutralNews, rhs: NeutralNews) -> Bool {
         lhs.id == rhs.id
@@ -52,6 +77,7 @@ struct NeutralNews: Codable, Hashable, Identifiable {
         createdAt: .now,
         updatedAt: .now,
         group: 0,
-        sourceIds: ["mock-news-1", "mock-news-2"]
+        sourceIds: ["mock-news-1", "mock-news-2"],
+        storyFocusPoint: nil
     )
 }
