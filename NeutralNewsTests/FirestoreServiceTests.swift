@@ -84,8 +84,8 @@ struct FirestoreServiceTests {
 
         let news = FirestoreService.decodeNeutralNews(from: payload, documentID: "neutral-1")
 
-        #expect(news?.storyFocusPoint?.x == 0.35)
-        #expect(news?.storyFocusPoint?.y == 0.45)
+        #expect(abs((news?.storyFocusPoint?.x ?? 0) - 0.35) < 0.000001)
+        #expect(abs((news?.storyFocusPoint?.y ?? 0) - 0.45) < 0.000001)
     }
 
     @Test("Decodes neutral news category from legacy fallback field")
@@ -241,5 +241,114 @@ struct FirestoreServiceTests {
         #expect(Problem.newsRepeated.firestoreValue == "news_repeated")
         #expect(Problem.newsRepeated.localizedTitle == String(localized: Problem.newsRepeated.title))
         #expect(Problem.notRelatedNews.firestoreValue == "not_related_news")
+    }
+
+    @Test("Fetches archived neutral news from share API")
+    func fetchesArchivedNeutralNewsFromShareAPI() async throws {
+        let payload = Data("""
+        {
+          "id": "story-123",
+          "neutral_title": "Archived title",
+          "neutral_description": "Archived description",
+          "category_id": "technology",
+          "relevance": 8,
+          "date": "2025-04-10T12:00:00",
+          "created_at": "2025-04-10T12:01:00",
+          "updated_at": "2025-04-10T12:02:00",
+          "image_url": "https://example.com/image.jpg",
+          "image_medium": "Example",
+          "group": 42,
+          "source_ids": ["source-1"],
+          "sources": []
+        }
+        """.utf8)
+        let session = ArchiveSessionMock(data: payload, statusCode: 200)
+        let client = ShareArchiveClient(
+            baseURL: URL(string: "https://share.example.com")!,
+            session: session
+        )
+
+        let snapshot = try await client.fetchArchivedNews(newsId: "story-123", region: .us)
+
+        #expect(session.requestedURL?.absoluteString == "https://share.example.com/api/us/news/story-123")
+        #expect(snapshot?.id == "story-123")
+        #expect(snapshot?.neutralTitle == "Archived title")
+    }
+
+    @Test("Archived news API 404 returns nil")
+    func archivedNewsAPI404ReturnsNil() async throws {
+        let session = ArchiveSessionMock(data: Data(), statusCode: 404)
+        let client = ShareArchiveClient(
+            baseURL: URL(string: "https://share.example.com")!,
+            session: session
+        )
+
+        let snapshot = try await client.fetchArchivedNews(newsId: "missing", region: .es)
+
+        #expect(snapshot?.id == nil)
+    }
+
+    @Test("Decodes archived snapshot into deep link navigation payload")
+    func decodesArchivedSnapshotIntoDeepLinkNavigationPayload() throws {
+        let payload = Data("""
+        {
+          "id": "42",
+          "neutral_title": "Archived title",
+          "neutral_description": "Archived description",
+          "category_id": "technology",
+          "relevance": 8,
+          "date": "2025-04-10T12:00:00",
+          "created_at": "2025-04-10T12:01:00",
+          "updated_at": "2025-04-10T12:02:00",
+          "image_url": "https://example.com/image.jpg",
+          "image_medium": "Example",
+          "group": 42,
+          "source_ids": ["source-1"],
+          "story_focus_point": { "x": 0.4, "y": 0.5 },
+          "sources": [
+            {
+              "id": "source-1",
+              "title": "Source title",
+              "description_short": "Short description",
+              "publisher": "Publisher",
+              "link": "https://example.com/source",
+              "pub_date": "2025-04-10T11:00:00",
+              "image_url": "https://example.com/source.jpg",
+              "neutral_score": 7
+            }
+          ]
+        }
+        """.utf8)
+        let snapshot = try JSONDecoder().decode(ArchivedNewsSnapshot.self, from: payload)
+        let lookup = try #require(FirestoreService.decodeArchivedNewsSnapshot(snapshot))
+
+        #expect(lookup.news.id == "42")
+        #expect(lookup.news.neutralTitle == "Archived title")
+        #expect(lookup.news.storyFocusPoint?.x == 0.4)
+        #expect(lookup.relatedNews.count == 1)
+        #expect(lookup.relatedNews.first?.id == "source-1")
+        #expect(lookup.relatedNews.first?.embedding == [])
+    }
+}
+
+private final class ArchiveSessionMock: URLSessionDataProviding {
+    let data: Data
+    let statusCode: Int
+    private(set) var requestedURL: URL?
+
+    init(data: Data, statusCode: Int) {
+        self.data = data
+        self.statusCode = statusCode
+    }
+
+    func fetchData(from url: URL) async throws -> (Data, URLResponse) {
+        requestedURL = url
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: nil
+        )!
+        return (data, response)
     }
 }

@@ -8,10 +8,129 @@
 import Foundation
 import FirebaseFirestore
 
+protocol URLSessionDataProviding {
+    func fetchData(from url: URL) async throws -> (Data, URLResponse)
+}
+
+extension URLSession: URLSessionDataProviding {
+    func fetchData(from url: URL) async throws -> (Data, URLResponse) {
+        try await data(from: url)
+    }
+}
+
+protocol ShareArchiveClientProtocol {
+    func fetchArchivedNews(newsId: String, region: ContentRegion) async throws -> ArchivedNewsSnapshot?
+}
+
+enum ShareArchiveError: Error {
+    case invalidURL
+    case invalidResponse
+    case requestFailed(Int)
+}
+
+struct NeutralNewsLookupResult {
+    let news: NeutralNews
+    let relatedNews: [News]
+}
+
+struct ArchivedNewsSnapshot: Decodable {
+    let id: String
+    let neutralTitle: String
+    let neutralDescription: String
+    let categoryId: String
+    let relevance: Int?
+    let date: String?
+    let createdAt: String?
+    let updatedAt: String?
+    let imageUrl: String
+    let imageMedium: String
+    let group: Int?
+    let sourceIds: [String]
+    let storyFocusPoint: StoryFocusPoint?
+    let sources: [ArchivedSourceSnapshot]
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case neutralTitle = "neutral_title"
+        case neutralDescription = "neutral_description"
+        case categoryId = "category_id"
+        case relevance
+        case date
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case imageUrl = "image_url"
+        case imageMedium = "image_medium"
+        case group
+        case sourceIds = "source_ids"
+        case storyFocusPoint = "story_focus_point"
+        case sources
+    }
+}
+
+struct ArchivedSourceSnapshot: Decodable {
+    let id: String
+    let title: String
+    let descriptionShort: String
+    let publisher: String
+    let link: String
+    let pubDate: String?
+    let imageUrl: String?
+    let neutralScore: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case descriptionShort = "description_short"
+        case publisher
+        case link
+        case pubDate = "pub_date"
+        case imageUrl = "image_url"
+        case neutralScore = "neutral_score"
+    }
+}
+
+struct ShareArchiveClient: ShareArchiveClientProtocol {
+    private let baseURL: URL
+    private let session: any URLSessionDataProviding
+    private let decoder = JSONDecoder()
+
+    init(
+        baseURL: URL = URL(string: "https://share.getfacts.app")!,
+        session: any URLSessionDataProviding = URLSession.shared
+    ) {
+        self.baseURL = baseURL
+        self.session = session
+    }
+
+    func fetchArchivedNews(newsId: String, region: ContentRegion) async throws -> ArchivedNewsSnapshot? {
+        let pathPrefix = region == .us ? "/api/us/news/" : "/api/news/"
+        guard let encodedNewsId = newsId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed),
+              let url = URL(string: pathPrefix + encodedNewsId, relativeTo: baseURL)?.absoluteURL else {
+            throw ShareArchiveError.invalidURL
+        }
+
+        let (data, response) = try await session.fetchData(from: url)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ShareArchiveError.invalidResponse
+        }
+
+        if httpResponse.statusCode == 404 {
+            return nil
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw ShareArchiveError.requestFailed(httpResponse.statusCode)
+        }
+
+        return try decoder.decode(ArchivedNewsSnapshot.self, from: data)
+    }
+}
+
 final class FirestoreService {
     static let shared = FirestoreService()
     private let db = Firestore.firestore()
     private let regionProvider: ContentRegionProviding
+    private let archiveClient: any ShareArchiveClientProtocol
     private let inQueryChunkSize = 10
     
     private enum Collection {
@@ -40,8 +159,12 @@ final class FirestoreService {
         }
     }
     
-    private init(regionProvider: ContentRegionProviding = ContentRegionProvider()) {
+    init(
+        regionProvider: ContentRegionProviding = ContentRegionProvider(),
+        archiveClient: any ShareArchiveClientProtocol = ShareArchiveClient()
+    ) {
         self.regionProvider = regionProvider
+        self.archiveClient = archiveClient
     }
     
     // MARK: - Neutral News Methods
@@ -63,6 +186,38 @@ final class FirestoreService {
 
     func fetchNeutralNews(newsId: String, region: ContentRegion? = nil) async throws -> NeutralNews? {
         let region = resolvedRegion(from: region)
+        if let news = try await fetchNeutralNewsFromFirestore(newsId: newsId, region: region) {
+            return news
+        }
+
+        guard let archivedSnapshot = try await archiveClient.fetchArchivedNews(
+            newsId: newsId,
+            region: region
+        ) else {
+            return nil
+        }
+
+        return Self.decodeArchivedNewsSnapshot(archivedSnapshot)?.news
+    }
+
+    func fetchNeutralNewsLookup(newsId: String, region: ContentRegion? = nil) async throws -> NeutralNewsLookupResult? {
+        let region = resolvedRegion(from: region)
+        if let news = try await fetchNeutralNewsFromFirestore(newsId: newsId, region: region) {
+            let relatedNews = (try? await fetchNews(newsIds: news.sourceIds, region: region)) ?? []
+            return NeutralNewsLookupResult(news: news, relatedNews: relatedNews)
+        }
+
+        guard let archivedSnapshot = try await archiveClient.fetchArchivedNews(
+            newsId: newsId,
+            region: region
+        ) else {
+            return nil
+        }
+
+        return Self.decodeArchivedNewsSnapshot(archivedSnapshot)
+    }
+
+    private func fetchNeutralNewsFromFirestore(newsId: String, region: ContentRegion) async throws -> NeutralNews? {
         let document = try await db.collection(Collection.neutralNews(for: region))
             .document(newsId)
             .getDocument()
@@ -214,6 +369,56 @@ final class FirestoreService {
         )
     }
 
+    static func decodeArchivedNewsSnapshot(_ snapshot: ArchivedNewsSnapshot) -> NeutralNewsLookupResult? {
+        guard let date = parseArchiveDate(snapshot.date),
+              let createdAt = parseArchiveDate(snapshot.createdAt),
+              let updatedAt = parseArchiveDate(snapshot.updatedAt) else {
+            return nil
+        }
+
+        let group = snapshot.group ?? Int(snapshot.id) ?? 0
+        let neutralNews = NeutralNews(
+            id: snapshot.id,
+            neutralTitle: snapshot.neutralTitle,
+            neutralDescription: snapshot.neutralDescription,
+            category: snapshot.categoryId,
+            relevance: snapshot.relevance ?? 0,
+            imageUrl: snapshot.imageUrl,
+            imageMedium: snapshot.imageMedium,
+            date: date,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            group: group,
+            sourceIds: snapshot.sourceIds,
+            storyFocusPoint: snapshot.storyFocusPoint
+        )
+
+        let relatedNews = snapshot.sources.compactMap { source -> News? in
+            guard let pubDate = parseArchiveDate(source.pubDate) else {
+                return nil
+            }
+
+            return News(
+                id: source.id,
+                title: source.title,
+                description: source.descriptionShort,
+                scrappedDescription: nil,
+                category: snapshot.categoryId,
+                imageUrl: source.imageUrl,
+                link: source.link,
+                pubDate: pubDate,
+                createdAt: pubDate,
+                updatedAt: pubDate,
+                publisher: source.publisher,
+                neutralScore: source.neutralScore ?? 0,
+                group: group,
+                embedding: []
+            )
+        }
+
+        return NeutralNewsLookupResult(news: neutralNews, relatedNews: relatedNews)
+    }
+
     private static func decodeStoryCrop(from value: Any?) -> StoryCrop? {
         guard let dictionary = value as? [String: Any],
               let x = decodeDouble(from: dictionary["x"]),
@@ -258,6 +463,36 @@ final class FirestoreService {
 
         if let number = value as? NSNumber {
             return number.doubleValue
+        }
+
+        return nil
+    }
+
+    private static func parseArchiveDate(_ value: String?) -> Date? {
+        guard let value, !value.isEmpty else {
+            return nil
+        }
+
+        let internetFormatter = ISO8601DateFormatter()
+        internetFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = internetFormatter.date(from: value) {
+            return date
+        }
+
+        internetFormatter.formatOptions = [.withInternetDateTime]
+        if let date = internetFormatter.date(from: value) {
+            return date
+        }
+
+        for format in ["yyyy-MM-dd'T'HH:mm:ss.SSSSSS", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd"] {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .iso8601)
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = format
+            if let date = formatter.date(from: value) {
+                return date
+            }
         }
 
         return nil

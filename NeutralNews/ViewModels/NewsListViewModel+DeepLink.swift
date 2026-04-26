@@ -120,29 +120,16 @@ extension NewsListViewModel {
 
                 group.addTask { [newsId, targetRegion] in
                     do {
-                        guard let news = try await FirestoreService.shared.fetchNeutralNews(
+                        guard let lookup = try await FirestoreService.shared.fetchNeutralNewsLookup(
                             newsId: newsId,
                             region: targetRegion
                         ) else {
                             return .notFound
                         }
 
-                        let relatedNews: [News]
-                        do {
-                            relatedNews = try await FirestoreService.shared.fetchNews(
-                                newsIds: news.sourceIds,
-                                region: targetRegion
-                            )
-                        } catch {
-#if DEBUG
-                            print("⚠️ Related news fetch failed for deep link \(newsId): \(error)")
-#endif
-                            relatedNews = []
-                        }
-
                         let target = DeepLinkNavigationTarget(
-                            news: news,
-                            relatedNews: relatedNews,
+                            news: lookup.news,
+                            relatedNews: lookup.relatedNews,
                             region: targetRegion
                         )
 
