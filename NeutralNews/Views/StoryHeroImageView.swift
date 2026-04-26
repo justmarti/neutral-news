@@ -17,8 +17,8 @@ struct StoryHeroImageView: View {
     @Environment(\.displayScale) private var displayScale
     @State private var loadedUIImage: UIImage?
     @State private var loadedImageIdentifier: String?
-    @State private var visionRefinedFocusPoint: StoryFocusPoint?
-    @State private var visionRefinedImageIdentifier: String?
+    @State private var displayFocusPoint: StoryFocusPoint?
+    @State private var displayFocusPointImageIdentifier: String?
 
     var body: some View {
         GeometryReader { geometry in
@@ -30,8 +30,8 @@ struct StoryHeroImageView: View {
             let resolvedUIImage = resolvedUIImage(size: size)
             let currentImageIdentifier = imageLoadIdentifier(size: size)
             let effectiveFocusPoint =
-                visionRefinedImageIdentifier == currentImageIdentifier
-                ? (visionRefinedFocusPoint ?? storyFocusPoint)
+                displayFocusPointImageIdentifier == currentImageIdentifier
+                ? displayFocusPoint
                 : storyFocusPoint
             let heroContainerSize = CGSize(width: size.width, height: sharpHeight)
             let backgroundContainerSize = CGSize(width: size.width, height: size.height)
@@ -94,11 +94,21 @@ struct StoryHeroImageView: View {
                             guard let url = URL(string: imageUrl) else {
                                 loadedUIImage = nil
                                 loadedImageIdentifier = nil
+                                displayFocusPoint = nil
+                                displayFocusPointImageIdentifier = nil
                                 return
                             }
 
                             let imageIdentifier = imageLoadIdentifier(size: size)
                             let maxPixelSize = imageLoadMaxPixelSize(size: size)
+                            let initialFocusPoint = await initialDisplayFocusPoint(for: imageIdentifier)
+
+                            guard !Task.isCancelled else { return }
+
+                            loadedUIImage = nil
+                            loadedImageIdentifier = imageIdentifier
+                            displayFocusPoint = initialFocusPoint
+                            displayFocusPointImageIdentifier = imageIdentifier
 
                             if let cachedImage = CachedAsyncImageHelper.cachedUIImage(
                                 url: url,
@@ -108,9 +118,6 @@ struct StoryHeroImageView: View {
                                 loadedImageIdentifier = imageIdentifier
                                 return
                             }
-
-                            loadedUIImage = nil
-                            loadedImageIdentifier = imageIdentifier
 
                             do {
                                 let image = try await CachedAsyncImageHelper.loadUIImage(
@@ -130,19 +137,10 @@ struct StoryHeroImageView: View {
                             let visionIdentifier = imageLoadIdentifier(size: size)
 
                             guard let uiImage = resolvedUIImage else {
-                                visionRefinedFocusPoint = nil
-                                visionRefinedImageIdentifier = visionIdentifier
                                 return
                             }
 
-                            if let cachedEntry = await StoryFaceFocusCache.shared.entry(for: visionIdentifier) {
-                                switch cachedEntry {
-                                case .hit(let focusPoint):
-                                    visionRefinedFocusPoint = focusPoint
-                                case .miss:
-                                    visionRefinedFocusPoint = nil
-                                }
-                                visionRefinedImageIdentifier = visionIdentifier
+                            if await StoryFaceFocusCache.shared.entry(for: visionIdentifier) != nil {
                                 return
                             }
 
@@ -153,14 +151,6 @@ struct StoryHeroImageView: View {
                             } else {
                                 await StoryFaceFocusCache.shared.set(.miss, for: visionIdentifier)
                             }
-
-                            guard !Task.isCancelled,
-                                  imageLoadIdentifier(size: size) == visionIdentifier else {
-                                return
-                            }
-
-                            visionRefinedFocusPoint = refinedFocusPoint
-                            visionRefinedImageIdentifier = visionIdentifier
                         }
                         .mask(
                             LinearGradient(
@@ -216,24 +206,26 @@ struct StoryHeroImageView: View {
     }
 
     private func resolvedUIImage(size: CGSize) -> UIImage? {
-        guard let url = URL(string: imageUrl) else {
-            return nil
-        }
-
         let imageIdentifier = imageLoadIdentifier(size: size)
-
-        if let cachedImage = CachedAsyncImageHelper.cachedUIImage(
-            url: url,
-            maxPixelSize: imageLoadMaxPixelSize(size: size)
-        ) {
-            return cachedImage
-        }
 
         guard loadedImageIdentifier == imageIdentifier else {
             return nil
         }
 
         return loadedUIImage
+    }
+
+    private func initialDisplayFocusPoint(for imageIdentifier: String) async -> StoryFocusPoint? {
+        guard let cachedEntry = await StoryFaceFocusCache.shared.entry(for: imageIdentifier) else {
+            return storyFocusPoint
+        }
+
+        switch cachedEntry {
+        case .hit(let focusPoint):
+            return focusPoint
+        case .miss:
+            return storyFocusPoint
+        }
     }
 
     @ViewBuilder
