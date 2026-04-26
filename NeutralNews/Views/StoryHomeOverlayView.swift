@@ -15,10 +15,12 @@ struct StoryHomeOverlayView: View {
     let onClose: () -> Void
 
     @State private var isShowingReportProblemSheet = false
+    @State private var saveFeedbackTrigger = 0
 
     var body: some View {
         overlayControls
         .padding(.top)
+        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
         .sheet(isPresented: $isShowingReportProblemSheet) {
             if let currentNews {
                 ReportProblemView(news: currentNews)
@@ -48,7 +50,8 @@ struct StoryHomeOverlayView: View {
                         news: currentNews,
                         relatedNews: currentRelatedNews,
                         region: currentRegion,
-                        isShowingReportProblemSheet: $isShowingReportProblemSheet
+                        isShowingReportProblemSheet: $isShowingReportProblemSheet,
+                        saveFeedbackTrigger: $saveFeedbackTrigger
                     )
                 } label: {
                     overlayCircleLabel(systemImage: "ellipsis")

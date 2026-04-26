@@ -12,10 +12,10 @@ struct NeutralNewsOptionsActions: View {
     let relatedNews: [News]
     let region: ContentRegion?
     @Binding var isShowingReportProblemSheet: Bool
+    @Binding var saveFeedbackTrigger: Int
 
     private let premiumManager = PremiumManager.shared
     @State private var savedNewsState = SavedNewsState.shared
-    @State private var saveFeedbackTrigger = 0
     @State private var savedRegionRawSnapshot: String?
 
     var body: some View {
@@ -52,7 +52,6 @@ struct NeutralNewsOptionsActions: View {
                 Label("Report a problem", systemImage: "exclamationmark.bubble")
             }
         }
-        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
         .task {
             await ensureSavedStatusLoadedIfNeeded()
         }
@@ -170,6 +169,7 @@ struct NeutralNewsOptionsMenu: View {
     let relatedNews: [News]
     let region: ContentRegion?
     @Binding var isShowingReportProblemSheet: Bool
+    @State private var saveFeedbackTrigger = 0
 
     var body: some View {
         Menu {
@@ -177,12 +177,14 @@ struct NeutralNewsOptionsMenu: View {
                 news: news,
                 relatedNews: relatedNews,
                 region: region,
-                isShowingReportProblemSheet: $isShowingReportProblemSheet
+                isShowingReportProblemSheet: $isShowingReportProblemSheet,
+                saveFeedbackTrigger: $saveFeedbackTrigger
             )
         } label: {
             Image(systemName: "ellipsis")
                 .font(.headline.weight(.semibold))
                 .accessibilityLabel("Options")
         }
+        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
     }
 }
