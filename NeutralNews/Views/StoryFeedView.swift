@@ -167,12 +167,16 @@ struct StoryFeedView: View {
     }
 
     private func prefetchUpcomingImages() async {
-        let upcomingURLs = newsItems
+        let upcomingNews = Array(newsItems
             .dropFirst(currentIndex + 1)
-            .prefix(3)
-            .compactMap { URL(string: $0.imageUrl) }
+            .prefix(3))
+        let upcomingURLs = upcomingNews.compactMap { URL(string: $0.imageUrl) }
 
-        await CachedAsyncImageHelper.prefetchImages(from: Array(upcomingURLs))
+        async let prefetchedImages: Void = CachedAsyncImageHelper.prefetchImages(from: upcomingURLs)
+        async let prefetchedFocusPoints: Void = StoryHeroImageView.prefetchFocusPoints(for: upcomingNews)
+
+        await prefetchedImages
+        await prefetchedFocusPoints
     }
 
     private func notifyCurrentStoryChange() {

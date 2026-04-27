@@ -63,9 +63,11 @@ struct StoryBriefingModuleView: View {
             thumbnailTransitionProgress = 1
 
             async let prefetchedThumbnails = prefetchThumbnailImages()
+            async let prefetchedFocusPoints: Void = prefetchStoryFocusPoints()
             dominantColor = await dominantColor(for: currentItem.imageUrl)
 
             await prefetchedThumbnails
+            await prefetchedFocusPoints
 
             guard items.count > 1, !accessibilityReduceMotion else { return }
 
@@ -169,6 +171,10 @@ struct StoryBriefingModuleView: View {
     private func prefetchThumbnailImages() async {
         let urls = items.compactMap { URL(string: $0.imageUrl) }
         await CachedAsyncImageHelper.prefetchImages(from: urls, maxPixelSize: thumbnailPixelSize)
+    }
+
+    private func prefetchStoryFocusPoints() async {
+        await StoryHeroImageView.prefetchFocusPoints(for: items)
     }
 
     @MainActor
