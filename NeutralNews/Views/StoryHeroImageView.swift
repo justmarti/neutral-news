@@ -14,6 +14,7 @@ struct StoryHeroImageView: View {
     let storyFocusPoint: StoryFocusPoint?
 
     private let fallbackSharpScale: CGFloat = 1.03
+    private let sharpImageBottomOverlap: CGFloat = 48
     @Environment(\.displayScale) private var displayScale
     @State private var loadedUIImage: UIImage?
     @State private var loadedImageIdentifier: String?
@@ -62,7 +63,8 @@ struct StoryHeroImageView: View {
             let size = geometry.size
             let extraBottomCrop: CGFloat = 0
             let topInset: CGFloat = 65
-            let availableSharpHeight = size.height - reservedBottomHeight - extraBottomCrop - topInset
+            let reservedSharpBottomHeight = max(reservedBottomHeight - sharpImageBottomOverlap, 0)
+            let availableSharpHeight = size.height - reservedSharpBottomHeight - extraBottomCrop - topInset
             let sharpHeight = max(availableSharpHeight, 0)
             let resolvedUIImage = resolvedUIImage(size: size)
             let currentImageIdentifier = imageLoadIdentifier(size: size)
