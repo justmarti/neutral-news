@@ -190,6 +190,11 @@ struct HomeView: View {
                 storyReaderView(for: story)
                     .zIndex(1)
             }
+
+            if storyPresentation == nil || isStoryOverlayHiddenForArticle {
+                AppFeedbackOverlay()
+                    .zIndex(2)
+            }
         }
         .animation(.default, value: config.isInMaintenance)
     }
@@ -698,6 +703,12 @@ private struct StoryReaderModalView: View {
                         .padding(.top, geometry.safeAreaInsets.top + 24)
                         .transition(.opacity)
                     }
+
+                    AppFeedbackOverlay(
+                        placement: .top,
+                        edgePadding: geometry.safeAreaInsets.top + 84
+                    )
+                    .zIndex(2)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .offset(y: surfaceOffsetY)
@@ -884,8 +895,6 @@ private struct HomeNewsCard: View {
     let vm: NewsListViewModel
     let premiumManager: PremiumManager
     let savedNewsState: SavedNewsState
-    @State private var saveFeedbackTrigger = 0
-    @State private var copyHeadlineTrigger = false
 
     init(
         news: NeutralNews,
@@ -939,13 +948,11 @@ private struct HomeNewsCard: View {
 
             Button {
                 UIPasteboard.general.string = news.neutralTitle
-                copyHeadlineTrigger.toggle()
+                AppFeedbackCenter.shared.show("Headline copied", systemImage: "doc.on.doc", style: .success)
             } label: {
                 Label("Copy headline", systemImage: "doc.on.doc")
             }
         }
-        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
-        .sensoryFeedback(.success, trigger: copyHeadlineTrigger)
         .onAppear {
             if vm.shouldLoadMore(currentItem: news) {
                 vm.loadNextPage()
@@ -980,7 +987,7 @@ private struct HomeNewsCard: View {
                 await MainActor.run {
                     vm.removeFromSavedNews(news.id)
                     savedNewsState.setSaved(false, for: news.id, regionRaw: unsaveRegionRaw)
-                    saveFeedbackTrigger &+= 1
+                    AppFeedbackCenter.shared.show("Removed from saved", systemImage: "bookmark.slash", style: .info, haptic: .success)
                 }
             } else {
                 try SavedNewsService.shared.saveNews(
@@ -990,11 +997,14 @@ private struct HomeNewsCard: View {
                 )
                 await MainActor.run {
                     savedNewsState.setSaved(true, for: news.id)
-                    saveFeedbackTrigger &+= 1
+                    AppFeedbackCenter.shared.show("Saved", systemImage: "bookmark", style: .success)
                 }
             }
         } catch {
             print("❌ Error saving/unsaving article: \(error)")
+            await MainActor.run {
+                AppFeedbackCenter.shared.show("Couldn’t update saved news", systemImage: "exclamationmark.triangle", style: .error)
+            }
         }
     }
 

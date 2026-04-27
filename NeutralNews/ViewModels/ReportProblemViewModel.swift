@@ -23,6 +23,8 @@ final class ReportProblemViewModel {
     // MARK: - Private State
     @ObservationIgnored
     @AppStorage("lastReportTime") private var lastReportTime: TimeInterval = 0
+    @ObservationIgnored
+    private let reportedNewsIDsKey = "reportedNewsIds"
     
     // MARK: - Initialization
     init(news: NeutralNews) {
@@ -34,11 +36,9 @@ final class ReportProblemViewModel {
         Date().timeIntervalSince1970 - lastReportTime > ReportConstants.Timing.cooldownPeriod
     }
     
-    var remainingCooldownText: String {
+    var remainingCooldownSeconds: Int {
         let remaining = ReportConstants.Timing.cooldownPeriod - (Date().timeIntervalSince1970 - lastReportTime)
-        let minutes = Int(remaining / 60)
-        let seconds = Int(remaining.truncatingRemainder(dividingBy: 60))
-        return "\(minutes):\(String(format: "%02d", seconds))"
+        return Int(max(0, remaining).rounded(.up))
     }
     
     var hasError: Bool {
@@ -58,9 +58,15 @@ final class ReportProblemViewModel {
     
     func submitReport() async {
         guard let problem = selectedProblem else { return }
+
+        guard !hasReportedCurrentNews else {
+            reportError = .alreadyReported
+            isShowingError = false
+            return
+        }
         
         guard canSubmitReport else {
-            reportError = .cooldown(remainingTime: remainingCooldownText)
+            reportError = .cooldown(remainingSeconds: remainingCooldownSeconds)
             isShowingError = false
             return
         }
@@ -79,6 +85,7 @@ final class ReportProblemViewModel {
 #endif
             
             lastReportTime = Date().timeIntervalSince1970
+            markCurrentNewsReported()
             
             withAnimation(.spring(duration: ReportConstants.Animation.springDuration, bounce: ReportConstants.Animation.springBounce)) {
                 isSubmitted = true
@@ -100,5 +107,25 @@ final class ReportProblemViewModel {
         isSubmitting = false
         isShowingError = false
         reportError = nil
+    }
+
+    private var hasReportedCurrentNews: Bool {
+        reportedNewsIDs.contains(news.id)
+    }
+
+    private var reportedNewsIDs: Set<String> {
+        get {
+            let storedValue = UserDefaults.standard.string(forKey: reportedNewsIDsKey) ?? ""
+            return Set(storedValue.split(separator: "\n").map(String.init))
+        }
+        set {
+            UserDefaults.standard.set(newValue.sorted().joined(separator: "\n"), forKey: reportedNewsIDsKey)
+        }
+    }
+
+    private func markCurrentNewsReported() {
+        var reportedNewsIDs = reportedNewsIDs
+        reportedNewsIDs.insert(news.id)
+        self.reportedNewsIDs = reportedNewsIDs
     }
 }

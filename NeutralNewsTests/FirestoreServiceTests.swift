@@ -329,6 +329,45 @@ struct FirestoreServiceTests {
         #expect(lookup.relatedNews.first?.id == "source-1")
         #expect(lookup.relatedNews.first?.embedding == [])
     }
+
+    @Test("Decodes archived snapshot with backend timestamp format")
+    func decodesArchivedSnapshotWithBackendTimestampFormat() throws {
+        let payload = Data("""
+        {
+          "id": "1584126",
+          "neutral_title": "Archived title",
+          "neutral_description": "Archived description",
+          "category_id": "society",
+          "relevance": 9,
+          "date": "2026-04-19T08:23:35",
+          "created_at": "2026-04-20T05:06:08.383369",
+          "updated_at": "2026-04-20T05:06:08.383369",
+          "image_url": "https://example.com/image.jpg",
+          "image_medium": "Publisher",
+          "group": 1584126,
+          "source_ids": ["source-1"],
+          "sources": [
+            {
+              "id": "source-1",
+              "title": "Source title",
+              "description_short": "Short description",
+              "publisher": "Publisher",
+              "link": "https://example.com/source",
+              "pub_date": "2026-04-19T08:23:35",
+              "image_url": "",
+              "neutral_score": 7
+            }
+          ]
+        }
+        """.utf8)
+        let snapshot = try JSONDecoder().decode(ArchivedNewsSnapshot.self, from: payload)
+        let lookup = try #require(FirestoreService.decodeArchivedNewsSnapshot(snapshot))
+
+        #expect(lookup.news.id == "1584126")
+        #expect(lookup.news.group == 1584126)
+        #expect(lookup.news.createdAt.timeIntervalSince1970 > 0)
+        #expect(lookup.relatedNews.first?.imageUrl == "")
+    }
 }
 
 private final class ArchiveSessionMock: URLSessionDataProviding {

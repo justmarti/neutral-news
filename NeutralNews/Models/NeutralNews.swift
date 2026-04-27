@@ -31,7 +31,7 @@ struct StoryFocusPoint: Codable, Hashable, Sendable {
     let y: Double
 }
 
-struct NeutralNews: Codable, Hashable, Identifiable {
+struct NeutralNews: Codable, Hashable, Identifiable, Sendable {
     let id: String
     let neutralTitle: String
     let neutralDescription: String

@@ -8,7 +8,8 @@
 import Foundation
 
 enum ReportError: Equatable {
-    case cooldown(remainingTime: String)
+    case alreadyReported
+    case cooldown(remainingSeconds: Int)
     case networkError
     case firebaseError
     case permissionDenied
@@ -16,6 +17,7 @@ enum ReportError: Equatable {
     
     var title: LocalizedStringResource {
         switch self {
+        case .alreadyReported: "Already reported"
         case .cooldown: "Wait a moment"
         case .networkError: "No connection"
         case .firebaseError: "Server error"
@@ -26,7 +28,8 @@ enum ReportError: Equatable {
     
     var description: LocalizedStringResource {
         switch self {
-        case .cooldown(let time): "You can send another report in \(time)."
+        case .alreadyReported: "You already reported this article"
+        case .cooldown(let remainingSeconds): "Wait \(remainingSeconds) seconds"
         case .networkError: "Check your internet connection and try again."
         case .firebaseError: "There was a problem with the server. Try again later."
         case .permissionDenied: "You don’t have permission to send reports."
@@ -36,6 +39,8 @@ enum ReportError: Equatable {
     
     var systemImage: String {
         switch self {
+        case .alreadyReported:
+            return "checkmark.circle.fill"
         case .cooldown:
             return "clock.fill"
         case .networkError:

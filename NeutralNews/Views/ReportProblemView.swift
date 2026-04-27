@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ReportProblemView: View {
     @State private var viewModel: ReportProblemViewModel
+    @Environment(\.dismiss) private var dismiss
     
     init(news: NeutralNews) {
         self._viewModel = State(initialValue: ReportProblemViewModel(news: news))
@@ -19,10 +20,8 @@ struct ReportProblemView: View {
             Group {
                 if viewModel.showMainContent {
                     mainContent
-                } else if viewModel.isSubmitted {
-                    ReportStatusView(type: .success)
-                } else if let error = viewModel.reportError {
-                    ReportStatusView(type: .error(error))
+                } else {
+                    Color.clear
                 }
             }
             .safeAreaInset(edge: .bottom) {
@@ -31,6 +30,23 @@ struct ReportProblemView: View {
                         .padding(.horizontal, ReportConstants.Layout.horizontalPadding)
                 }
             }
+        }
+        .onChange(of: viewModel.isSubmitted) { _, isSubmitted in
+            guard isSubmitted else { return }
+            finishWithFeedback(
+                "Report sent successfully",
+                systemImage: "checkmark.circle",
+                style: .success
+            )
+        }
+        .onChange(of: viewModel.reportError) { _, reportError in
+            guard let reportError else { return }
+            finishWithFeedback(
+                reportError.description,
+                systemImage: reportError.systemImage,
+                style: reportError == .alreadyReported ? .info : .error,
+                haptic: reportError.feedbackHaptic
+            )
         }
     }
     
@@ -82,6 +98,31 @@ struct ReportProblemView: View {
         .disabled(viewModel.selectedProblem == nil || viewModel.isSubmitting)
         .animation(.default, value: viewModel.selectedProblem != nil)
         .animation(.default, value: viewModel.isSubmitting)
+    }
+
+    private func finishWithFeedback(
+        _ title: LocalizedStringResource,
+        systemImage: String,
+        style: AppFeedbackCenter.FeedbackStyle,
+        haptic: AppFeedbackCenter.FeedbackHaptic? = nil
+    ) {
+        dismiss()
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(220))
+            AppFeedbackCenter.shared.show(title, systemImage: systemImage, style: style, haptic: haptic)
+        }
+    }
+}
+
+private extension ReportError {
+    var feedbackHaptic: AppFeedbackCenter.FeedbackHaptic {
+        switch self {
+        case .alreadyReported, .cooldown:
+            return .warning
+        case .networkError, .firebaseError, .permissionDenied, .unknown:
+            return .error
+        }
     }
 }
 
@@ -144,96 +185,5 @@ private struct ProblemSelectionView: View {
             insertion: .scale.combined(with: .opacity),
             removal: .scale.combined(with: .opacity)
         ))
-    }
-}
-
-private struct ReportStatusView: View {
-    enum StatusType {
-        case success
-        case error(ReportError)
-    }
-    
-    let type: StatusType
-    @Environment(\.dismiss) private var dismiss
-    @State private var isVisible = false
-    
-    var body: some View {
-        VStack(spacing: ReportConstants.Spacing.statusViewSpacing) {
-            Spacer()
-            
-            VStack(spacing: ReportConstants.Spacing.statusContentSpacing) {
-                statusIcon
-                statusText
-            }
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            isVisible = true
-            
-            Task {
-                try? await Task.sleep(nanoseconds: ReportConstants.Timing.autoDismissDelay)
-                dismiss()
-            }
-        }
-        .transition(.asymmetric(
-            insertion: .move(edge: .trailing).combined(with: .opacity),
-            removal: .identity
-        ))
-    }
-    
-    private var statusIcon: some View {
-        Image(systemName: iconName)
-            .font(.system(size: ReportConstants.Animation.iconSize))
-            .foregroundStyle(iconColor, iconSecondaryColor)
-            .scaleEffect(isVisible ? 1.0 : 0.5)
-            .opacity(isVisible ? 1.0 : 0.0)
-            .animation(.default, value: isVisible)
-    }
-    
-    private var statusText: some View {
-        Text(statusMessage)
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
-            .opacity(isVisible ? 1.0 : 0.0)
-            .animation(.default, value: isVisible)
-    }
-    
-    private var iconName: String {
-        switch type {
-        case .success:
-            return "checkmark.circle.fill"
-        case .error(let reportError):
-            return reportError.systemImage
-        }
-    }
-    
-    private var iconColor: Color {
-        switch type {
-        case .success:
-            return .white
-        case .error:
-            return .red
-        }
-    }
-    
-    private var iconSecondaryColor: Color {
-        switch type {
-        case .success:
-            return .green
-        case .error:
-            return .white
-        }
-    }
-    
-    private var statusMessage: LocalizedStringResource {
-        switch type {
-        case .success:
-            return "Report sent successfully"
-        case .error(let reportError):
-            return reportError.description
-        }
     }
 }

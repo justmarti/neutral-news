@@ -13,19 +13,7 @@ import Observation
 @MainActor
 @Observable
 final class NewsListViewModel {
-    actor ObservationStreamState {
-        private var isTerminated = false
-
-        func terminate() {
-            isTerminated = true
-        }
-
-        func canContinue() -> Bool {
-            !isTerminated
-        }
-    }
-
-    struct DeepLinkNavigationTarget: Identifiable, Hashable {
+    struct DeepLinkNavigationTarget: Identifiable, Hashable, Sendable {
         let news: NeutralNews
         let relatedNews: [News]
         let region: ContentRegion
@@ -77,6 +65,7 @@ final class NewsListViewModel {
     
     var isLoadingNeutralNews = false
     var isLoadingForSearch = false
+    var isResolvingDeepLink = false
     var hasCompletedInitialLaunchLoad = false
 
     // MARK: - Saved News State

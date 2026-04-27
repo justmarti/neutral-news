@@ -12,7 +12,6 @@ struct NeutralNewsOptionsActions: View {
     let relatedNews: [News]
     let region: ContentRegion?
     @Binding var isShowingReportProblemSheet: Bool
-    @Binding var saveFeedbackTrigger: Int
 
     private let premiumManager = PremiumManager.shared
     @State private var savedNewsState = SavedNewsState.shared
@@ -94,7 +93,7 @@ struct NeutralNewsOptionsActions: View {
                 try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context, regionRaw: unsaveRegionRaw)
                 await MainActor.run {
                     savedNewsState.setSaved(false, for: news.id, regionRaw: unsaveRegionRaw)
-                    saveFeedbackTrigger &+= 1
+                    AppFeedbackCenter.shared.show("Removed from saved", systemImage: "bookmark.slash", style: .info, haptic: .success)
                 }
 #if DEBUG
                 print("✅ Article unsaved successfully")
@@ -125,7 +124,7 @@ struct NeutralNewsOptionsActions: View {
                         )
                     }
 
-                    saveFeedbackTrigger &+= 1
+                    AppFeedbackCenter.shared.show("Saved", systemImage: "bookmark", style: .success)
                 }
 #if DEBUG
                 print("✅ Article saved successfully")
@@ -133,6 +132,9 @@ struct NeutralNewsOptionsActions: View {
             }
         } catch {
             print("❌ Error saving/unsaving article: \(error)")
+            await MainActor.run {
+                AppFeedbackCenter.shared.show("Couldn’t update saved news", systemImage: "exclamationmark.triangle", style: .error)
+            }
         }
     }
 
@@ -169,7 +171,6 @@ struct NeutralNewsOptionsMenu: View {
     let relatedNews: [News]
     let region: ContentRegion?
     @Binding var isShowingReportProblemSheet: Bool
-    @State private var saveFeedbackTrigger = 0
 
     var body: some View {
         Menu {
@@ -177,14 +178,12 @@ struct NeutralNewsOptionsMenu: View {
                 news: news,
                 relatedNews: relatedNews,
                 region: region,
-                isShowingReportProblemSheet: $isShowingReportProblemSheet,
-                saveFeedbackTrigger: $saveFeedbackTrigger
+                isShowingReportProblemSheet: $isShowingReportProblemSheet
             )
         } label: {
             Image(systemName: "ellipsis")
                 .font(.headline.weight(.semibold))
                 .accessibilityLabel("Options")
         }
-        .sensoryFeedback(.success, trigger: saveFeedbackTrigger)
     }
 }
