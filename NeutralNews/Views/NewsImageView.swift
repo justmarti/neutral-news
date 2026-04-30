@@ -11,6 +11,8 @@ struct NewsImageView: View {
     let news: NeutralNews
     let imageUrl: String?
     @Environment(\.displayScale) private var displayScale
+    private static let cardHeight: CGFloat = 250
+    private static let cornerRadius: CGFloat = 16
 
     // Gradient is created once and shared by all instances
     private static let overlayGradient = LinearGradient(
@@ -36,11 +38,11 @@ struct NewsImageView: View {
                         image
                             .resizable()
                             .scaledToFill()
-                            .frame(width: geometry.size.width, height: 250)
+                            .frame(width: geometry.size.width, height: Self.cardHeight)
                             .clipped()
                     } else {
                         ShimmerView()
-                            .frame(width: geometry.size.width, height: 250)
+                            .frame(width: geometry.size.width, height: Self.cardHeight)
                     }
                 }
                 
@@ -60,10 +62,11 @@ struct NewsImageView: View {
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: geometry.size.width)
+            .frame(width: geometry.size.width, height: Self.cardHeight)
         }
-        .frame(height: 250)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .frame(height: Self.cardHeight)
+        .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius))
+        .contentShape(.interaction, RoundedRectangle(cornerRadius: Self.cornerRadius))
     }
 }
 
