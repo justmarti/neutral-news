@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4111E2772D8761DE0057CA98 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 4111E2762D8761DE0057CA98 /* FirebaseAuth */; };
+		4117AABA2FB491A3003A64C3 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */ = {isa = PBXBuildFile; productRef = 4117AAB92FB491A3003A64C3 /* FirebaseAnalyticsWithoutAdIdSupport */; };
 		4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C42E7C7B1000E94D76 /* RevenueCat */; };
 		4130E0C72E7C7B1000E94D76 /* RevenueCatUI in Frameworks */ = {isa = PBXBuildFile; productRef = 4130E0C62E7C7B1000E94D76 /* RevenueCatUI */; };
 		414539F42EE2FB2F00541692 /* ASO.md in Resources */ = {isa = PBXBuildFile; fileRef = 414539F32EE2FB2F00541692 /* ASO.md */; };
@@ -80,6 +81,7 @@
 				4199F40F2EB2AF1100BFAF43 /* FirebaseCrashlytics in Frameworks */,
 				4130E0C52E7C7B1000E94D76 /* RevenueCat in Frameworks */,
 				41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */,
+				4117AABA2FB491A3003A64C3 /* FirebaseAnalyticsWithoutAdIdSupport in Frameworks */,
 				416D20D42E4371690070F565 /* FirebaseRemoteConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -166,6 +168,7 @@
 				4130E0C62E7C7B1000E94D76 /* RevenueCatUI */,
 				4199F40E2EB2AF1100BFAF43 /* FirebaseCrashlytics */,
 				418CA6312F5DF24900B3B4AD /* FirebaseMessaging */,
+				4117AAB92FB491A3003A64C3 /* FirebaseAnalyticsWithoutAdIdSupport */,
 			);
 			productName = NeutralNews;
 			productReference = 419D2FB72D11C96500D95E22 /* NeutralNews.app */;
@@ -599,6 +602,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseAuth;
+		};
+		4117AAB92FB491A3003A64C3 /* FirebaseAnalyticsWithoutAdIdSupport */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 41A736202D820C8F00E08EA1 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalyticsWithoutAdIdSupport;
 		};
 		4130E0C42E7C7B1000E94D76 /* RevenueCat */ = {
 			isa = XCSwiftPackageProductDependency;
