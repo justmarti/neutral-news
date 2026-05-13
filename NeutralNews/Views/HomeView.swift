@@ -23,9 +23,30 @@ struct StoryArticleNavigationTarget: Identifiable, Hashable {
 }
 
 enum StoryCollectionBuilder {
-    static func buildBriefingCollection(dayNews: [NeutralNews]) -> StoryCollection? {
-        guard !dayNews.isEmpty else { return nil }
-        let briefingItems = Array(dayNews.sorted { $0.relevance > $1.relevance }.prefix(6))
+    private static let briefingLimit = 8
+    private static let briefingWindow: TimeInterval = 24 * 60 * 60
+
+    static func buildBriefingCollection(
+        news: [NeutralNews],
+        referenceDate: Date = .now
+    ) -> StoryCollection? {
+        let windowStart = referenceDate.addingTimeInterval(-briefingWindow)
+        let briefingItems = Array(
+            news
+                .filter { $0.date >= windowStart }
+                .sorted { first, second in
+                    if first.relevance != second.relevance {
+                        return first.relevance > second.relevance
+                    }
+
+                    if first.date != second.date {
+                        return first.date > second.date
+                    }
+
+                    return first.id < second.id
+                }
+                .prefix(briefingLimit)
+        )
 
         guard let coverNews = briefingItems.first else {
             return nil
@@ -112,9 +133,20 @@ struct HomeView: View {
     private var briefingCollection: StoryCollection? {
         guard isShowingPrimaryDayHome else { return nil }
 
-        let dayNews = newsDataManager.getNewsArrayForDay(vm.daySelected)
+        let recentNews = newsDataManager.getNewsArrayForDay(vm.daySelected)
+            + previousDayNewsForStoryWindow
 
-        return StoryCollectionBuilder.buildBriefingCollection(dayNews: dayNews)
+        return StoryCollectionBuilder.buildBriefingCollection(news: recentNews)
+    }
+
+    private var previousDayForStoryWindow: DayInfo? {
+        Calendar.current.date(byAdding: .day, value: -1, to: vm.daySelected.date)
+            .map(DayInfo.init)
+    }
+
+    private var previousDayNewsForStoryWindow: [NeutralNews] {
+        guard let previousDayForStoryWindow else { return [] }
+        return newsDataManager.getNewsArrayForDay(previousDayForStoryWindow)
     }
 
     var body: some View {
@@ -147,6 +179,9 @@ struct HomeView: View {
                     }
                     .onAppear {
                         vm.checkPendingDeepLink()
+                    }
+                    .task(id: isShowingPrimaryDayHome) {
+                        await loadStoryWindowNewsIfNeeded()
                     }
                     .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
                         guard let deepLink = notification.userInfo?[PushNotificationService.deepLinkUserInfoKey] as? DeepLinkService.DeepLinkData else {
@@ -570,20 +605,24 @@ struct HomeView: View {
     }
 
     private func storyCollectionKey(for collection: StoryCollection) -> String {
-        let dayKey = vm.daySelected.date.formatted(
-            Date.FormatStyle()
-                .year()
-                .month(.twoDigits)
-                .day(.twoDigits)
-        )
-
-        return "\(dayKey)|\(collection.id)"
+        let itemIDsKey = collection.items.map(\.id).joined(separator: ",")
+        return "\(collection.id)|\(itemIDsKey)"
     }
 
     private func markStoryCollectionAsViewed(_ collection: StoryCollection) {
         var updatedKeys = viewedStoryCollectionKeys
         updatedKeys.insert(storyCollectionKey(for: collection))
         viewedStoryCollectionKeysStorage = updatedKeys.sorted().joined(separator: "\n")
+    }
+
+    private func loadStoryWindowNewsIfNeeded() async {
+        guard isShowingPrimaryDayHome,
+              let previousDayForStoryWindow,
+              !newsDataManager.isDayLoaded(previousDayForStoryWindow) else {
+            return
+        }
+
+        await newsDataManager.loadNews(for: previousDayForStoryWindow)
     }
 
     private func resolvedRegion(for news: NeutralNews) -> ContentRegion? {
