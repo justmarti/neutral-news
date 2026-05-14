@@ -76,6 +76,14 @@ struct NeutralNewsView: View {
                         .padding()
                         
                         Spacer()
+
+                        Text("Media coverage")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                            .fontWidth(.expanded)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.leading, 16)
+                            .padding(.top, 32)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack {
