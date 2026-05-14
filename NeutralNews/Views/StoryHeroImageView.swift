@@ -329,12 +329,8 @@ struct StoryHeroImageView: View {
             width: imageSize.width * scale,
             height: imageSize.height * scale
         )
-        let offset = CGSize(
-            width: (containerSize.width - renderedSize.width) / 2,
-            height: (containerSize.height - renderedSize.height) / 2
-        )
 
-        return StoryImageMetrics(renderedSize: renderedSize, offset: offset)
+        return StoryImageMetrics(renderedSize: renderedSize, offset: .zero)
     }
 
     private func focusCropMetrics(
