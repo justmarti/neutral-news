@@ -112,8 +112,7 @@ struct SavedNewsSourcesPayloadTests {
             createdAt: createdAt,
             updatedAt: createdAt,
             group: 1,
-            sourceIds: [newsId],
-            storyFocusPoint: nil
+            sourceIds: [newsId]
         )
 
         return SavedNewsService.SavedNeutralNewsEntry(

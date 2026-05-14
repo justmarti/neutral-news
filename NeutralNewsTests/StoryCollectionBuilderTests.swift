@@ -100,7 +100,6 @@ private func makeStoryCollectionNews(
         createdAt: date,
         updatedAt: date,
         group: 1,
-        sourceIds: ["source-1", "source-2"],
-        storyFocusPoint: nil
+        sourceIds: ["source-1", "source-2"]
     )
 }

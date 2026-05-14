@@ -107,8 +107,7 @@ struct CacheServiceTests {
             createdAt: date,
             updatedAt: date,
             group: 1,
-            sourceIds: ["\(id)-source-a", "\(id)-source-b"],
-            storyFocusPoint: nil
+            sourceIds: ["\(id)-source-a", "\(id)-source-b"]
         )
     }
 

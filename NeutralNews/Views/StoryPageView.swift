@@ -23,8 +23,7 @@ struct StoryPageView: View {
             ZStack {
                 StoryHeroImageView(
                     imageUrl: news.imageUrl,
-                    reservedBottomHeight: reservedBottomHeight,
-                    storyFocusPoint: news.storyFocusPoint
+                    reservedBottomHeight: reservedBottomHeight
                 )
 
                 navigationTapOverlay(

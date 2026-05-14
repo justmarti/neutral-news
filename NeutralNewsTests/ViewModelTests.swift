@@ -246,8 +246,7 @@ private func makeNeutralNews(
         createdAt: date,
         updatedAt: date,
         group: 1,
-        sourceIds: sourceIds,
-        storyFocusPoint: nil
+        sourceIds: sourceIds
     )
 }
 

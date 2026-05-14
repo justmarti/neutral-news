@@ -63,7 +63,7 @@ struct StoryBriefingModuleView: View {
             thumbnailTransitionProgress = 1
 
             async let prefetchedThumbnails = prefetchThumbnailImages()
-            async let prefetchedFocusPoints: Void = prefetchStoryFocusPoints()
+            async let prefetchedFocusPoints: Void = prefetchImageFocusPoints()
             dominantColor = await dominantColor(for: currentItem.imageUrl)
 
             await prefetchedThumbnails
@@ -173,7 +173,7 @@ struct StoryBriefingModuleView: View {
         await CachedAsyncImageHelper.prefetchImages(from: urls, maxPixelSize: thumbnailPixelSize)
     }
 
-    private func prefetchStoryFocusPoints() async {
+    private func prefetchImageFocusPoints() async {
         await StoryHeroImageView.prefetchFocusPoints(for: items)
     }
 

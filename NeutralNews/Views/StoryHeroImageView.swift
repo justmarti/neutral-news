@@ -8,10 +8,14 @@
 import SwiftUI
 import Vision
 
+private struct StoryFocusPoint: Sendable {
+    let x: Double
+    let y: Double
+}
+
 struct StoryHeroImageView: View {
     let imageUrl: String
     let reservedBottomHeight: CGFloat
-    let storyFocusPoint: StoryFocusPoint?
 
     private let fallbackSharpScale: CGFloat = 1.03
     private let sharpImageBottomOverlap: CGFloat = 48
@@ -67,12 +71,11 @@ struct StoryHeroImageView: View {
             let availableSharpHeight = size.height - reservedSharpBottomHeight - extraBottomCrop - topInset
             let sharpHeight = max(availableSharpHeight, 0)
             let resolvedUIImage = resolvedUIImage(size: size)
-            let currentImageIdentifier = imageLoadIdentifier(size: size)
             let currentFocusIdentifier = imageFocusIdentifier
             let effectiveFocusPoint =
                 displayFocusPointIdentifier == currentFocusIdentifier
                 ? displayFocusPoint
-                : storyFocusPoint
+                : nil
             let heroContainerSize = CGSize(width: size.width, height: sharpHeight)
             let backgroundContainerSize = CGSize(width: size.width, height: size.height)
             let heroMetrics = resolvedUIImage.map {
@@ -273,7 +276,7 @@ struct StoryHeroImageView: View {
             image: image
         )
 
-        return refinedFocusPoint ?? storyFocusPoint
+        return refinedFocusPoint
     }
 
     @ViewBuilder
