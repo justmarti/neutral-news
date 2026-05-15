@@ -34,7 +34,7 @@ struct StoryBriefingModuleView: View {
                         .fontDesign(.serif)
                         .foregroundStyle(.primary)
 
-                    Text("A quick summary of the latest news.")
+                    Text("A quick look at what’s happening")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
