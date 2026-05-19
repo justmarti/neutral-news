@@ -44,13 +44,6 @@ final class NewsFilterViewModel {
         }
     }
     
-    var orderBy: OrderBy = .hour {
-        didSet {
-            // No debounce for orderBy - user expects immediate response
-            onFiltersChanged?()
-        }
-    }
-    
     // MARK: - Computed Properties
     var isAnyFilterEnabled: Bool {
         !categoryFilter.isEmpty
@@ -94,9 +87,7 @@ final class NewsFilterViewModel {
 
         // Apply premium limitations for search scope
         if searchScope == .lastSevenDays && !PremiumManager.shared.isPremium {
-            // For free users: show 5 most relevant results as premium teaser
-            let relevanceSorted = filteredNews.sorted { $0.relevance > $1.relevance }
-            return Array(relevanceSorted.prefix(5))
+            return Array(sortedNews.prefix(5))
         }
 
         return sortedNews
@@ -137,7 +128,6 @@ final class NewsFilterViewModel {
         categoryFilter.removeAll()
         searchText = ""
         searchScope = .daySelected
-        orderBy = .hour
     }
     
     // MARK: - Private Methods
@@ -157,16 +147,6 @@ final class NewsFilterViewModel {
     }
     
     private func sortNews(_ news: [NeutralNews]) -> [NeutralNews] {
-        // Pre-compute popularity scores to avoid expensive calls during sorting
-        let popularityCache: [String: Int] = {
-            guard orderBy == .popularity else { return [:] }
-            var cache: [String: Int] = [:]
-            for newsItem in news {
-                cache[newsItem.id] = newsItem.sourceIds.count
-            }
-            return cache
-        }()
-        
         return news.sorted { (news1: NeutralNews, news2: NeutralNews) -> Bool in
             // Prioritize search matches in titles
             if !searchText.isEmpty {
@@ -181,17 +161,7 @@ final class NewsFilterViewModel {
                 }
             }
             
-            // Apply order by
-            switch orderBy {
-            case .hour:
-                return news1.date > news2.date
-            case .relevance:
-                return news1.relevance > news2.relevance
-            case .popularity:
-                let count1 = popularityCache[news1.id] ?? 0
-                let count2 = popularityCache[news2.id] ?? 0
-                return count1 > count2
-            }
+            return news1.date > news2.date
         }
     }
 }

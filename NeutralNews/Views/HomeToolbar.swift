@@ -87,51 +87,8 @@ struct HomeToolbar {
         }
     }
     
-    private var orderMenu: some View {
-        Menu {
-            Button {
-                vm.orderBy = .hour
-            } label: {
-                Label("Time", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
-                Text("Latest news")
-            }
-            Button {
-                vm.orderBy = .relevance
-            } label: {
-                Label("Relevance", systemImage: vm.orderBy == .relevance ? "megaphone.fill" : "megaphone")
-                Text("Top stories")
-            }
-            Button {
-                vm.orderBy = .popularity
-            } label: {
-                Label("Coverage", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
-                Text("Most commented")
-            }
-        } label: {
-            Label("Sort", systemImage: "arrow.up.arrow.down.circle")
-        }
-    }
-    
     private var filterMenu: some View {
         Menu {
-            ControlGroup {
-                Button {
-                    vm.orderBy = .hour
-                } label: {
-                    Label("Time", systemImage: vm.orderBy == .hour ? "clock.fill" : "clock")
-                }
-                Button {
-                    vm.orderBy = .relevance
-                } label: {
-                    Label("Relevance", systemImage: vm.orderBy == .relevance ? "megaphone.fill" : "megaphone")
-                }
-                Button {
-                    vm.orderBy = .popularity
-                } label: {
-                    Label("Coverage", systemImage: vm.orderBy == .popularity ? "flame.fill" : "flame")
-                }
-            }
-            
             ForEach(vm.getCategoriesOfTheDay(), id: \.self) { category in
                 Button {
                     vm.filterByCategory(category)

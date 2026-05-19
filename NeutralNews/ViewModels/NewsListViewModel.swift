@@ -158,11 +158,6 @@ final class NewsListViewModel {
         set { filterViewModel.categoryFilter = newValue }
     }
     
-    var orderBy: OrderBy {
-        get { filterViewModel.orderBy }
-        set { filterViewModel.orderBy = newValue }
-    }
-    
     var isAnyFilterEnabled: Bool {
         filterViewModel.isAnyFilterEnabled
     }

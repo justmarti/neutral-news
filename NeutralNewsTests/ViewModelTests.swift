@@ -83,39 +83,25 @@ struct NewsFilterViewModelTests {
         #expect(filtered.map(\.id) == [politics.id])
     }
 
-    @Test("Relevance order sorts highest relevance stories first")
-    func relevanceOrderSortsHighestRelevanceFirst() {
+    @Test("Regular news always sorts by latest publication date")
+    func regularNewsAlwaysSortsByLatestPublicationDate() {
         let sut = NewsFilterViewModel()
-        let low = makeNeutralNews(id: "filter-relevance-low", title: "Low", relevance: 2)
-        let high = makeNeutralNews(id: "filter-relevance-high", title: "High", relevance: 9)
-        let medium = makeNeutralNews(id: "filter-relevance-medium", title: "Medium", relevance: 5)
-
-        sut.orderBy = .relevance
-
-        let filtered = sut.applyFilters(to: [medium, low, high])
-
-        #expect(filtered.map(\.id) == [high.id, medium.id, low.id])
-    }
-
-    @Test("Popularity order sorts stories with more linked sources first")
-    func popularityOrderSortsStoriesWithMoreLinkedSourcesFirst() {
-        let sut = NewsFilterViewModel()
-        let lowCoverage = makeNeutralNews(
-            id: "filter-popularity-low",
-            title: "Low coverage",
-            sourceIds: ["source-1"]
+        let olderHighRelevance = makeNeutralNews(
+            id: "filter-hour-older-high-relevance",
+            title: "Older high relevance",
+            relevance: 10,
+            date: Date().addingTimeInterval(-7_200)
         )
-        let highCoverage = makeNeutralNews(
-            id: "filter-popularity-high",
-            title: "High coverage",
-            sourceIds: ["source-1", "source-2", "source-3"]
+        let newerLowRelevance = makeNeutralNews(
+            id: "filter-hour-newer-low-relevance",
+            title: "Newer low relevance",
+            relevance: 1,
+            date: Date()
         )
 
-        sut.orderBy = .popularity
+        let filtered = sut.applyFilters(to: [olderHighRelevance, newerLowRelevance])
 
-        let filtered = sut.applyFilters(to: [lowCoverage, highCoverage])
-
-        #expect(filtered.map(\.id) == [highCoverage.id, lowCoverage.id])
+        #expect(filtered.map(\.id) == [newerLowRelevance.id, olderHighRelevance.id])
     }
 }
 

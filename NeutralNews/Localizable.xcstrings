@@ -487,22 +487,6 @@
         }
       }
     },
-    "Coverage" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coverage"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cobertura"
-          }
-        }
-      }
-    },
     "Culture" : {
       "localizations" : {
         "en" : {
@@ -871,22 +855,6 @@
         }
       }
     },
-    "Latest news" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Latest news"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Últimas noticias"
-          }
-        }
-      }
-    },
     "Legal" : {
       "localizations" : {
         "en" : {
@@ -1019,22 +987,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ruido mediático"
-          }
-        }
-      }
-    },
-    "Most commented" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Most commented"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las más comentadas"
           }
         }
       }
@@ -1449,22 +1401,6 @@
         }
       }
     },
-    "Relevance" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Relevance"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Relevancia"
-          }
-        }
-      }
-    },
     "Removed from saved" : {
       "localizations" : {
         "en" : {
@@ -1809,22 +1745,6 @@
         }
       }
     },
-    "Sort" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sort"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ordenar"
-          }
-        }
-      }
-    },
     "Spain" : {
       "localizations" : {
         "en" : {
@@ -2047,22 +1967,6 @@
         }
       }
     },
-    "Time" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Time"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Hora"
-          }
-        }
-      }
-    },
     "Top results" : {
       "localizations" : {
         "en" : {
@@ -2075,22 +1979,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Mejores resultados"
-          }
-        }
-      }
-    },
-    "Top stories" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Top stories"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Las más importantes"
           }
         }
       }
