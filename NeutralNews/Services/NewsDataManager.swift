@@ -248,15 +248,16 @@ final class NewsDataManager {
             self.regularNewsLoadCoordinator.currentSessionID()
         }
 
-        // Step 1: Try cache first (unless force refresh)
-        if !forceRefresh && cacheService.isCacheValid(for: day) {
+        // Step 1: Try cached neutral news first (unless force refresh).
+        if !forceRefresh && cacheService.isNeutralNewsCacheValid(for: day) {
 #if DEBUG
             print("📱 Cache HIT for \(day.dayName)")
 #endif
-            
+
+            let hasRegularCache = cacheService.isNewsCacheValid(for: day)
             let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
-            let cachedNews = cacheService.getCachedNews(for: day)
-            
+            let cachedNews = hasRegularCache ? cacheService.getCachedNews(for: day) : []
+
             await MainActor.run {
                 self.addNewNewsForDay(
                     neutralNews: cachedNeutralNews,
@@ -266,6 +267,16 @@ final class NewsDataManager {
                 self.markDateAsLoaded(startOfDay)
             }
             await dayLoadGate.markLoaded(startOfDay)
+
+            if !hasRegularCache {
+                await startRegularNewsLoad(
+                    for: dayDate,
+                    startOfDay: startOfDay,
+                    dayName: dayName,
+                    sessionID: sessionID
+                )
+            }
+
             return
         }
         
@@ -311,9 +322,9 @@ final class NewsDataManager {
             } catch {
                 print("❌ Error loading news for \(dayName): \(error.localizedDescription)")
 
-                // Fallback: try to load from cache even if potentially stale
-                let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
-                let cachedNews = cacheService.getCachedNews(for: day)
+                // Fallback: try to load from local cache even if it is past the refresh TTL.
+                let cachedNeutralNews = cacheService.getStaleCachedNeutralNews(for: day)
+                let cachedNews = cacheService.getStaleCachedNews(for: day)
 
                 if !cachedNeutralNews.isEmpty || !cachedNews.isEmpty {
 #if DEBUG
@@ -365,8 +376,8 @@ final class NewsDataManager {
         } catch {
             print("❌ Error loading neutral news for \(dayName): \(error.localizedDescription)")
 
-            // Fallback: try stale neutral cache
-            let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
+            // Fallback: try local neutral cache even if it is past the refresh TTL.
+            let cachedNeutralNews = cacheService.getStaleCachedNeutralNews(for: day)
 
             if !cachedNeutralNews.isEmpty {
 #if DEBUG
@@ -386,6 +397,20 @@ final class NewsDataManager {
             }
         }
 
+        await startRegularNewsLoad(
+            for: dayDate,
+            startOfDay: startOfDay,
+            dayName: dayName,
+            sessionID: sessionID
+        )
+    }
+
+    private func startRegularNewsLoad(
+        for dayDate: Date,
+        startOfDay: Date,
+        dayName: String,
+        sessionID: UUID
+    ) async {
         let regularNewsTask = Task(priority: .utility) { [weak self] in
             guard let self else { return }
 
@@ -420,7 +445,7 @@ final class NewsDataManager {
 
                 // Fallback to stale regular cache to keep related-news lookups usable.
                 let dayInfo = DayInfo(date: dayDate)
-                let cachedNews = self.cacheService.getCachedNews(for: dayInfo)
+                let cachedNews = self.cacheService.getStaleCachedNews(for: dayInfo)
                 guard !cachedNews.isEmpty else {
                     await MainActor.run {
                         self.regularNewsLoadCoordinator.removeTask(for: startOfDay)

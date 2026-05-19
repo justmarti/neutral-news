@@ -56,6 +56,17 @@ struct CacheServiceTests {
         #expect(cached.first?.publisher == "Example Publisher")
     }
 
+    @Test("Neutral and regular news cache validity are checked independently")
+    func neutralAndRegularNewsCacheValidityAreCheckedIndependently() {
+        let day = makeDay(daysFromNow: 49)
+        let neutral = makeNeutralNews(id: "cache-validity-neutral", title: "Neutral only", date: day.date)
+
+        cacheService.cacheNeutralNews([neutral], for: day)
+
+        #expect(cacheService.isNeutralNewsCacheValid(for: day) == true)
+        #expect(cacheService.isNewsCacheValid(for: day) == false)
+    }
+
     @Test("Caching an empty neutral news batch preserves the existing cache")
     func cachingAnEmptyNeutralNewsBatchPreservesTheExistingCache() {
         let day = makeDay(daysFromNow: -48)

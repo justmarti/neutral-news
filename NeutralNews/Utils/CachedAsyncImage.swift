@@ -30,6 +30,18 @@ fileprivate final class ImageCacheKey: NSObject {
     }
 }
 
+private extension UIImage {
+    var decodedMemoryCost: Int {
+        if let cgImage {
+            return cgImage.bytesPerRow * cgImage.height
+        }
+
+        let pixelWidth = Int(size.width * scale)
+        let pixelHeight = Int(size.height * scale)
+        return pixelWidth * pixelHeight * 4
+    }
+}
+
 enum CachedAsyncImageHelper {
     static let urlSession: URLSession = {
         let cache = URLCache(
@@ -80,7 +92,7 @@ enum CachedAsyncImageHelper {
 
                 if let uiImage = await decodeUIImage(data, maxPixelSize: targetPixelSize) {
                     guard !Task.isCancelled else { return }
-                    decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
+                    decodedImageCache.setObject(uiImage, forKey: key, cost: uiImage.decodedMemoryCost)
                 }
             } catch {
                 continue
@@ -106,7 +118,7 @@ enum CachedAsyncImageHelper {
         }
         try Task.checkCancellation()
 
-        decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
+        decodedImageCache.setObject(uiImage, forKey: key, cost: uiImage.decodedMemoryCost)
         return uiImage
     }
 
@@ -172,7 +184,11 @@ struct CachedAsyncImage<Content: View>: View {
                 maxPixelSize: targetPixelSize
             ) {
                 guard !Task.isCancelled else { return }
-                CachedAsyncImageHelper.decodedImageCache.setObject(uiImage, forKey: key, cost: data.count)
+                CachedAsyncImageHelper.decodedImageCache.setObject(
+                    uiImage,
+                    forKey: key,
+                    cost: uiImage.decodedMemoryCost
+                )
                 updatePhase(.success(Image(uiImage: uiImage)))
             } else {
                 updatePhase(.failure(URLError(.cannotDecodeContentData)))

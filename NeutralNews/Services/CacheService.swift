@@ -38,6 +38,7 @@ final class CacheService {
 
     // Cleanup interval: 6 hours between cleanups
     private static let cleanupInterval: TimeInterval = 6 * 60 * 60
+    private static let cacheRetentionDays = 7
 
     private init() {
         do {
@@ -94,7 +95,7 @@ final class CacheService {
     
     // MARK: - Cache Check Methods
 
-    /// Checks if cached data for a specific day is still valid based on TTL (Time To Live).
+    /// Checks if cached neutral news for a specific day is still valid based on TTL (Time To Live).
     ///
     /// TTL varies by day:
     /// - Today: 45 minutes
@@ -105,6 +106,11 @@ final class CacheService {
     /// - Returns: `true` if valid cached data exists, `false` otherwise
     /// - Note: Triggers cache cleanup check as a side effect
     func isCacheValid(for day: DayInfo) -> Bool {
+        isNeutralNewsCacheValid(for: day)
+    }
+
+    /// Checks if cached neutral news for a specific day is still valid based on TTL (Time To Live).
+    func isNeutralNewsCacheValid(for day: DayInfo) -> Bool {
         cleanExpiredCacheIfNeeded()
         let context = createContext()
         let startOfDay = Calendar.current.startOfDay(for: day.date)
@@ -122,6 +128,29 @@ final class CacheService {
             return count > 0
         } catch {
             print("Error checking cache validity: \(error)")
+            return false
+        }
+    }
+
+    /// Checks if cached regular news for a specific day is still valid based on TTL (Time To Live).
+    func isNewsCacheValid(for day: DayInfo) -> Bool {
+        cleanExpiredCacheIfNeeded()
+        let context = createContext()
+        let startOfDay = Calendar.current.startOfDay(for: day.date)
+        let ttl = getTTL(for: day.date)
+        let cutoffDate = Date().addingTimeInterval(-ttl)
+
+        let descriptor = FetchDescriptor<CachedNews>(
+            predicate: #Predicate<CachedNews> { cached in
+                cached.dayDate == startOfDay && cached.cacheDate > cutoffDate
+            }
+        )
+
+        do {
+            let count = try context.fetchCount(descriptor)
+            return count > 0
+        } catch {
+            print("Error checking news cache validity: \(error)")
             return false
         }
     }
@@ -152,6 +181,32 @@ final class CacheService {
             return cachedItems.map { $0.toNeutralNews() }
         } catch {
             print("Error fetching cached neutral news: \(error)")
+            return []
+        }
+    }
+
+    /// Retrieves cached neutral news for a specific day without applying TTL.
+    ///
+    /// Use this only as an offline/network-error fallback. The result is still bounded by the
+    /// local cache retention window.
+    func getStaleCachedNeutralNews(for day: DayInfo) -> [NeutralNews] {
+        guard isWithinCacheRetention(day.date) else { return [] }
+
+        let context = createContext()
+        let startOfDay = Calendar.current.startOfDay(for: day.date)
+
+        let descriptor = FetchDescriptor<CachedNeutralNews>(
+            predicate: #Predicate<CachedNeutralNews> { cached in
+                cached.dayDate == startOfDay
+            },
+            sortBy: [SortDescriptor(\.date, order: .reverse)]
+        )
+
+        do {
+            let cachedItems = try context.fetch(descriptor)
+            return cachedItems.map { $0.toNeutralNews() }
+        } catch {
+            print("Error fetching stale cached neutral news: \(error)")
             return []
         }
     }
@@ -231,6 +286,32 @@ final class CacheService {
             return []
         }
     }
+
+    /// Retrieves cached regular news for a specific day without applying TTL.
+    ///
+    /// Use this only as an offline/network-error fallback. The result is still bounded by the
+    /// local cache retention window.
+    func getStaleCachedNews(for day: DayInfo) -> [News] {
+        guard isWithinCacheRetention(day.date) else { return [] }
+
+        let context = createContext()
+        let startOfDay = Calendar.current.startOfDay(for: day.date)
+
+        let descriptor = FetchDescriptor<CachedNews>(
+            predicate: #Predicate<CachedNews> { cached in
+                cached.dayDate == startOfDay
+            },
+            sortBy: [SortDescriptor(\.pubDate, order: .reverse)]
+        )
+
+        do {
+            let cachedItems = try context.fetch(descriptor)
+            return cachedItems.compactMap { $0.toNews() }
+        } catch {
+            print("Error fetching stale cached news: \(error)")
+            return []
+        }
+    }
     
     /// Stores regular news in SwiftData cache for a specific day.
     ///
@@ -282,22 +363,19 @@ final class CacheService {
 
     /// Performs comprehensive cache cleanup in the background.
     ///
-    /// This method executes three cleanup operations:
+    /// This method executes two cleanup operations:
     /// 1. Removes neutral news older than 7 days
     /// 2. Removes regular news older than 7 days
-    /// 3. Removes TTL-expired items for the last 7 days
     ///
     /// - Note: This is an async operation that should be called from background tasks
     func cleanExpiredCache() async {
         await cleanExpiredNeutralNews()
         await cleanExpiredNews()
-        await cleanOldCache()
     }
     
     private func cleanExpiredNeutralNews() async {
         let context = createContext()
-        // Clean cache older than 7 days
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        let sevenDaysAgo = oldestRetainedDay()
 
         let descriptor = FetchDescriptor<CachedNeutralNews>(
             predicate: #Predicate<CachedNeutralNews> { cached in
@@ -321,8 +399,7 @@ final class CacheService {
 
     private func cleanExpiredNews() async {
         let context = createContext()
-        // Clean cache older than 7 days
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
+        let sevenDaysAgo = oldestRetainedDay()
 
         let descriptor = FetchDescriptor<CachedNews>(
             predicate: #Predicate<CachedNews> { cached in
@@ -344,64 +421,6 @@ final class CacheService {
         }
     }
 
-    private func cleanOldCache() async {
-        let context = createContext()
-        // Also clean based on TTL for current days
-        let calendar = Calendar.current
-        let today = Date()
-
-        var totalCleaned = 0
-
-        for dayOffset in 0..<7 {
-            guard let dayDate = calendar.date(byAdding: .day, value: -dayOffset, to: today) else { continue }
-            let dayStartDate = calendar.startOfDay(for: dayDate)
-            let ttl = getTTL(for: dayDate)
-            let cutoffDate = today.addingTimeInterval(-ttl)
-
-            // Clean expired neutral news for this day
-            let neutralDescriptor = FetchDescriptor<CachedNeutralNews>(
-                predicate: #Predicate<CachedNeutralNews> { cached in
-                    cached.dayDate == dayStartDate && cached.cacheDate < cutoffDate
-                }
-            )
-
-            do {
-                let expiredNeutral = try context.fetch(neutralDescriptor)
-                for item in expiredNeutral {
-                    context.delete(item)
-                }
-                totalCleaned += expiredNeutral.count
-            } catch {
-                print("❌ Error cleaning expired neutral news for day \(dayOffset): \(error)")
-            }
-
-            // Clean expired regular news for this day
-            let newsDescriptor = FetchDescriptor<CachedNews>(
-                predicate: #Predicate<CachedNews> { cached in
-                    cached.dayDate == dayStartDate && cached.cacheDate < cutoffDate
-                }
-            )
-
-            do {
-                let expiredNews = try context.fetch(newsDescriptor)
-                for item in expiredNews {
-                    context.delete(item)
-                }
-                totalCleaned += expiredNews.count
-            } catch {
-                print("❌ Error cleaning expired news for day \(dayOffset): \(error)")
-            }
-        }
-
-#if DEBUG
-        if totalCleaned > 0 {
-            print("🗑️ Cleaned \(totalCleaned) TTL-expired cache items")
-        }
-#endif
-
-        saveContext(context)
-    }
-    
     // MARK: - Helper Methods
     
     private func getTTL(for date: Date) -> TimeInterval {
@@ -416,6 +435,16 @@ final class CacheService {
         case 1: return TTL.yesterday  // Yesterday: 4 hours
         default: return TTL.older     // Older: 24 hours
         }
+    }
+
+    private func isWithinCacheRetention(_ date: Date) -> Bool {
+        Calendar.current.startOfDay(for: date) >= oldestRetainedDay()
+    }
+
+    private func oldestRetainedDay() -> Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        return calendar.date(byAdding: .day, value: -Self.cacheRetentionDays, to: today)!
     }
     
     private func saveContext(_ context: ModelContext) {
