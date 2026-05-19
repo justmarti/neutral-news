@@ -76,6 +76,7 @@ struct HomeView: View {
     @State private var storyPresentation: StoryCollection?
     @State private var storyInitialNewsID: String?
     @State private var isStoryArticleExpanded = false
+    @State private var isSearchPresented = false
     @State private var currentStoryOverlayNews: NeutralNews?
     @State private var currentStoryOverlayRelatedNews: [News] = []
     @State private var currentStoryOverlayRegion: ContentRegion?
@@ -275,8 +276,8 @@ struct HomeView: View {
             .navigationTitle(navigationTitleText)
             .navigationBarTitleDisplayMode(.large)
             .myNavigationSubtitle(navigationSubtitleText)
-            .searchable(text: $vm.searchText, placement: .toolbar, prompt: "Search")
-            .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope), activation: .onSearchPresentation) {
+            .searchable(text: $vm.searchText, isPresented: $isSearchPresented, placement: .toolbar, prompt: "Search")
+            .searchScopes(vm.isShowingSavedNews ? .constant(.daySelected) : (vm.isShowingAllDays ? .constant(.lastSevenDays) : $vm.searchScope)) {
                 if !vm.isShowingAllDays && !vm.isShowingSavedNews {
                     Text(vm.daySelected.dayName).tag(SearchScope.daySelected)
                     Text("Last 7 days").tag(SearchScope.lastSevenDays)
@@ -289,6 +290,13 @@ struct HomeView: View {
                 ).content
             }
             .accentGradientBackground(isEnabled: isBackgroundColorEnabled)
+            .onChange(of: isSearchPresented) { oldValue, newValue in
+                guard oldValue && !newValue else { return }
+
+                if vm.searchScope == .lastSevenDays {
+                    vm.searchScope = .daySelected
+                }
+            }
     }
     
     private var newsContentView: some View {
@@ -309,9 +317,6 @@ struct HomeView: View {
                 } else {
                     await vm.refreshNews()
                 }
-            }
-            .overlay {
-                SearchableContentView(vm: vm)
             }
         }
     }
@@ -895,6 +900,7 @@ extension View {
             self
         }
     }
+
 }
 
 // MARK: - Environment Keys
