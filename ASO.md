@@ -50,3 +50,20 @@ Keywords: periodicos,sesgo,politica,actualidad,titulares,neutral,imparcial,espan
 Title: Facts: Unbiased News
 Subtitle: Compare headlines by source
 Keywords: summary,coverage,politics,today,ai summarize,neutral,objective,media bias,fact,bias
+
+
+
+# 1.2.0
+
+## ES
+
+Title: Facts: Noticias 24 horas
+Subtitle: Múltiples fuentes y resumen IA
+Keywords: periodicos,prensa,diario,titulares,politica,actualidad,ultima,hora,medios,sesgo,neutral,bulos,espana
+
+
+## US
+
+Title: Facts: Daily News Digest
+Subtitle: Coverage from multiple sources
+Keywords: headlines,media,bias,balance,balanced,compare,summary,objective,unbiased,ai summarize,today,politics
