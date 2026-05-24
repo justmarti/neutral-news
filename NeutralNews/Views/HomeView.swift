@@ -92,6 +92,7 @@ struct HomeView: View {
     @State private var currentStoryOverlayRelatedNews: [News] = []
     @State private var currentStoryOverlayRegion: ContentRegion?
     @State private var savedNewsState = SavedNewsState.shared
+    @State private var foregroundRefreshTask: Task<Void, Never>?
     private let pushNotificationService = PushNotificationService.shared
 
     @Namespace private var animationNamespace
@@ -210,13 +211,10 @@ struct HomeView: View {
                     }
                     .onChange(of: scenePhase) { oldValue, newValue in
                         guard oldValue == .background, newValue == .active else { return }
-                        Task {
-                            if vm.isShowingSavedNews {
-                                await vm.loadSavedNews()
-                            } else {
-                                await vm.preloadTodayOnResume()
-                            }
-                        }
+                        refreshNewsAfterForegroundEvent()
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: .NSCalendarDayChanged)) { _ in
+                        refreshNewsAfterForegroundEvent()
                     }
                     .onChange(of: premiumManager.paywallPresentationToken) { _, _ in
                         showingPaywall = true
@@ -644,6 +642,19 @@ struct HomeView: View {
         }
 
         await newsDataManager.loadNews(for: previousDayForStoryWindow)
+    }
+
+    private func refreshNewsAfterForegroundEvent() {
+        foregroundRefreshTask?.cancel()
+        foregroundRefreshTask = Task {
+            guard !Task.isCancelled else { return }
+
+            if vm.isShowingSavedNews {
+                await vm.loadSavedNews()
+            } else {
+                await vm.refreshNewsForCurrentDateIfNeeded()
+            }
+        }
     }
 
     private func resolvedRegion(for news: NeutralNews) -> ContentRegion? {

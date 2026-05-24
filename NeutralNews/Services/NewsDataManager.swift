@@ -237,6 +237,17 @@ final class NewsDataManager {
         }
     }
 
+    /// Refreshes a day only when the local cache has expired.
+    ///
+    /// This keeps foreground activation cheap when the in-memory data is still fresh, while allowing
+    /// already-loaded days to fetch new Firebase data after the cache TTL expires.
+    func refreshNewsIfNeeded(for day: DayInfo) async {
+        let shouldRefresh = !cacheService.isNeutralNewsCacheValid(for: day)
+            || !cacheService.isNewsCacheValid(for: day)
+
+        await loadNews(for: day, forceRefresh: shouldRefresh)
+    }
+
     private func performLoadNews(
         for day: DayInfo,
         startOfDay: Date,

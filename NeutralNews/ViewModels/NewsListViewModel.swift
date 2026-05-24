@@ -87,6 +87,9 @@ final class NewsListViewModel {
                 } else {
                     savedNewsPrefetchTask?.cancel()
                     recomputeVisibleNews()
+                    Task {
+                        await refreshNewsForCurrentDateIfNeeded()
+                    }
                 }
             }
         }
@@ -194,6 +197,7 @@ final class NewsListViewModel {
     private var selectedDayLoadTask: Task<Void, Never>?
     private var lastDayPrefetchHash: Int = 0
     private var lastVisibleNewsHash: Int?
+    private var lastKnownToday = DayInfo.today
     private(set) var visibleNews: [NeutralNews] = []
 
     // MARK: - Public Methods
@@ -309,12 +313,30 @@ final class NewsListViewModel {
         }
     }
 
-    /// Preloads today's news on app resume without forcing refresh or UI loading state.
+    /// Refreshes the active news context after foreground or calendar-day changes.
     ///
-    /// This avoids competing with user-driven navigation when coming back from background.
-    func preloadTodayOnResume() async {
+    /// If the user was following today's feed and the calendar day changed, the selection moves to
+    /// the new day. Otherwise, the selected historical day is left untouched.
+    func refreshNewsForCurrentDateIfNeeded() async {
+        let previousToday = lastKnownToday
+        let currentToday = DayInfo.today
+        let didCalendarDayChange = previousToday != currentToday
+        lastKnownToday = currentToday
+
         guard !isShowingSavedNews else { return }
-        await newsDataManager.loadNews(for: .today)
+
+        if didCalendarDayChange {
+            await handleCalendarDayChange(from: previousToday, to: currentToday)
+            return
+        }
+
+        if isShowingAllDays || searchScope == .lastSevenDays {
+            await newsDataManager.refreshNewsIfNeeded(for: currentToday)
+            refreshPaginationIfNeeded()
+        } else if Calendar.current.isDateInToday(daySelected.date) {
+            await newsDataManager.refreshNewsIfNeeded(for: currentToday)
+            recomputeVisibleNews()
+        }
     }
 
     /// Handles content region changes by resetting data and reloading current context.
@@ -399,6 +421,31 @@ final class NewsListViewModel {
                 self.recomputeVisibleNews()
                 self.selectedDayLoadTask = nil
             }
+        }
+    }
+
+    private func handleCalendarDayChange(from previousToday: DayInfo, to currentToday: DayInfo) async {
+        if isShowingAllDays || searchScope == .lastSevenDays {
+            await newsDataManager.loadNews(for: currentToday)
+            await loadMissingLastSevenDays(showLoading: false)
+            refreshPaginationIfNeeded()
+            return
+        }
+
+        if daySelected == previousToday {
+            allDaysLoadingTask?.cancel()
+            allDaysLoadingTask = nil
+            isLoadingNeutralNews = true
+            await newsDataManager.loadNews(for: currentToday)
+            guard !Task.isCancelled else { return }
+
+            isShowingAllDays = false
+            searchScope = .daySelected
+            daySelected = currentToday
+            isLoadingNeutralNews = false
+            recomputeVisibleNews()
+        } else {
+            await newsDataManager.loadNews(for: currentToday)
         }
     }
     
