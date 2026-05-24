@@ -31,7 +31,7 @@ enum StoryCollectionBuilder {
         referenceDate: Date = .now
     ) -> StoryCollection? {
         let windowStart = referenceDate.addingTimeInterval(-briefingWindow)
-        let briefingItems = Array(
+        let relevantItems = Array(
             news
                 .filter { $0.date >= windowStart }
                 .sorted { first, second in
@@ -47,6 +47,17 @@ enum StoryCollectionBuilder {
                 }
                 .prefix(briefingLimit)
         )
+        let briefingItems = relevantItems.sorted { first, second in
+            if first.date != second.date {
+                return first.date > second.date
+            }
+
+            if first.relevance != second.relevance {
+                return first.relevance > second.relevance
+            }
+
+            return first.id < second.id
+        }
 
         guard let coverNews = briefingItems.first else {
             return nil
@@ -122,26 +133,31 @@ struct HomeView: View {
         )
     }
 
-    private var isShowingPrimaryDayHome: Bool {
-        Calendar.current.isDateInToday(vm.daySelected.date)
-            && !vm.isShowingSavedNews
-            && !vm.isShowingAllDays
+    private var shouldShowStoryBriefing: Bool {
+        !vm.isShowingSavedNews
             && vm.searchText.isEmpty
-            && vm.searchScope == .daySelected
             && !vm.isAnyFilterEnabled
+            && (isShowingTodayHome || vm.isShowingAllDays)
+    }
+
+    private var isShowingTodayHome: Bool {
+        Calendar.current.isDateInToday(vm.daySelected.date)
+            && !vm.isShowingAllDays
+            && vm.searchScope == .daySelected
     }
 
     private var briefingCollection: StoryCollection? {
-        guard isShowingPrimaryDayHome else { return nil }
+        guard shouldShowStoryBriefing else { return nil }
 
-        let recentNews = newsDataManager.getNewsArrayForDay(vm.daySelected)
-            + previousDayNewsForStoryWindow
+        let recentNews = vm.isShowingAllDays
+            ? newsDataManager.neutralNews
+            : newsDataManager.getNewsArrayForDay(.today) + previousDayNewsForStoryWindow
 
         return StoryCollectionBuilder.buildBriefingCollection(news: recentNews)
     }
 
     private var previousDayForStoryWindow: DayInfo? {
-        Calendar.current.date(byAdding: .day, value: -1, to: vm.daySelected.date)
+        Calendar.current.date(byAdding: .day, value: -1, to: DayInfo.today.date)
             .map(DayInfo.init)
     }
 
@@ -181,7 +197,7 @@ struct HomeView: View {
                     .onAppear {
                         vm.checkPendingDeepLink()
                     }
-                    .task(id: isShowingPrimaryDayHome) {
+                    .task(id: shouldShowStoryBriefing) {
                         await loadStoryWindowNewsIfNeeded()
                     }
                     .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
@@ -621,7 +637,7 @@ struct HomeView: View {
     }
 
     private func loadStoryWindowNewsIfNeeded() async {
-        guard isShowingPrimaryDayHome,
+        guard shouldShowStoryBriefing,
               let previousDayForStoryWindow,
               !newsDataManager.isDayLoaded(previousDayForStoryWindow) else {
             return

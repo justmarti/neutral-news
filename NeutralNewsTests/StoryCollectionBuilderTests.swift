@@ -11,8 +11,8 @@ import Testing
 
 @Suite("Story Collection Builder Tests")
 struct StoryCollectionBuilderTests {
-    @Test("Builds the briefing from the top eight stories in the last 24 hours")
-    func buildsBriefingFromTopEightStoriesInLast24Hours() {
+    @Test("Builds the briefing from the top eight relevant stories in the last 24 hours ordered by date")
+    func buildsBriefingFromTopEightRelevantStoriesInLast24HoursOrderedByDate() {
         let referenceDate = Date(timeIntervalSince1970: 2_000_000)
         let topOlder = makeStoryCollectionNews(id: "top-older", title: "Top Older", categoryRawValue: "world", relevance: 10, date: referenceDate.addingTimeInterval(-120))
         let topNewer = makeStoryCollectionNews(id: "top-newer", title: "Top Newer", categoryRawValue: "world", relevance: 10, date: referenceDate.addingTimeInterval(-60))
@@ -51,13 +51,84 @@ struct StoryCollectionBuilderTests {
             "relevance-8",
             "relevance-7",
             "relevance-6",
-            "boundary",
-            "relevance-4"
+            "relevance-4",
+            "boundary"
         ])
     }
 
-    @Test("Keeps relevant stories from late yesterday in the next morning window")
-    func keepsLateYesterdayStoriesInNextMorningWindow() throws {
+    @Test("Keeps relevant late yesterday stories over less relevant recent stories")
+    func keepsRelevantLateYesterdayStoriesOverLessRelevantRecentStories() {
+        let referenceDate = Date(timeIntervalSince1970: 2_000_000)
+        let relevantYesterday = makeStoryCollectionNews(id: "relevant-yesterday", title: "Relevant Yesterday", categoryRawValue: "world", relevance: 9, date: referenceDate.addingTimeInterval(-10 * 60 * 60))
+        let recentLowRelevance = makeStoryCollectionNews(id: "recent-low", title: "Recent Low", categoryRawValue: "world", relevance: 1, date: referenceDate.addingTimeInterval(-60))
+
+        var news = [relevantYesterday, recentLowRelevance]
+        for index in 0..<7 {
+            news.append(
+                makeStoryCollectionNews(
+                    id: "recent-\(index)",
+                    title: "Recent \(index)",
+                    categoryRawValue: "politics",
+                    relevance: 8,
+                    date: referenceDate.addingTimeInterval(TimeInterval(-(index + 2) * 60))
+                )
+            )
+        }
+
+        let briefingCollection = StoryCollectionBuilder.buildBriefingCollection(
+            news: news,
+            referenceDate: referenceDate
+        )
+
+        #expect(briefingCollection?.items.contains(where: { $0.id == "relevant-yesterday" }) == true)
+        #expect(briefingCollection?.items.contains(where: { $0.id == "recent-low" }) == false)
+    }
+
+    @Test("Uses relevance as a tie breaker for stories with the same date")
+    func usesRelevanceAsTieBreakerForStoriesWithSameDate() {
+        let referenceDate = Date(timeIntervalSince1970: 2_000_000)
+        let sameDateLowerRelevance = makeStoryCollectionNews(id: "same-date-lower", title: "Same Date Lower", categoryRawValue: "world", relevance: 6, date: referenceDate.addingTimeInterval(-60))
+        let sameDateHigherRelevance = makeStoryCollectionNews(id: "same-date-higher", title: "Same Date Higher", categoryRawValue: "world", relevance: 9, date: referenceDate.addingTimeInterval(-60))
+        let olderHighestRelevance = makeStoryCollectionNews(id: "older-highest", title: "Older Highest", categoryRawValue: "politics", relevance: 10, date: referenceDate.addingTimeInterval(-120))
+
+        let briefingCollection = StoryCollectionBuilder.buildBriefingCollection(
+            news: [
+                olderHighestRelevance,
+                sameDateLowerRelevance,
+                sameDateHigherRelevance
+            ],
+            referenceDate: referenceDate
+        )
+
+        #expect(briefingCollection?.items.map(\.id) == [
+            "same-date-higher",
+            "same-date-lower",
+            "older-highest"
+        ])
+    }
+
+    @Test("Uses id as a final tie breaker")
+    func usesIDAsFinalTieBreaker() {
+        let referenceDate = Date(timeIntervalSince1970: 2_000_000)
+        let secondByID = makeStoryCollectionNews(id: "story-b", title: "Story B", categoryRawValue: "world", relevance: 8, date: referenceDate.addingTimeInterval(-60))
+        let firstByID = makeStoryCollectionNews(id: "story-a", title: "Story A", categoryRawValue: "world", relevance: 8, date: referenceDate.addingTimeInterval(-60))
+
+        let briefingCollection = StoryCollectionBuilder.buildBriefingCollection(
+            news: [
+                secondByID,
+                firstByID
+            ],
+            referenceDate: referenceDate
+        )
+
+        #expect(briefingCollection?.items.map(\.id) == [
+            "story-a",
+            "story-b"
+        ])
+    }
+
+    @Test("Orders selected stories by recency")
+    func ordersSelectedStoriesByRecency() throws {
         let calendar = Calendar.current
         let referenceDate = try #require(calendar.date(from: DateComponents(year: 2026, month: 5, day: 13, hour: 9)))
         let lateYesterday = makeStoryCollectionNews(id: "late-yesterday", title: "Late Yesterday", categoryRawValue: "world", relevance: 9, date: referenceDate.addingTimeInterval(-10 * 60 * 60))
@@ -68,7 +139,7 @@ struct StoryCollectionBuilderTests {
             referenceDate: referenceDate
         )
 
-        #expect(briefingCollection?.items.map(\.id) == ["late-yesterday", "morning-story"])
+        #expect(briefingCollection?.items.map(\.id) == ["morning-story", "late-yesterday"])
     }
 
     @Test("Returns nil when there are no stories inside the last 24 hours")

@@ -28,13 +28,13 @@ struct StoryBriefingModuleView: View {
         } label: {
             HStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Selected stories")
+                    Text("News briefing")
                         .font(.title2)
                         .bold()
                         .fontDesign(.serif)
                         .foregroundStyle(.primary)
 
-                    Text("A quick look at what’s happening")
+                    Text("A quick look at the past 24 hours")
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
