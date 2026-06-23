@@ -93,6 +93,10 @@ struct HomeView: View {
     @State private var currentStoryOverlayRegion: ContentRegion?
     @State private var savedNewsState = SavedNewsState.shared
     @State private var foregroundRefreshTask: Task<Void, Never>?
+    @State private var shouldShowPaywallAfterSettingsDismiss = false
+#if DEBUG
+    @State private var shouldShowDebugOnboardingAfterSettingsDismiss = false
+#endif
     private let pushNotificationService = PushNotificationService.shared
 
     @Namespace private var animationNamespace
@@ -228,10 +232,41 @@ struct HomeView: View {
                         PaywallView(isPresented: $showingPaywall)
                     }
                     .sheet(isPresented: $showingSettingsSheet) {
+#if DEBUG
                         SettingsView(
                             vm: vm,
                             systemColorScheme: colorScheme,
+                            showPaywall: {
+                                shouldShowPaywallAfterSettingsDismiss = true
+                            },
+                            showDebugOnboarding: {
+                                shouldShowDebugOnboardingAfterSettingsDismiss = true
+                            }
                         )
+#else
+                        SettingsView(
+                            vm: vm,
+                            systemColorScheme: colorScheme,
+                            showPaywall: {
+                                shouldShowPaywallAfterSettingsDismiss = true
+                            }
+                        )
+#endif
+                    }
+                    .onChange(of: showingSettingsSheet) { _, isPresented in
+                        guard !isPresented else { return }
+
+                        if shouldShowPaywallAfterSettingsDismiss {
+                            shouldShowPaywallAfterSettingsDismiss = false
+                            showingPaywall = true
+                        }
+
+#if DEBUG
+                        if shouldShowDebugOnboardingAfterSettingsDismiss {
+                            shouldShowDebugOnboardingAfterSettingsDismiss = false
+                            showDebugOnboarding()
+                        }
+#endif
                     }
                 }
             }
@@ -525,6 +560,12 @@ struct HomeView: View {
         pushNotificationService.handleCompletedOnboarding()
         showingPaywall = true
     }
+
+#if DEBUG
+    private func showDebugOnboarding() {
+        hasSeenOnboarding = false
+    }
+#endif
 
     private func presentStories(_ collection: StoryCollection, initialNewsID: String? = nil) {
         let presentedCollection = reorderedStoryCollection(from: collection, startingAt: initialNewsID)

@@ -11,6 +11,10 @@ import UIKit
 struct SettingsView: View {
     @Bindable var vm: NewsListViewModel
     let systemColorScheme: ColorScheme
+    let showPaywall: () -> Void
+#if DEBUG
+    var showDebugOnboarding: () -> Void = {}
+#endif
     
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
@@ -18,7 +22,6 @@ struct SettingsView: View {
     
     @State private var showingSafari = false
     @State private var safariURL: URL?
-    @State private var showingPaywall = false
     private let pushNotificationService = PushNotificationService.shared
 
     @Environment(\.dismiss) private var dismiss
@@ -42,9 +45,6 @@ struct SettingsView: View {
                 }
             }
             .safariSheet(url: safariURL, isPresented: $showingSafari)
-            .sheet(isPresented: $showingPaywall) {
-                PaywallView(isPresented: $showingPaywall)
-            }
         }
         .task {
             await pushNotificationService.refreshAuthorizationStatus()
@@ -59,7 +59,8 @@ struct SettingsView: View {
             if !premiumManager.isPremium {
                 Section {
                     Button {
-                        showingPaywall = true
+                        showPaywall()
+                        dismiss()
                     } label: {
                         premiumBanner
                     }
@@ -189,6 +190,20 @@ struct SettingsView: View {
             }
 
             Section("Support") {
+//                Button {
+//                    Task {
+//                        await premiumManager.presentOfferCodeRedemption()
+//                        await premiumManager.refreshSubscriptionStatusAfterActivation()
+//                    }
+//                } label: {
+//                    SettingsRowLabel(
+//                        title: "Redeem Code",
+//                        systemImage: "ticket.fill",
+//                        tint: .purple
+//                    )
+//                }
+//                .buttonStyle(.plain)
+
                 Button {
                     contactSupport()
                 } label: {
@@ -200,6 +215,34 @@ struct SettingsView: View {
                 }
                 .buttonStyle(.plain)
             }
+
+#if DEBUG
+            Section("Developer") {
+                Button {
+                    showPaywall()
+                    dismiss()
+                } label: {
+                    SettingsRowLabel(
+                        title: "Show Paywall",
+                        systemImage: "creditcard.fill",
+                        tint: .teal
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showDebugOnboarding()
+                    dismiss()
+                } label: {
+                    SettingsRowLabel(
+                        title: "Show Onboarding",
+                        systemImage: "sparkles",
+                        tint: .pink
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+#endif
 
             Section("Legal") {
                 Button {
@@ -400,5 +443,6 @@ struct SettingsView: View {
     SettingsView(
         vm: NewsListViewModel.shared,
         systemColorScheme: .dark,
+        showPaywall: {}
     )
 }
