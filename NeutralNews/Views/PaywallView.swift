@@ -19,7 +19,6 @@ struct PaywallView: View {
 
     var body: some View {
         SubscriptionStoreView(productIDs: [
-            "dev.itram.news.pro.weekly",
             "dev.itram.news.pro.monthly",
             "dev.itram.news.pro.annual"
         ]) {
@@ -34,17 +33,19 @@ struct PaywallView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
 
-                    Text("Full app access")
+                    Text("See the full picture")
                         .foregroundStyle(.secondary)
                 }
                 .multilineTextAlignment(.center)
                 
-                VStack(spacing: 16) {
-                    ProFeatureRow(icon: "calendar", text: "Read news from the last 7 days")
-                    ProFeatureRow(icon: "bookmark.fill", text: "Save stories for later")
-                    ProFeatureRow(icon: "heart.fill", text: "Support an independent app")
+                VStack(alignment: .leading, spacing: 16) {
+                    ProFeatureRow(icon: "calendar", text: "More days of news")
+                    ProFeatureRow(icon: "bookmark.fill", text: "Save stories")
+                    ProFeatureRow(icon: "person.3.fill", text: "Family sharing")
                 }
+                .fixedSize(horizontal: true, vertical: false)
                 .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, alignment: .center)
 
             }
             .environment(\.locale, appLocale)
@@ -54,54 +55,31 @@ struct PaywallView: View {
         .subscriptionStorePickerItemBackground(.regularMaterial)
         .subscriptionStoreControlStyle(.pagedProminentPicker)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 8) {
-                // Restore Purchases Button
-                HStack(spacing: 16) {
-                    Button {
-                        isRestoringPurchases = true
-                        Task {
-                            await PremiumManager.shared.restorePurchases()
-                            isRestoringPurchases = false
-                        }
-                    } label: {
-                        Text(isRestoringPurchases ? "Restoring..." : "Restore Purchases")
+            HStack(spacing: 24) {
+                Button {
+                    isRestoringPurchases = true
+                    Task {
+                        await PremiumManager.shared.restorePurchases()
+                        isRestoringPurchases = false
                     }
-                    .disabled(isRestoringPurchases)
-
-                    // Redeem Code button commented out - only works with Offer Codes, not Promotional Codes
-                    // TODO: Use this since offer codes are the new promo codes
-//                    Text("•")
-//                        .foregroundColor(.secondary)
-//
-//                    Button {
-//                        Task {
-//                            await PremiumManager.shared.presentOfferCodeRedemption()
-//                        }
-//                    } label: {
-//                        Text("Canjear Código")
-//                    }
+                } label: {
+                    Text("Restore Purchases")
                 }
-                .font(.caption)
-                .foregroundColor(.accentColor)
+                .disabled(isRestoringPurchases)
 
-                // Terms and Privacy Links
-                HStack {
-                    Button("Terms of Use") {
-                        safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
-                        showingSafari = true
-                    }
-
-                    Text("•")
-
-                    Button("Privacy Policy") {
-                        safariURL = URL(string: "https://getfacts.app/privacy")
-                        showingSafari = true
-                    }
+                Button("Terms") {
+                    safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
+                    showingSafari = true
                 }
-                .font(.caption)
-                .foregroundColor(.secondary)
+
+                Button("Privacy") {
+                    safariURL = URL(string: "https://getfacts.app/privacy")
+                    showingSafari = true
+                }
             }
             .padding(.top)
+            .font(.caption)
+            .foregroundColor(.secondary)
         }
         .overlay {
             if isProcessingPurchase {
@@ -214,7 +192,6 @@ struct ProFeatureRow: View {
                 .foregroundStyle(.primary)
         }
         .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
         
     }
 }
