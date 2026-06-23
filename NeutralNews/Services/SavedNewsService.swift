@@ -456,7 +456,6 @@ final class SavedNewsService {
 
     func getSavedNeutralNews(context: NSManagedObjectContext?) throws -> [SavedNeutralNewsEntry] {
         prepareStoreIfNeeded(coreDataContext: context)
-        migrateCoreDataSavedNewsIfNeeded(coreDataContext: context)
 
         let modelContext = createContext()
         let swiftDataEntries: [SavedNeutralNewsEntry]

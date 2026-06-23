@@ -87,7 +87,7 @@ final class AppFeedbackCenter {
             do {
                 try await Task.sleep(for: duration)
                 guard !Task.isCancelled else { return }
-                await self?.dismiss()
+                self?.dismiss()
             } catch {
                 return
             }
