@@ -68,6 +68,27 @@ extension Color {
     var adaptiveBackground: some View {
         AdaptiveBackgroundView(baseColor: self)
     }
+
+    var lightModeDominantForeground: Color {
+        let uiColor = UIColor(self)
+        var hue: CGFloat = 0
+        var saturation: CGFloat = 0
+        var brightness: CGFloat = 0
+        var alpha: CGFloat = 0
+
+        guard uiColor.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return .nnForeground
+        }
+
+        let adjustedSaturation: CGFloat = saturation < 0.08 ? 0 : min(0.7, max(0.3, saturation * 1.1))
+        let adjustedBrightness = min(0.38, max(0.18, brightness * 0.5))
+
+        return Color(
+            hue: Double(hue),
+            saturation: Double(adjustedSaturation),
+            brightness: Double(adjustedBrightness)
+        )
+    }
 }
 
 struct AdaptiveBackgroundView: View {

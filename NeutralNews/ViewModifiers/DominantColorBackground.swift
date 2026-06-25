@@ -10,14 +10,24 @@ import SwiftUI
 struct DominantColorBackground: ViewModifier {
     let imageUrl: String?
     let isEnabled: Bool
+    @Environment(\.colorScheme) private var colorScheme
     
     @State private var dominantColor: Color = .nnBackground
     @State private var isLoading = false
     
     private let imageService = ImageService.shared
+
+    private var foregroundColor: Color {
+        guard isEnabled, colorScheme == .light else {
+            return .primary
+        }
+
+        return dominantColor.lightModeDominantForeground
+    }
     
     func body(content: Content) -> some View {
         content
+            .foregroundStyle(foregroundColor)
             .background {
                 if isEnabled {
                     dominantColor.adaptiveBackground
