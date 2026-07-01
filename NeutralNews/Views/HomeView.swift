@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct StoryCollection: Identifiable, Hashable {
     let coverNews: NeutralNews
@@ -728,6 +729,7 @@ private struct StoryReaderModalView: View {
     @State private var reservedFeedBottomHeight: CGFloat
     @State private var selectedSheetDetent: PresentationDetent
     @State private var pendingStoryDismissCompletion: Bool?
+    @State private var shareSheetItem: StoryShareSheetItem?
     @State private var surfaceOffsetY: CGFloat = 24
     @State private var surfaceOpacity: Double = 0
     @State private var backdropVisibility: Double = 0
@@ -807,6 +809,9 @@ private struct StoryReaderModalView: View {
                             currentNews: currentStoryOverlayNews,
                             currentRelatedNews: currentStoryOverlayRelatedNews,
                             currentRegion: currentStoryOverlayRegion,
+                            onShare: { url in
+                                shareSheetItem = StoryShareSheetItem(url: url)
+                            },
                             onClose: {
                                 dismissStory(completed: isCurrentStoryLastInCollection)
                             }
@@ -850,6 +855,9 @@ private struct StoryReaderModalView: View {
             .presentationBackground(.clear)
             .presentationDragIndicator(.hidden)
             .interactiveDismissDisabled()
+            .sheet(item: $shareSheetItem) { item in
+                StoryShareSheetView(item: item)
+            }
         }
         .onChange(of: selectedSheetDetent) { _, newValue in
             let isExpanded = newValue == .large
@@ -951,6 +959,24 @@ private struct StoryReaderModalView: View {
             backdropVisibility = 1
         }
     }
+}
+
+private struct StoryShareSheetItem: Identifiable, Equatable {
+    let url: URL
+
+    var id: String {
+        url.absoluteString
+    }
+}
+
+private struct StoryShareSheetView: UIViewControllerRepresentable {
+    let item: StoryShareSheetItem
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [item.url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 // MARK: - View Extensions

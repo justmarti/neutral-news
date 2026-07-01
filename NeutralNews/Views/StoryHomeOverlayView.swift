@@ -12,6 +12,7 @@ struct StoryHomeOverlayView: View {
     let currentNews: NeutralNews?
     let currentRelatedNews: [News]
     let currentRegion: ContentRegion?
+    let onShare: (URL) -> Void
     let onClose: () -> Void
 
     @State private var isShowingReportProblemSheet = false
@@ -48,6 +49,7 @@ struct StoryHomeOverlayView: View {
                         news: currentNews,
                         relatedNews: currentRelatedNews,
                         region: currentRegion,
+                        onShare: onShare,
                         isShowingReportProblemSheet: $isShowingReportProblemSheet
                     )
                 } label: {
@@ -110,6 +112,7 @@ private struct StoryOverlayChromeModifier: ViewModifier {
                 currentNews: .mock,
                 currentRelatedNews: [],
                 currentRegion: nil,
+                onShare: { _ in },
                 onClose: {}
             )
             .padding(.horizontal)

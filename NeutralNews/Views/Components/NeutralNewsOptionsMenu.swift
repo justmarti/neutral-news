@@ -11,6 +11,7 @@ struct NeutralNewsOptionsActions: View {
     let news: NeutralNews
     let relatedNews: [News]
     let region: ContentRegion?
+    let onShare: ((URL) -> Void)?
     @Binding var isShowingReportProblemSheet: Bool
 
     private let premiumManager = PremiumManager.shared
@@ -41,8 +42,16 @@ struct NeutralNewsOptionsActions: View {
                 )
             }
 
-            ShareLink(item: generateShareURL()) {
-                Label("Share", systemImage: "square.and.arrow.up")
+            if let onShare {
+                Button {
+                    onShare(generateShareURL())
+                } label: {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+            } else {
+                ShareLink(item: generateShareURL()) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
             }
 
             Button {
@@ -178,6 +187,7 @@ struct NeutralNewsOptionsMenu: View {
                 news: news,
                 relatedNews: relatedNews,
                 region: region,
+                onShare: nil,
                 isShowingReportProblemSheet: $isShowingReportProblemSheet
             )
         } label: {
