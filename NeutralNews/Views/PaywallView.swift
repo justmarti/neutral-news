@@ -54,51 +54,6 @@ struct PaywallView: View {
         .subscriptionStoreButtonLabel(.automatic)
         .subscriptionStorePickerItemBackground(.regularMaterial)
         .subscriptionStoreControlStyle(.pagedProminentPicker)
-        .safeAreaInset(edge: .bottom) {
-            HStack(spacing: 24) {
-                Button {
-                    isRestoringPurchases = true
-                    Task {
-                        await PremiumManager.shared.restorePurchases()
-                        isRestoringPurchases = false
-                    }
-                } label: {
-                    Text("Restore Purchases")
-                }
-                .disabled(isRestoringPurchases)
-
-                Button("Terms") {
-                    safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
-                    showingSafari = true
-                }
-
-                Button("Privacy") {
-                    safariURL = URL(string: "https://getfacts.app/privacy")
-                    showingSafari = true
-                }
-            }
-            .padding(.top)
-            .font(.caption)
-            .foregroundColor(.secondary)
-        }
-        .overlay {
-            if isProcessingPurchase {
-                ZStack {
-                    Color.nnBackground
-                        .ignoresSafeArea()
-
-                    VStack(spacing: 16) {
-                        ProgressView()
-                            .scaleEffect(1.2)
-
-                        Text("Activating subscription...")
-                            .font(.headline)
-                    }
-                    .padding(32)
-                    .background(.regularMaterial, in: .rect(cornerRadius: 16))
-                }
-            }
-        }
         .onInAppPurchaseCompletion { product, result in
             switch result {
             case .success(.success(let transaction)):
@@ -164,6 +119,51 @@ struct PaywallView: View {
 #if DEBUG
                 print("⚠️ Unknown purchase result")
 #endif
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            HStack(spacing: 24) {
+                Button {
+                    isRestoringPurchases = true
+                    Task {
+                        await PremiumManager.shared.restorePurchases()
+                        isRestoringPurchases = false
+                    }
+                } label: {
+                    Text("Restore Purchases")
+                }
+                .disabled(isRestoringPurchases)
+
+                Button("Terms") {
+                    safariURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")
+                    showingSafari = true
+                }
+
+                Button("Privacy") {
+                    safariURL = URL(string: "https://getfacts.app/privacy")
+                    showingSafari = true
+                }
+            }
+            .padding(.top)
+            .font(.caption)
+            .foregroundColor(.secondary)
+        }
+        .overlay {
+            if isProcessingPurchase {
+                ZStack {
+                    Color.nnBackground
+                        .ignoresSafeArea()
+
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .scaleEffect(1.2)
+
+                        Text("Activating subscription...")
+                            .font(.headline)
+                    }
+                    .padding(32)
+                    .background(.regularMaterial, in: .rect(cornerRadius: 16))
+                }
             }
         }
         .safariSheet(url: safariURL, isPresented: $showingSafari)
