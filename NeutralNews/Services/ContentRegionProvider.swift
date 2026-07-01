@@ -40,6 +40,7 @@ protocol ContentRegionProviding {
 struct ContentRegionProvider: ContentRegionProviding {
     var currentRegion: ContentRegion {
         let preferenceRaw = UserDefaults.standard.string(forKey: ContentRegionPreference.storageKey)
+        WidgetRegionPreferenceStore.syncPreference(rawValue: preferenceRaw)
         let preference = ContentRegionPreference(rawValue: preferenceRaw ?? ContentRegionPreference.automatic.rawValue) ?? .automatic
 
         switch preference {

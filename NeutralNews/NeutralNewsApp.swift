@@ -83,6 +83,7 @@ struct NeutralNewsApp: App {
 
                     // Perform cache cleanup if needed (runs in background)
                     CacheService.shared.cleanExpiredCacheIfNeeded()
+                    NewsDataManager.shared.refreshTodayWidgetSnapshot()
                 }
                 .onChange(of: scenePhase) { oldValue, newValue in
                     guard oldValue == .background, newValue == .active else { return }
@@ -92,6 +93,7 @@ struct NeutralNewsApp: App {
                     // Also cleanup when app returns from background
                     CacheService.shared.cleanExpiredCacheIfNeeded()
                     SavedNewsService.shared.prewarmStore()
+                    NewsDataManager.shared.refreshTodayWidgetSnapshot()
 
                     // Refresh subscription state and capture external redemptions
                     // without forcing a user-facing restore flow.

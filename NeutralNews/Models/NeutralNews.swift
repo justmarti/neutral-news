@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct NeutralNews: Codable, Hashable, Identifiable, Sendable {
+struct NeutralNews: Codable, Hashable, Identifiable, Sendable, WidgetBriefingNews {
     let id: String
     let neutralTitle: String
     let neutralDescription: String

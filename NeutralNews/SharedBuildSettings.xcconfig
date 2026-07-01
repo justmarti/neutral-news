@@ -1,0 +1,9 @@
+//
+//  SharedBuildSettings.xcconfig
+//  NeutralNews
+//
+//  Created by Martí Espinosa Farran on 30/6/26.
+//
+
+MARKETING_VERSION = 1.2.0
+CURRENT_PROJECT_VERSION = 16

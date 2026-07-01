@@ -17,6 +17,9 @@
 		4199F40F2EB2AF1100BFAF43 /* FirebaseCrashlytics in Frameworks */ = {isa = PBXBuildFile; productRef = 4199F40E2EB2AF1100BFAF43 /* FirebaseCrashlytics */; };
 		41A736222D820C8F00E08EA1 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736212D820C8F00E08EA1 /* FirebaseFirestore */; };
 		41A736242D820C8F00E08EA1 /* FirebaseFunctions in Frameworks */ = {isa = PBXBuildFile; productRef = 41A736232D820C8F00E08EA1 /* FirebaseFunctions */; };
+		41EF9EF82FEDDC5E0079B0CE /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 41EF9EF72FEDDC5D0079B0CE /* WidgetKit.framework */; };
+		41EF9EFA2FEDDC5E0079B0CE /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 41EF9EF92FEDDC5E0079B0CE /* SwiftUI.framework */; };
+		41EF9F052FEDDC5E0079B0CE /* NeutralNewsWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 41EF9EF62FEDDC5D0079B0CE /* NeutralNewsWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,12 +30,37 @@
 			remoteGlobalIDString = 419D2FB62D11C96500D95E22;
 			remoteInfo = NeutralNews;
 		};
+		41EF9F032FEDDC5E0079B0CE /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 419D2FAF2D11C96500D95E22 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 41EF9EF52FEDDC5D0079B0CE;
+			remoteInfo = NeutralNewsWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		41EF9F0A2FEDDC5E0079B0CE /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				41EF9F052FEDDC5E0079B0CE /* NeutralNewsWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		413546162D9C1FA0006569EA /* NeutralNewsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NeutralNewsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		414539F32EE2FB2F00541692 /* ASO.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = ASO.md; sourceTree = "<group>"; };
 		419D2FB72D11C96500D95E22 /* NeutralNews.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NeutralNews.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		41EF9EF62FEDDC5D0079B0CE /* NeutralNewsWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NeutralNewsWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		41EF9EF72FEDDC5D0079B0CE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		41EF9EF92FEDDC5E0079B0CE /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		41EF9F0C2FEDDCCD0079B0CE /* NeutralNewsWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = NeutralNewsWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -41,8 +69,33 @@
 			membershipExceptions = (
 				Config.xcconfig,
 				Info.plist,
+				SharedBuildSettings.xcconfig,
 			);
 			target = 419D2FB62D11C96500D95E22 /* NeutralNews */;
+		};
+		41EF9F092FEDDC5E0079B0CE /* Exceptions for "NeutralNewsWidgets" folder in "NeutralNewsWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 41EF9EF52FEDDC5D0079B0CE /* NeutralNewsWidgets */;
+		};
+		41EF9F0E2FEDDE810079B0CE /* Exceptions for "NeutralNews" folder in "NeutralNewsWidgets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Utils/WidgetNewsSnapshot.swift,
+				Utils/WidgetSnapshotStore.swift,
+			);
+			target = 41EF9EF52FEDDC5D0079B0CE /* NeutralNewsWidgets */;
+		};
+		41EF9F122FEDDF750079B0CE /* Exceptions for "NeutralNews" folder in "NeutralNewsTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Utils/WidgetBriefingBuilder.swift,
+				Utils/WidgetNewsSnapshot.swift,
+				Utils/WidgetSnapshotStore.swift,
+			);
+			target = 413546152D9C1FA0006569EA /* NeutralNewsTests */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -56,8 +109,18 @@
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				417E18D52E3168F7005A5812 /* Exceptions for "NeutralNews" folder in "NeutralNews" target */,
+				41EF9F122FEDDF750079B0CE /* Exceptions for "NeutralNews" folder in "NeutralNewsTests" target */,
+				41EF9F0E2FEDDE810079B0CE /* Exceptions for "NeutralNews" folder in "NeutralNewsWidgets" target */,
 			);
 			path = NeutralNews;
+			sourceTree = "<group>";
+		};
+		41EF9EFB2FEDDC5E0079B0CE /* NeutralNewsWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				41EF9F092FEDDC5E0079B0CE /* Exceptions for "NeutralNewsWidgets" folder in "NeutralNewsWidgets" target */,
+			);
+			path = NeutralNewsWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -86,12 +149,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		41EF9EF32FEDDC5D0079B0CE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41EF9EFA2FEDDC5E0079B0CE /* SwiftUI.framework in Frameworks */,
+				41EF9EF82FEDDC5E0079B0CE /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		418CA6302F5DF24900B3B4AD /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				41EF9EF72FEDDC5D0079B0CE /* WidgetKit.framework */,
+				41EF9EF92FEDDC5E0079B0CE /* SwiftUI.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -99,9 +173,11 @@
 		419D2FAE2D11C96500D95E22 = {
 			isa = PBXGroup;
 			children = (
+				41EF9F0C2FEDDCCD0079B0CE /* NeutralNewsWidgets.entitlements */,
 				414539F32EE2FB2F00541692 /* ASO.md */,
 				419D2FB92D11C96500D95E22 /* NeutralNews */,
 				413546172D9C1FA0006569EA /* NeutralNewsTests */,
+				41EF9EFB2FEDDC5E0079B0CE /* NeutralNewsWidgets */,
 				418CA6302F5DF24900B3B4AD /* Frameworks */,
 				419D2FB82D11C96500D95E22 /* Products */,
 			);
@@ -112,6 +188,7 @@
 			children = (
 				419D2FB72D11C96500D95E22 /* NeutralNews.app */,
 				413546162D9C1FA0006569EA /* NeutralNewsTests.xctest */,
+				41EF9EF62FEDDC5D0079B0CE /* NeutralNewsWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -150,10 +227,12 @@
 				419D2FB42D11C96500D95E22 /* Frameworks */,
 				419D2FB52D11C96500D95E22 /* Resources */,
 				4199F4102EB2B08400BFAF43 /* ShellScript */,
+				41EF9F0A2FEDDC5E0079B0CE /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				41EF9F042FEDDC5E0079B0CE /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				419D2FB92D11C96500D95E22 /* NeutralNews */,
@@ -174,6 +253,28 @@
 			productReference = 419D2FB72D11C96500D95E22 /* NeutralNews.app */;
 			productType = "com.apple.product-type.application";
 		};
+		41EF9EF52FEDDC5D0079B0CE /* NeutralNewsWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 41EF9F062FEDDC5E0079B0CE /* Build configuration list for PBXNativeTarget "NeutralNewsWidgets" */;
+			buildPhases = (
+				41EF9EF22FEDDC5D0079B0CE /* Sources */,
+				41EF9EF32FEDDC5D0079B0CE /* Frameworks */,
+				41EF9EF42FEDDC5D0079B0CE /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				41EF9EFB2FEDDC5E0079B0CE /* NeutralNewsWidgets */,
+			);
+			name = NeutralNewsWidgets;
+			packageProductDependencies = (
+			);
+			productName = NeutralNewsWidgets;
+			productReference = 41EF9EF62FEDDC5D0079B0CE /* NeutralNewsWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -181,7 +282,7 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 1630;
+				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2620;
 				TargetAttributes = {
 					413546152D9C1FA0006569EA = {
@@ -190,6 +291,9 @@
 					};
 					419D2FB62D11C96500D95E22 = {
 						CreatedOnToolsVersion = 16.1;
+					};
+					41EF9EF52FEDDC5D0079B0CE = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -214,6 +318,7 @@
 			targets = (
 				419D2FB62D11C96500D95E22 /* NeutralNews */,
 				413546152D9C1FA0006569EA /* NeutralNewsTests */,
+				41EF9EF52FEDDC5D0079B0CE /* NeutralNewsWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -231,6 +336,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				414539F42EE2FB2F00541692 /* ASO.md in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		41EF9EF42FEDDC5D0079B0CE /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -278,6 +390,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		41EF9EF22FEDDC5D0079B0CE /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -285,6 +404,11 @@
 			isa = PBXTargetDependency;
 			target = 419D2FB62D11C96500D95E22 /* NeutralNews */;
 			targetProxy = 4135461A2D9C1FA0006569EA /* PBXContainerItemProxy */;
+		};
+		41EF9F042FEDDC5E0079B0CE /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 41EF9EF52FEDDC5D0079B0CE /* NeutralNewsWidgets */;
+			targetProxy = 41EF9F032FEDDC5E0079B0CE /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -470,7 +594,6 @@
 				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNews.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -488,11 +611,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
 				"OTHER_LDFLAGS[arch=*]" = "-ObjC";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -513,7 +636,6 @@
 				CODE_SIGN_ENTITLEMENTS = NeutralNews/NeutralNewsRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 16;
 				DEVELOPMENT_ASSET_PATHS = "\"NeutralNews/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = NO;
@@ -531,11 +653,11 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.2.0;
 				"OTHER_LDFLAGS[arch=*]" = "-ObjC";
 				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
+				REGISTER_APP_GROUPS = YES;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SUPPORTS_MACCATALYST = NO;
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
@@ -543,6 +665,72 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		41EF9F072FEDDC5E0079B0CE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 419D2FB92D11C96500D95E22 /* NeutralNews */;
+			baseConfigurationReferenceRelativePath = SharedBuildSettings.xcconfig;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = NeutralNewsWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NeutralNewsWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NeutralNewsWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		41EF9F082FEDDC5E0079B0CE /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = 419D2FB92D11C96500D95E22 /* NeutralNews */;
+			baseConfigurationReferenceRelativePath = SharedBuildSettings.xcconfig;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = NeutralNewsWidgets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NeutralNewsWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NeutralNewsWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = dev.itram.news.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -572,6 +760,15 @@
 			buildConfigurations = (
 				419D2FC62D11C96600D95E22 /* Debug */,
 				419D2FC72D11C96600D95E22 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		41EF9F062FEDDC5E0079B0CE /* Build configuration list for PBXNativeTarget "NeutralNewsWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				41EF9F072FEDDC5E0079B0CE /* Debug */,
+				41EF9F082FEDDC5E0079B0CE /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
