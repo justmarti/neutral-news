@@ -92,8 +92,10 @@ struct HomeView: View {
     @State private var currentStoryOverlayNews: NeutralNews?
     @State private var currentStoryOverlayRelatedNews: [News] = []
     @State private var currentStoryOverlayRegion: ContentRegion?
+    @State private var homeScreenQuickActionService = HomeScreenQuickActionService.shared
     @State private var savedNewsState = SavedNewsState.shared
     @State private var foregroundRefreshTask: Task<Void, Never>?
+    @State private var homeScreenQuickActionTask: Task<Void, Never>?
     @State private var shouldShowPaywallAfterSettingsDismiss = false
 #if DEBUG
     @State private var shouldShowDebugOnboardingAfterSettingsDismiss = false
@@ -202,9 +204,13 @@ struct HomeView: View {
                     }
                     .onAppear {
                         vm.checkPendingDeepLink()
+                        handlePendingHomeScreenQuickAction()
                     }
                     .task(id: shouldShowStoryBriefing) {
                         await loadStoryWindowNewsIfNeeded()
+                    }
+                    .onChange(of: homeScreenQuickActionService.pendingAction) { _, _ in
+                        handlePendingHomeScreenQuickAction()
                     }
                     .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
                         guard let deepLink = notification.userInfo?[PushNotificationService.deepLinkUserInfoKey] as? DeepLinkService.DeepLinkData else {
@@ -502,21 +508,24 @@ struct HomeView: View {
         Group {
             if vm.isLoadingSavedNews {
                 ProgressView("Loading saved news...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: availableSize.width)
+                    .frame(minHeight: availableSize.height)
             } else if !vm.searchText.isEmpty && newsItems.isEmpty {
                 ContentUnavailableView(
                     "No results for \"\(vm.searchText)\"",
                     systemImage: "magnifyingglass",
                     description: Text("Try another search in your saved news.")
                 )
-                .containerRelativeFrame([.horizontal, .vertical])
+                .frame(width: availableSize.width)
+                .frame(minHeight: availableSize.height)
             } else if vm.savedNews.isEmpty {
                 ContentUnavailableView(
                     "You don't have any saved news",
                     systemImage: "bookmark.slash",
                     description: Text("Save stories you're interested in to read later.")
                 )
-                .containerRelativeFrame([.horizontal, .vertical])
+                .frame(width: availableSize.width)
+                .frame(minHeight: availableSize.height)
             } else {
                 newsRendererView(
                     newsItems: newsItems,
@@ -696,6 +705,76 @@ struct HomeView: View {
             } else {
                 await vm.refreshNewsForCurrentDateIfNeeded()
             }
+        }
+    }
+
+    private func handlePendingHomeScreenQuickAction() {
+        guard let action = HomeScreenQuickActionService.shared.consumePendingAction() else { return }
+        handleHomeScreenQuickAction(action)
+    }
+
+    private func handleHomeScreenQuickAction(_ action: HomeScreenQuickAction) {
+        resetStoryPresentationState()
+
+        switch action {
+        case .search:
+            presentSearchFromHomeScreen()
+        case .savedNews:
+            presentSavedNewsFromHomeScreen()
+        case .randomNews:
+            openRandomNewsFromHomeScreen()
+        }
+    }
+
+    private func presentSearchFromHomeScreen() {
+        if vm.isShowingSavedNews {
+            vm.toggleSavedNewsMode()
+        } else {
+            vm.clearFilters()
+        }
+
+        isSearchPresented = true
+    }
+
+    private func presentSavedNewsFromHomeScreen() {
+        if !vm.isShowingSavedNews {
+            vm.toggleSavedNewsMode()
+        } else {
+            vm.clearFilters()
+        }
+
+        isSearchPresented = false
+    }
+
+    private func openRandomNewsFromHomeScreen() {
+        homeScreenQuickActionTask?.cancel()
+        homeScreenQuickActionTask = Task {
+            if vm.isShowingSavedNews {
+                vm.toggleSavedNewsMode()
+            } else {
+                vm.clearFilters()
+            }
+
+            await waitForInitialNewsLoadIfNeeded()
+
+            guard !Task.isCancelled,
+                  let news = vm.newsToShow.randomElement()
+            else { return }
+
+            targetNews = NewsListViewModel.DeepLinkNavigationTarget(
+                news: news,
+                relatedNews: vm.getRelatedNews(from: news),
+                region: ContentRegionProvider().currentRegion
+            )
+        }
+    }
+
+    private func waitForInitialNewsLoadIfNeeded() async {
+        var attempts = 0
+
+        while !vm.hasCompletedInitialLaunchLoad && attempts < 40 {
+            try? await Task.sleep(for: .milliseconds(100))
+            attempts += 1
         }
     }
 
