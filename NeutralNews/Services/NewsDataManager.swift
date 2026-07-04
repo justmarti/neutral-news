@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import WidgetKit
 
 private final class RegularNewsLoadCoordinator {
     private var tasksByDay: [Date: Task<Void, Never>] = [:]
@@ -115,6 +116,7 @@ final class NewsDataManager {
 
     // MARK: - Dependencies
     private let cacheService = CacheService.shared
+    private let widgetSnapshotStore = WidgetSnapshotStore()
 
     // MARK: - Data Collections
     private(set) var allNews = [News]() {
@@ -509,6 +511,10 @@ final class NewsDataManager {
         }
     }
 
+    func refreshTodayWidgetSnapshot() {
+        exportWidgetSnapshotIfNeeded(for: Date())
+    }
+
     /// Retrieves cached news for a specific day from memory.
     ///
     /// - Parameter dayInfo: The day to retrieve news for
@@ -601,6 +607,10 @@ final class NewsDataManager {
             self.neutralNews.append(contentsOf: newNeutralNews)
             self.addNewsToDay(newNeutralNews, for: date)
         }
+
+        if !fetchedNeutralNews.isEmpty {
+            exportWidgetSnapshotIfNeeded(for: date)
+        }
         
         // Add only truly new regular news with O(n) ID lookups.
         let existingNewsIDs = Set(allNews.map(\.id))
@@ -636,6 +646,7 @@ final class NewsDataManager {
         // Step 3: Update the day collection with fresh data
         ensureNewsSetExists(for: date)
         setNewsForDate(Set(fetchedNeutralNews), date: date)
+        exportWidgetSnapshotIfNeeded(for: date)
         
         // Step 4: Handle regular news similarly
         let fetchedNewsDict = Dictionary(uniqueKeysWithValues: fetchedNews.map { ($0.id, $0) })
@@ -658,6 +669,27 @@ final class NewsDataManager {
     
     private func addNewsToDay(_ news: [NeutralNews], for date: Date) {
         addNewsToDate(Set(news), date: date)
+    }
+
+    private func exportWidgetSnapshotIfNeeded(for date: Date) {
+        guard Calendar.current.isDateInToday(date) else { return }
+
+        let todayNews = getNewsArrayForDay(.today)
+        let region = ContentRegionProvider().currentRegion.rawValue
+        guard let snapshot = WidgetBriefingBuilder.buildSnapshot(from: todayNews, region: region) else { return }
+
+        Task(priority: .utility) { [widgetSnapshotStore] in
+            do {
+                let didWriteSnapshot = try widgetSnapshotStore.writeSnapshot(snapshot)
+                if didWriteSnapshot {
+                    WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotConstants.widgetKind)
+                }
+            } catch {
+#if DEBUG
+                print("Failed to export widget snapshot: \(error.localizedDescription)")
+#endif
+            }
+        }
     }
     
     private func startProgressiveLoading() {

@@ -8,13 +8,17 @@
 	<array>
 		<string>applinks:share.getfacts.app</string>
 	</array>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.dev.itram.news</string>
+	</array>
 	<key>com.apple.developer.icloud-services</key>
 	<array>
 		<string>CloudKit</string>
 	</array>
-	<key>com.apple.developer.icloud-container-identifiers</key>
+	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>iCloud.dev.itram.news</string>
+		<string>group.dev.itram.news</string>
 	</array>
 </dict>
 </plist>
