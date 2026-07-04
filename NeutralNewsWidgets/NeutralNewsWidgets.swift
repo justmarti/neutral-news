@@ -21,7 +21,7 @@ struct DailyBriefingEntry: TimelineEntry {
         }
 
         guard let item else { return WidgetDeepLink.appURL }
-        return WidgetDeepLink.url(for: item, region: region)
+        return WidgetDeepLink.url(for: item, region: region) ?? WidgetDeepLink.appURL
     }
 
     static let preview = DailyBriefingEntry(
@@ -250,7 +250,7 @@ struct DailyBriefingProvider: TimelineProvider {
 
     private func loadSnapshot(for region: String) async -> WidgetNewsSnapshot? {
         if let remoteSnapshot = try? await remoteClient.fetchSnapshot(for: region) {
-            _ = try? store.writeSnapshot(remoteSnapshot, skipUnchangedContent: false)
+            _ = try? store.writeSnapshot(remoteSnapshot)
             return remoteSnapshot
         }
 
