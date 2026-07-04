@@ -72,6 +72,34 @@ struct WidgetNewsSnapshotTests {
         #expect(snapshot?.items.first?.imageURL?.absoluteString == "https://example.com/story-1.jpg")
     }
 
+    @Test("Normalizes HTML escaped image URLs")
+    func normalizesHTMLEscapedImageURLs() throws {
+        let payload = """
+        {
+          "schemaVersion": 1,
+          "generatedAt": "1970-01-24T03:33:20Z",
+          "region": "ES",
+          "items": [
+            {
+              "id": "story-1",
+              "title": "Story One",
+              "imageURL": "https://example.com/story.jpg?width=1200&amp;height=675&amp;format=webply",
+              "date": "1970-01-24T03:31:40Z",
+              "relevance": 9
+            }
+          ]
+        }
+        """
+
+        let data = try #require(payload.data(using: .utf8))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
+        let snapshot = try decoder.decode(WidgetNewsSnapshot.self, from: data)
+
+        #expect(snapshot.items.first?.imageURL?.absoluteString == "https://example.com/story.jpg?width=1200&height=675&format=webply")
+    }
+
     @Test("Rejects stale widget snapshots")
     func rejectsStaleWidgetSnapshots() {
         let referenceDate = Date(timeIntervalSince1970: 2_000_000)

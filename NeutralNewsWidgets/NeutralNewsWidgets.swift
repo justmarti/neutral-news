@@ -16,6 +16,10 @@ struct DailyBriefingEntry: TimelineEntry {
     }
 
     var deepLinkURL: URL? {
+        if isPlaceholder {
+            return WidgetDeepLink.appURL
+        }
+
         guard let item else { return WidgetDeepLink.appURL }
         return WidgetDeepLink.url(for: item, region: region)
     }
@@ -52,13 +56,15 @@ struct DailyBriefingEntry: TimelineEntry {
 }
 
 struct DailyBriefingProvider: TimelineProvider {
+    private static let storyRotationInterval: TimeInterval = 60 * 60
+
     private let store = WidgetSnapshotStore()
     private let remoteClient = WidgetRemoteSnapshotClient()
 
     func placeholder(in context: Context) -> DailyBriefingEntry {
         DailyBriefingEntry(
             date: .now,
-            items: [Self.placeholderItem],
+            items: placeholderItems(for: context.family),
             region: "US",
             imageDataByItemID: [:],
             isPlaceholder: true
@@ -85,46 +91,81 @@ struct DailyBriefingProvider: TimelineProvider {
         guard let snapshot = try? store.readSnapshot(), !snapshot.items.isEmpty else {
             return DailyBriefingEntry(
                 date: .now,
-                items: [Self.placeholderItem],
+                items: placeholderItems(for: family),
                 region: "US",
                 imageDataByItemID: [:],
-                isPlaceholder: false
+                isPlaceholder: true
             )
         }
 
-        return await makeEntry(
-            for: visibleItems(from: snapshot, family: family),
+        let imageDataByItemID = await loadImageData(for: snapshot)
+        return makeEntry(
+            from: snapshot,
+            family: family,
             region: snapshot.region,
             date: .now,
-            loadImages: true
+            imageDataByItemID: imageDataByItemID
         )
     }
 
     private func makeCurrentEntry(for family: WidgetFamily) async -> DailyBriefingEntry {
         let region = WidgetRegionResolver.currentRegion()
         guard let snapshot = await loadSnapshot(for: region), !snapshot.items.isEmpty else {
-            return DailyBriefingEntry(date: .now, items: [], region: region, imageDataByItemID: [:], isPlaceholder: false)
+            return DailyBriefingEntry(
+                date: .now,
+                items: placeholderItems(for: family),
+                region: region,
+                imageDataByItemID: [:],
+                isPlaceholder: true
+            )
         }
 
-        return await makeEntry(
-            for: visibleItems(from: snapshot, family: family),
+        let imageDataByItemID = await loadImageData(for: snapshot)
+        return makeEntry(
+            from: snapshot,
+            family: family,
             region: snapshot.region,
             date: .now,
-            loadImages: true
+            imageDataByItemID: imageDataByItemID
         )
     }
 
-    private func makeEntry(for items: [WidgetNewsItem], region: String, date: Date, loadImages: Bool) async -> DailyBriefingEntry {
-        var imageDataByItemID: [String: Data] = [:]
-        if loadImages {
-            for item in items {
-                imageDataByItemID[item.id] = await WidgetImageLoader.imageData(from: item.imageURL)
-            }
+    private func makeEntry(
+        from snapshot: WidgetNewsSnapshot,
+        family: WidgetFamily,
+        startingAt index: Int = 0,
+        region: String,
+        date: Date,
+        imageDataByItemID: [String: Data]
+    ) -> DailyBriefingEntry {
+        let itemCount = visibleItemCount(for: family)
+        let candidates = candidateItems(from: snapshot, startingAt: index)
+        let itemsWithLoadedImages = candidates.filter { imageDataByItemID[$0.id] != nil }
+        let selectedItems: [WidgetNewsItem]
+
+        if itemsWithLoadedImages.count >= itemCount {
+            selectedItems = Array(itemsWithLoadedImages.prefix(itemCount))
+        } else {
+            let loadedItemIDs = Set(itemsWithLoadedImages.map(\.id))
+            selectedItems = Array(
+                (itemsWithLoadedImages + candidates.filter { !loadedItemIDs.contains($0.id) })
+                    .prefix(itemCount)
+            )
+        }
+
+        if selectedItems.isEmpty {
+            return DailyBriefingEntry(
+                date: date,
+                items: placeholderItems(for: family),
+                region: region,
+                imageDataByItemID: [:],
+                isPlaceholder: true
+            )
         }
 
         return DailyBriefingEntry(
             date: date,
-            items: items,
+            items: selectedItems,
             region: region,
             imageDataByItemID: imageDataByItemID,
             isPlaceholder: false
@@ -136,33 +177,51 @@ struct DailyBriefingProvider: TimelineProvider {
         let region = WidgetRegionResolver.currentRegion()
 
         guard let snapshot = await loadSnapshot(for: region), !snapshot.items.isEmpty else {
-            let entry = DailyBriefingEntry(date: now, items: [], region: region, imageDataByItemID: [:], isPlaceholder: false)
-            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(30 * 60)))
+            let entry = DailyBriefingEntry(
+                date: now,
+                items: placeholderItems(for: family),
+                region: region,
+                imageDataByItemID: [:],
+                isPlaceholder: true
+            )
+            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(5 * 60)))
         }
 
         var entries: [DailyBriefingEntry] = []
+        let imageDataByItemID = await loadImageData(for: snapshot)
         for index in snapshot.items.indices {
             entries.append(
-                await makeEntry(
-                    for: visibleItems(from: snapshot, family: family, startingAt: index),
+                makeEntry(
+                    from: snapshot,
+                    family: family,
+                    startingAt: index,
                     region: snapshot.region,
-                    date: now.addingTimeInterval(TimeInterval(index) * 30 * 60),
-                    loadImages: true
+                    date: now.addingTimeInterval(TimeInterval(index) * Self.storyRotationInterval),
+                    imageDataByItemID: imageDataByItemID
                 )
             )
         }
 
-        let refreshDate = now.addingTimeInterval(TimeInterval(snapshot.items.count) * 30 * 60)
+        let refreshDate = now.addingTimeInterval(TimeInterval(snapshot.items.count) * Self.storyRotationInterval)
         return Timeline(entries: entries, policy: .after(refreshDate))
     }
 
-    private func visibleItems(from snapshot: WidgetNewsSnapshot, family: WidgetFamily, startingAt index: Int = 0) -> [WidgetNewsItem] {
-        let count = min(visibleItemCount(for: family), snapshot.items.count)
-        guard count > 0 else { return [] }
+    private func candidateItems(from snapshot: WidgetNewsSnapshot, startingAt index: Int) -> [WidgetNewsItem] {
+        let sourceItems = snapshot.items.filter { $0.imageURL != nil }
+        let items = sourceItems.isEmpty ? snapshot.items : sourceItems
+        guard !items.isEmpty else { return [] }
 
-        return (0..<count).map { offset in
-            snapshot.items[(index + offset) % snapshot.items.count]
+        return items.indices.map { offset in
+            items[(index + offset) % items.count]
         }
+    }
+
+    private func loadImageData(for snapshot: WidgetNewsSnapshot) async -> [String: Data] {
+        var imageDataByItemID: [String: Data] = [:]
+        for item in snapshot.items where item.imageURL != nil {
+            imageDataByItemID[item.id] = await WidgetImageLoader.imageData(from: item.imageURL)
+        }
+        return imageDataByItemID
     }
 
     private func visibleItemCount(for family: WidgetFamily) -> Int {
@@ -175,6 +234,18 @@ struct DailyBriefingProvider: TimelineProvider {
         }
 
         return 1
+    }
+
+    private func placeholderItems(for family: WidgetFamily) -> [WidgetNewsItem] {
+        (0..<visibleItemCount(for: family)).map { index in
+            WidgetNewsItem(
+                id: "placeholder-story-\(index)",
+                title: Self.placeholderTitles[index % Self.placeholderTitles.count],
+                imageURL: nil,
+                date: .now,
+                relevance: 0
+            )
+        }
     }
 
     private func loadSnapshot(for region: String) async -> WidgetNewsSnapshot? {
@@ -191,13 +262,11 @@ struct DailyBriefingProvider: TimelineProvider {
         return cachedSnapshot
     }
 
-    private static let placeholderItem = WidgetNewsItem(
-        id: "preview-story",
-        title: "Global leaders prepare for a new round of high-stakes talks",
-        imageURL: nil,
-        date: .now,
-        relevance: 10
-    )
+    private static let placeholderTitles = [
+        "Global leaders prepare for a new round of high-stakes talks",
+        "Markets react as policy makers outline new economic measures",
+        "Researchers report steady progress on clean energy storage"
+    ]
 }
 
 private enum WidgetImageLoader {
@@ -286,7 +355,9 @@ struct NeutralNewsWidgetsEntryView: View {
     private func multiStoryContent(itemCount: Int) -> some View {
         VStack(spacing: multiStorySpacing) {
             ForEach(Array(entry.items.prefix(itemCount))) { item in
-                if let url = WidgetDeepLink.url(for: item, region: entry.region) ?? WidgetDeepLink.appURL {
+                if entry.isPlaceholder {
+                    multiStoryTile(for: item)
+                } else if let url = WidgetDeepLink.url(for: item, region: entry.region) ?? WidgetDeepLink.appURL {
                     Link(destination: url) {
                         multiStoryTile(for: item)
                     }
@@ -402,7 +473,15 @@ private struct DailyBriefingStoryTile: View {
     @ViewBuilder
     private var titleContent: some View {
         if isPlaceholder {
-            EmptyView()
+            Text(item?.title ?? Self.placeholderTitle)
+                .font(.system(size: titleFontSize, weight: .semibold, design: .serif))
+                .foregroundStyle(.secondary)
+                .lineLimit(titleLineLimit)
+                .minimumScaleFactor(0.86)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(contentInsets)
+                .redacted(reason: .placeholder)
         } else if let item {
             Text(item.title)
                 .font(.system(size: titleFontSize, weight: .semibold, design: .serif))
@@ -424,6 +503,8 @@ private struct DailyBriefingStoryTile: View {
                 .unredacted()
         }
     }
+
+    private static let placeholderTitle = "Global leaders prepare for a new round of high-stakes talks"
 
     private var titleFontSize: CGFloat {
         family == .systemMedium ? 16 : 12

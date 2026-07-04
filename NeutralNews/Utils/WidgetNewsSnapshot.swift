@@ -42,6 +42,52 @@ struct WidgetNewsItem: Codable, Equatable, Identifiable, Sendable {
     let imageURL: URL?
     let date: Date
     let relevance: Int
+
+    init(
+        id: String,
+        title: String,
+        imageURL: URL?,
+        date: Date,
+        relevance: Int
+    ) {
+        self.id = id
+        self.title = title
+        self.imageURL = imageURL
+        self.date = date
+        self.relevance = relevance
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case imageURL
+        case date
+        case relevance
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.title = try container.decode(String.self, forKey: .title)
+        let rawImageURL = try container.decodeIfPresent(String.self, forKey: .imageURL)
+        self.imageURL = Self.normalizedImageURL(from: rawImageURL)
+        self.date = try container.decode(Date.self, forKey: .date)
+        self.relevance = try container.decode(Int.self, forKey: .relevance)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(title, forKey: .title)
+        try container.encodeIfPresent(imageURL, forKey: .imageURL)
+        try container.encode(date, forKey: .date)
+        try container.encode(relevance, forKey: .relevance)
+    }
+
+    private static func normalizedImageURL(from rawValue: String?) -> URL? {
+        guard let rawValue else { return nil }
+        return URL(string: rawValue.replacingOccurrences(of: "&amp;", with: "&"))
+    }
 }
 
 enum WidgetSnapshotConstants {
