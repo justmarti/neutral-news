@@ -123,14 +123,22 @@ enum WidgetDeepLink {
     static var appURL: URL? {
         URL(string: "neutralnews://")
     }
+
+    static var proURL: URL? {
+        URL(string: "neutralnews://pro")
+    }
 }
 
 extension WidgetNewsSnapshot {
+    var isUsableForWidget: Bool {
+        schemaVersion == Self.currentSchemaVersion && !items.isEmpty
+    }
+
     func isFresh(
         referenceDate: Date = .now,
         maxAge: TimeInterval = WidgetSnapshotConstants.snapshotFreshnessInterval
     ) -> Bool {
-        guard schemaVersion == Self.currentSchemaVersion, !items.isEmpty else { return false }
+        guard isUsableForWidget else { return false }
         let allowedClockSkew: TimeInterval = 5 * 60
         guard generatedAt <= referenceDate.addingTimeInterval(allowedClockSkew) else { return false }
         return referenceDate.timeIntervalSince(generatedAt) <= maxAge
@@ -148,6 +156,24 @@ enum WidgetRegionPreferenceStore {
         } else {
             defaults.removeObject(forKey: storageKey)
         }
+    }
+}
+
+enum WidgetPremiumAccessStore {
+    private static let storageKey = "widget_premium_access"
+
+    static func sync(isPremium: Bool) {
+        UserDefaults(suiteName: WidgetSnapshotConstants.appGroupIdentifier)?
+            .set(isPremium, forKey: storageKey)
+    }
+
+    static func currentValue() -> Bool? {
+        guard let defaults = UserDefaults(suiteName: WidgetSnapshotConstants.appGroupIdentifier),
+              defaults.object(forKey: storageKey) != nil else {
+            return nil
+        }
+
+        return defaults.bool(forKey: storageKey)
     }
 }
 
@@ -201,22 +227,31 @@ struct WidgetRemoteSnapshotClient: Sendable {
 
     func fetchSnapshot(for region: String, referenceDate: Date = .now) async throws -> WidgetNewsSnapshot? {
         var request = URLRequest(url: WidgetSnapshotConstants.remoteSnapshotURL(for: region))
-        request.timeoutInterval = 6
+        request.timeoutInterval = 3
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("NeutralNewsWidget/1.0", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await dataLoader(request)
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200..<300).contains(httpResponse.statusCode),
-              data.count <= Self.maximumSnapshotBytes else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            return nil
+        }
+
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            return nil
+        }
+
+        guard data.count <= Self.maximumSnapshotBytes else {
             return nil
         }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let snapshot = try decoder.decode(WidgetNewsSnapshot.self, from: data)
-        guard snapshot.region.uppercased() == region.uppercased(),
-              snapshot.isFresh(referenceDate: referenceDate) else {
+        guard snapshot.region.uppercased() == region.uppercased() else {
+            return nil
+        }
+
+        guard snapshot.isUsableForWidget else {
             return nil
         }
 

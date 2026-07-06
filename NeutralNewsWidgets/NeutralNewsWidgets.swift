@@ -1,4 +1,3 @@
-import ImageIO
 import SwiftUI
 import UIKit
 import WidgetKit
@@ -10,12 +9,17 @@ struct DailyBriefingEntry: TimelineEntry {
     let region: String
     let imageDataByItemID: [String: Data]
     let isPlaceholder: Bool
+    let isPremiumLocked: Bool
 
     var item: WidgetNewsItem? {
         items.first
     }
 
     var deepLinkURL: URL? {
+        if isPremiumLocked {
+            return WidgetDeepLink.proURL
+        }
+
         if isPlaceholder {
             return WidgetDeepLink.appURL
         }
@@ -51,14 +55,15 @@ struct DailyBriefingEntry: TimelineEntry {
         ],
         region: "US",
         imageDataByItemID: [:],
-        isPlaceholder: false
+        isPlaceholder: false,
+        isPremiumLocked: false
     )
 }
 
 struct DailyBriefingProvider: TimelineProvider {
     private static let storyRotationInterval: TimeInterval = 60 * 60
-
     private let store = WidgetSnapshotStore()
+    private let imageStore = WidgetImageStore()
     private let remoteClient = WidgetRemoteSnapshotClient()
 
     func placeholder(in context: Context) -> DailyBriefingEntry {
@@ -67,7 +72,8 @@ struct DailyBriefingProvider: TimelineProvider {
             items: placeholderItems(for: context.family),
             region: "US",
             imageDataByItemID: [:],
-            isPlaceholder: true
+            isPlaceholder: true,
+            isPremiumLocked: false
         )
     }
 
@@ -94,14 +100,17 @@ struct DailyBriefingProvider: TimelineProvider {
                 items: placeholderItems(for: family),
                 region: "US",
                 imageDataByItemID: [:],
-                isPlaceholder: true
+                isPlaceholder: true,
+                isPremiumLocked: false
             )
         }
 
-        let imageDataByItemID = await loadImageData(for: snapshot)
+        let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
+        let imageDataByItemID = cachedImageData(for: snapshot.items)
         return makeEntry(
             from: snapshot,
             family: family,
+            startingAt: rotationIndex,
             region: snapshot.region,
             date: .now,
             imageDataByItemID: imageDataByItemID
@@ -110,20 +119,28 @@ struct DailyBriefingProvider: TimelineProvider {
 
     private func makeCurrentEntry(for family: WidgetFamily) async -> DailyBriefingEntry {
         let region = WidgetRegionResolver.currentRegion()
+
+        if shouldLockPremiumContent(for: family) {
+            return makePremiumLockedEntry(for: family, region: region, date: .now)
+        }
+
         guard let snapshot = await loadSnapshot(for: region), !snapshot.items.isEmpty else {
             return DailyBriefingEntry(
                 date: .now,
                 items: placeholderItems(for: family),
                 region: region,
                 imageDataByItemID: [:],
-                isPlaceholder: true
+                isPlaceholder: true,
+                isPremiumLocked: false
             )
         }
 
-        let imageDataByItemID = await loadImageData(for: snapshot)
+        let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
+        let imageDataByItemID = cachedImageData(for: snapshot.items)
         return makeEntry(
             from: snapshot,
             family: family,
+            startingAt: rotationIndex,
             region: snapshot.region,
             date: .now,
             imageDataByItemID: imageDataByItemID
@@ -159,7 +176,8 @@ struct DailyBriefingProvider: TimelineProvider {
                 items: placeholderItems(for: family),
                 region: region,
                 imageDataByItemID: [:],
-                isPlaceholder: true
+                isPlaceholder: true,
+                isPremiumLocked: false
             )
         }
 
@@ -168,7 +186,8 @@ struct DailyBriefingProvider: TimelineProvider {
             items: selectedItems,
             region: region,
             imageDataByItemID: imageDataByItemID,
-            isPlaceholder: false
+            isPlaceholder: false,
+            isPremiumLocked: false
         )
     }
 
@@ -176,34 +195,45 @@ struct DailyBriefingProvider: TimelineProvider {
         let now = Date()
         let region = WidgetRegionResolver.currentRegion()
 
+        if shouldLockPremiumContent(for: family) {
+            let entry = makePremiumLockedEntry(for: family, region: region, date: now)
+            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(Self.storyRotationInterval)))
+        }
+
         guard let snapshot = await loadSnapshot(for: region), !snapshot.items.isEmpty else {
             let entry = DailyBriefingEntry(
                 date: now,
                 items: placeholderItems(for: family),
                 region: region,
                 imageDataByItemID: [:],
-                isPlaceholder: true
+                isPlaceholder: true,
+                isPremiumLocked: false
             )
-            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(5 * 60)))
+            return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(60)))
         }
 
-        var entries: [DailyBriefingEntry] = []
-        let imageDataByItemID = await loadImageData(for: snapshot)
-        for index in snapshot.items.indices {
-            entries.append(
-                makeEntry(
-                    from: snapshot,
-                    family: family,
-                    startingAt: index,
-                    region: snapshot.region,
-                    date: now.addingTimeInterval(TimeInterval(index) * Self.storyRotationInterval),
-                    imageDataByItemID: imageDataByItemID
-                )
-            )
-        }
+        let rotationIndex = currentRotationIndex(for: snapshot, date: now)
+        let imageDataByItemID = cachedImageData(for: snapshot.items)
+        let entry = makeEntry(
+            from: snapshot,
+            family: family,
+            startingAt: rotationIndex,
+            region: snapshot.region,
+            date: now,
+            imageDataByItemID: imageDataByItemID
+        )
+        return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(Self.storyRotationInterval)))
+    }
 
-        let refreshDate = now.addingTimeInterval(TimeInterval(snapshot.items.count) * Self.storyRotationInterval)
-        return Timeline(entries: entries, policy: .after(refreshDate))
+    private func makePremiumLockedEntry(for family: WidgetFamily, region: String, date: Date) -> DailyBriefingEntry {
+        DailyBriefingEntry(
+            date: date,
+            items: placeholderItems(for: family),
+            region: region,
+            imageDataByItemID: [:],
+            isPlaceholder: false,
+            isPremiumLocked: true
+        )
     }
 
     private func candidateItems(from snapshot: WidgetNewsSnapshot, startingAt index: Int) -> [WidgetNewsItem] {
@@ -216,12 +246,20 @@ struct DailyBriefingProvider: TimelineProvider {
         }
     }
 
-    private func loadImageData(for snapshot: WidgetNewsSnapshot) async -> [String: Data] {
-        var imageDataByItemID: [String: Data] = [:]
-        for item in snapshot.items where item.imageURL != nil {
-            imageDataByItemID[item.id] = await WidgetImageLoader.imageData(from: item.imageURL)
-        }
-        return imageDataByItemID
+    private func currentRotationIndex(for snapshot: WidgetNewsSnapshot, date: Date) -> Int {
+        guard !snapshot.items.isEmpty else { return 0 }
+        let elapsed = max(0, date.timeIntervalSince(snapshot.generatedAt))
+        return Int(elapsed / Self.storyRotationInterval) % snapshot.items.count
+    }
+
+    private func cachedImageData(for items: [WidgetNewsItem]) -> [String: Data] {
+        Dictionary(uniqueKeysWithValues: items.compactMap { item in
+            guard let data = imageStore.readImageData(for: item) else {
+                return nil
+            }
+
+            return (item.id, data)
+        })
     }
 
     private func visibleItemCount(for family: WidgetFamily) -> Int {
@@ -234,6 +272,14 @@ struct DailyBriefingProvider: TimelineProvider {
         }
 
         return 1
+    }
+
+    private func shouldLockPremiumContent(for family: WidgetFamily) -> Bool {
+        guard family == .systemLarge || WidgetFamily.isNeutralNewsExtraLarge(family) else {
+            return false
+        }
+
+        return WidgetPremiumAccessStore.currentValue() == false
     }
 
     private func placeholderItems(for family: WidgetFamily) -> [WidgetNewsItem] {
@@ -249,17 +295,29 @@ struct DailyBriefingProvider: TimelineProvider {
     }
 
     private func loadSnapshot(for region: String) async -> WidgetNewsSnapshot? {
+        if let cachedSnapshot = cachedSnapshot(matching: region) {
+            return cachedSnapshot
+        }
+
         if let remoteSnapshot = try? await remoteClient.fetchSnapshot(for: region) {
             _ = try? store.writeSnapshot(remoteSnapshot)
             return remoteSnapshot
         }
 
-        guard let cachedSnapshot = try? store.readFreshSnapshot(),
-              cachedSnapshot.region.uppercased() == region.uppercased() else {
+        return cachedSnapshot()
+    }
+
+    private func cachedSnapshot(matching region: String? = nil) -> WidgetNewsSnapshot? {
+        guard let snapshot = try? store.readSnapshot(),
+              snapshot.isUsableForWidget else {
             return nil
         }
 
-        return cachedSnapshot
+        if let region, snapshot.region.uppercased() != region.uppercased() {
+            return nil
+        }
+
+        return snapshot
     }
 
     private static let placeholderTitles = [
@@ -267,53 +325,6 @@ struct DailyBriefingProvider: TimelineProvider {
         "Markets react as policy makers outline new economic measures",
         "Researchers report steady progress on clean energy storage"
     ]
-}
-
-private enum WidgetImageLoader {
-    private static let maximumDownloadBytes = 15_000_000
-    private static let thumbnailMaxPixelSize: CGFloat = 900
-
-    static func imageData(from url: URL?) async -> Data? {
-        guard let url else { return nil }
-
-        var request = URLRequest(url: url)
-        request.timeoutInterval = 8
-        request.cachePolicy = .returnCacheDataElseLoad
-        request.setValue("NeutralNewsWidget/1.0", forHTTPHeaderField: "User-Agent")
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode),
-                  data.count <= maximumDownloadBytes else {
-                return nil
-            }
-            return downsampledJPEGData(from: data)
-        } catch {
-            return nil
-        }
-    }
-
-    private static func downsampledJPEGData(from data: Data) -> Data? {
-        let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
-        guard let imageSource = CGImageSourceCreateWithData(data as CFData, imageSourceOptions) else {
-            return nil
-        }
-
-        let downsampleOptions = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceShouldCacheImmediately: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: thumbnailMaxPixelSize
-        ] as CFDictionary
-
-        guard let cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions) else {
-            return nil
-        }
-
-        let image = UIImage(cgImage: cgImage)
-        return image.jpegData(compressionQuality: 0.82)
-    }
 }
 
 struct NeutralNewsWidgetsEntryView: View {
@@ -338,7 +349,9 @@ struct NeutralNewsWidgetsEntryView: View {
 
     @ViewBuilder
     private var content: some View {
-        if family == .systemLarge {
+        if entry.isPremiumLocked {
+            PremiumLockedWidgetView()
+        } else if family == .systemLarge {
             multiStoryContent(itemCount: 2)
         } else if WidgetFamily.isNeutralNewsExtraLarge(family) {
             multiStoryContent(itemCount: 3)
@@ -403,6 +416,27 @@ struct NeutralNewsWidgetsEntryView: View {
     }
 }
 
+private struct PremiumLockedWidgetView: View {
+    var body: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "lock.fill")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+
+            Text("Facts Pro")
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            Text("Unlock larger widgets")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 private struct DailyBriefingStoryTile: View {
     let item: WidgetNewsItem?
     let imageData: Data?
@@ -440,14 +474,7 @@ private struct DailyBriefingStoryTile: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
         } else {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.07, green: 0.08, blue: 0.10),
-                    Color(red: 0.18, green: 0.19, blue: 0.21)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            Color(.tertiarySystemFill)
         }
     }
 

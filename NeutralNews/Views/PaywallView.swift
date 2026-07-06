@@ -41,6 +41,7 @@ struct PaywallView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     ProFeatureRow(icon: "calendar", text: "More days of news")
                     ProFeatureRow(icon: "bookmark.fill", text: "Save stories")
+                    ProFeatureRow(icon: "widget.large", text: "Larger widgets")
                     ProFeatureRow(icon: "person.3.fill", text: "Family sharing")
                 }
                 .fixedSize(horizontal: true, vertical: false)

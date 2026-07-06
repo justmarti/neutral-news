@@ -120,6 +120,43 @@ struct WidgetNewsSnapshotTests {
         #expect(snapshot.isFresh(referenceDate: referenceDate) == false)
     }
 
+    @Test("Remote client accepts stale but usable widget snapshots")
+    func remoteClientAcceptsStaleButUsableWidgetSnapshots() async throws {
+        let payload = """
+        {
+          "schemaVersion": 1,
+          "generatedAt": "1970-01-24T03:33:20Z",
+          "region": "ES",
+          "items": [
+            {
+              "id": "story-1",
+              "title": "Story One",
+              "imageURL": "https://example.com/story-1.jpg",
+              "date": "1970-01-24T03:31:40Z",
+              "relevance": 9
+            }
+          ]
+        }
+        """
+        let data = try #require(payload.data(using: .utf8))
+        let response = try #require(HTTPURLResponse(
+            url: WidgetSnapshotConstants.remoteSnapshotURL(for: "ES"),
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        ))
+        let client = WidgetRemoteSnapshotClient { _ in
+            (data, response)
+        }
+
+        let snapshot = try await client.fetchSnapshot(
+            for: "ES",
+            referenceDate: Date(timeIntervalSince1970: 3_000_000)
+        )
+
+        #expect(snapshot?.items.map(\.id) == ["story-1"])
+    }
+
     @Test("Builds Spain widget deep link")
     func buildsSpainWidgetDeepLink() {
         let item = WidgetNewsItem(id: "story-1", title: "Story One", imageURL: nil, date: .now, relevance: 1)
@@ -137,4 +174,5 @@ struct WidgetNewsSnapshotTests {
 
         #expect(url?.absoluteString == "neutralnews://us/news/story-2")
     }
+
 }

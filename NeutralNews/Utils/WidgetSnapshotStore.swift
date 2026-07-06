@@ -36,10 +36,11 @@ struct WidgetSnapshotStore: @unchecked Sendable {
         referenceDate: Date = .now,
         maxAge: TimeInterval = WidgetSnapshotConstants.snapshotFreshnessInterval
     ) throws -> WidgetNewsSnapshot? {
-        guard let snapshot = try readSnapshot(),
-              snapshot.isFresh(referenceDate: referenceDate, maxAge: maxAge) else {
+        guard let snapshot = try readSnapshot() else {
             return nil
         }
+
+        guard snapshot.isFresh(referenceDate: referenceDate, maxAge: maxAge) else { return nil }
 
         return snapshot
     }
@@ -61,6 +62,44 @@ struct WidgetSnapshotStore: @unchecked Sendable {
 
     private var fileURL: URL? {
         directoryURL?.appendingPathComponent(WidgetSnapshotConstants.fileName, isDirectory: false)
+    }
+}
+
+struct WidgetImageStore: @unchecked Sendable {
+    private let directoryURL: URL?
+    private let fileManager: FileManager
+
+    init(
+        directoryURL: URL? = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: WidgetSnapshotConstants.appGroupIdentifier),
+        fileManager: FileManager = .default
+    ) {
+        self.directoryURL = directoryURL?.appendingPathComponent("daily-briefing-widget-images", isDirectory: true)
+        self.fileManager = fileManager
+    }
+
+    func readImageData(for item: WidgetNewsItem) -> Data? {
+        guard let fileURL = fileURL(for: item) else { return nil }
+        return try? Data(contentsOf: fileURL)
+    }
+
+    @discardableResult
+    func writeImageData(_ data: Data, for item: WidgetNewsItem) throws -> Bool {
+        guard let directoryURL, let fileURL = fileURL(for: item) else {
+            throw WidgetSnapshotStore.StoreError.appGroupUnavailable
+        }
+
+        guard !fileManager.fileExists(atPath: fileURL.path) else {
+            return false
+        }
+
+        try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        try data.write(to: fileURL, options: [.atomic])
+        return true
+    }
+
+    private func fileURL(for item: WidgetNewsItem) -> URL? {
+        let fileName = item.id.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? item.id
+        return directoryURL?.appendingPathComponent("\(fileName).jpg", isDirectory: false)
     }
 }
 

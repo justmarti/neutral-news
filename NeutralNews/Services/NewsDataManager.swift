@@ -117,6 +117,7 @@ final class NewsDataManager {
     // MARK: - Dependencies
     private let cacheService = CacheService.shared
     private let widgetSnapshotStore = WidgetSnapshotStore()
+    private let widgetImageStore = WidgetImageStore()
 
     // MARK: - Data Collections
     private(set) var allNews = [News]() {
@@ -678,10 +679,13 @@ final class NewsDataManager {
         let region = ContentRegionProvider().currentRegion.rawValue
         guard let snapshot = WidgetBriefingBuilder.buildSnapshot(from: todayNews, region: region) else { return }
 
-        Task(priority: .utility) { [widgetSnapshotStore] in
+        Task(priority: .utility) { [widgetSnapshotStore, widgetImageStore] in
             do {
-                let didWriteSnapshot = try widgetSnapshotStore.writeSnapshot(snapshot)
-                if didWriteSnapshot {
+                _ = try widgetSnapshotStore.writeSnapshot(snapshot)
+                WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotConstants.widgetKind)
+
+                let didCacheImages = await Self.cacheWidgetImages(for: snapshot, store: widgetImageStore)
+                if didCacheImages {
                     WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotConstants.widgetKind)
                 }
             } catch {
@@ -690,6 +694,25 @@ final class NewsDataManager {
 #endif
             }
         }
+    }
+
+    private static func cacheWidgetImages(for snapshot: WidgetNewsSnapshot, store: WidgetImageStore) async -> Bool {
+        var didWriteImage = false
+        let maxPixelSize: Double = 900
+
+        for item in snapshot.items {
+            guard let imageURL = item.imageURL else { continue }
+
+            do {
+                let image = try await CachedAsyncImageHelper.loadUIImage(url: imageURL, maxPixelSize: maxPixelSize)
+                guard let data = image.jpegData(compressionQuality: 0.82) else { continue }
+                didWriteImage = try store.writeImageData(data, for: item) || didWriteImage
+            } catch {
+                continue
+            }
+        }
+
+        return didWriteImage
     }
     
     private func startProgressiveLoading() {

@@ -205,6 +205,7 @@ final class PremiumManager {
 
     private func apply(customerInfo: CustomerInfo) {
         isPremium = !customerInfo.entitlements.active.isEmpty
+        WidgetPremiumAccessStore.sync(isPremium: isPremium)
         updateEntitlementInfo(from: customerInfo)
 
         if isPremium, let action = pendingAction {

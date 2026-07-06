@@ -105,6 +105,11 @@ struct NeutralNewsApp: App {
 #if DEBUG
                     print("🔗 Deep link received: \(url)")
 #endif
+                    if url.absoluteString == WidgetDeepLink.proURL?.absoluteString {
+                        PremiumManager.shared.requirePremium(for: "large_widgets")
+                        return
+                    }
+
                     // Only set loading if it's a valid deep link
                     if let deepLinkData = DeepLinkService.parseDeepLink(url) {
                         // Activate loading IMMEDIATELY to prevent showing empty state
