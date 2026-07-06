@@ -304,7 +304,8 @@ struct HomeView: View {
                     news: target.news,
                     relatedNews: target.relatedNews,
                     region: target.region,
-                    namespace: animationNamespace
+                    namespace: animationNamespace,
+                    relatedNewsProvider: vm.getRelatedNews
                 )
                     .toolbarVisibility(.visible, for: .navigationBar)
                     .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
@@ -322,7 +323,8 @@ struct HomeView: View {
                     news: target.news,
                     relatedNews: target.relatedNews,
                     region: target.region,
-                    namespace: animationNamespace
+                    namespace: animationNamespace,
+                    relatedNewsProvider: vm.getRelatedNews
                 )
                     .toolbarVisibility(.visible, for: .navigationBar)
                     .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
@@ -1134,7 +1136,13 @@ private struct HomeNewsCard: View {
 
     var body: some View {
         NavigationLink {
-            NeutralNewsView(news: news, relatedNews: relatedNews, region: nil, namespace: namespace)
+            NeutralNewsView(
+                news: news,
+                relatedNews: relatedNews,
+                region: nil,
+                namespace: namespace,
+                relatedNewsProvider: vm.getRelatedNews
+            )
                 .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
                 .navigationTransition(.zoom(sourceID: news.id, in: namespace))
                 .onAppear {
