@@ -1,5 +1,5 @@
 import SwiftUI
-import UIKit
+import ImageIO
 import WidgetKit
 
 
@@ -62,6 +62,7 @@ struct DailyBriefingEntry: TimelineEntry {
 
 struct DailyBriefingProvider: TimelineProvider {
     private static let storyRotationInterval: TimeInterval = 60 * 60
+    private static let maximumTimelineEntryCount = 6
     private let store = WidgetSnapshotStore()
     private let imageStore = WidgetImageStore()
     private let remoteClient = WidgetRemoteSnapshotClient()
@@ -136,6 +137,7 @@ struct DailyBriefingProvider: TimelineProvider {
         }
 
         let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
+        _ = await WidgetImageCache.cacheImages(for: snapshot, store: imageStore)
         let imageDataByItemID = cachedImageData(for: snapshot.items)
         return makeEntry(
             from: snapshot,
@@ -212,17 +214,15 @@ struct DailyBriefingProvider: TimelineProvider {
             return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(60)))
         }
 
-        let rotationIndex = currentRotationIndex(for: snapshot, date: now)
+        _ = await WidgetImageCache.cacheImages(for: snapshot, store: imageStore)
         let imageDataByItemID = cachedImageData(for: snapshot.items)
-        let entry = makeEntry(
+        let entries = timelineEntries(
             from: snapshot,
             family: family,
-            startingAt: rotationIndex,
-            region: snapshot.region,
-            date: now,
+            startingAt: now,
             imageDataByItemID: imageDataByItemID
         )
-        return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(Self.storyRotationInterval)))
+        return Timeline(entries: entries, policy: .atEnd)
     }
 
     private func makePremiumLockedEntry(for family: WidgetFamily, region: String, date: Date) -> DailyBriefingEntry {
@@ -295,7 +295,7 @@ struct DailyBriefingProvider: TimelineProvider {
     }
 
     private func loadSnapshot(for region: String) async -> WidgetNewsSnapshot? {
-        if let cachedSnapshot = cachedSnapshot(matching: region) {
+        if let cachedSnapshot = cachedSnapshot(matching: region, requireFresh: true) {
             return cachedSnapshot
         }
 
@@ -304,12 +304,20 @@ struct DailyBriefingProvider: TimelineProvider {
             return remoteSnapshot
         }
 
+        if let staleRegionalSnapshot = cachedSnapshot(matching: region) {
+            return staleRegionalSnapshot
+        }
+
         return cachedSnapshot()
     }
 
-    private func cachedSnapshot(matching region: String? = nil) -> WidgetNewsSnapshot? {
+    private func cachedSnapshot(matching region: String? = nil, requireFresh: Bool = false) -> WidgetNewsSnapshot? {
         guard let snapshot = try? store.readSnapshot(),
               snapshot.isUsableForWidget else {
+            return nil
+        }
+
+        guard !requireFresh || snapshot.isFresh() else {
             return nil
         }
 
@@ -318,6 +326,28 @@ struct DailyBriefingProvider: TimelineProvider {
         }
 
         return snapshot
+    }
+
+    private func timelineEntries(
+        from snapshot: WidgetNewsSnapshot,
+        family: WidgetFamily,
+        startingAt date: Date,
+        imageDataByItemID: [String: Data]
+    ) -> [DailyBriefingEntry] {
+        let entryCount = max(1, min(snapshot.items.count, Self.maximumTimelineEntryCount))
+
+        return (0..<entryCount).map { offset in
+            let entryDate = date.addingTimeInterval(TimeInterval(offset) * Self.storyRotationInterval)
+            let rotationIndex = currentRotationIndex(for: snapshot, date: entryDate)
+            return makeEntry(
+                from: snapshot,
+                family: family,
+                startingAt: rotationIndex,
+                region: snapshot.region,
+                date: entryDate,
+                imageDataByItemID: imageDataByItemID
+            )
+        }
     }
 
     private static let placeholderTitles = [
@@ -467,8 +497,8 @@ private struct DailyBriefingStoryTile: View {
         if isPlaceholder {
             Color(.tertiarySystemFill)
         } else if let imageData,
-           let image = UIImage(data: imageData) {
-            Image(uiImage: image)
+           let image = Self.image(from: imageData) {
+            Image(decorative: image, scale: 1, orientation: .up)
                 .resizable()
                 .scaledToFill()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -476,6 +506,14 @@ private struct DailyBriefingStoryTile: View {
         } else {
             Color(.tertiarySystemFill)
         }
+    }
+
+    private static func image(from data: Data) -> CGImage? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return nil
+        }
+
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }
 
     private var bottomGradient: some View {

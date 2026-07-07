@@ -684,7 +684,7 @@ final class NewsDataManager {
                 _ = try widgetSnapshotStore.writeSnapshot(snapshot)
                 WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotConstants.widgetKind)
 
-                let didCacheImages = await Self.cacheWidgetImages(for: snapshot, store: widgetImageStore)
+                let didCacheImages = await WidgetImageCache.cacheImages(for: snapshot, store: widgetImageStore)
                 if didCacheImages {
                     WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotConstants.widgetKind)
                 }
@@ -694,25 +694,6 @@ final class NewsDataManager {
 #endif
             }
         }
-    }
-
-    private static func cacheWidgetImages(for snapshot: WidgetNewsSnapshot, store: WidgetImageStore) async -> Bool {
-        var didWriteImage = false
-        let maxPixelSize: Double = 900
-
-        for item in snapshot.items {
-            guard let imageURL = item.imageURL else { continue }
-
-            do {
-                let image = try await CachedAsyncImageHelper.loadUIImage(url: imageURL, maxPixelSize: maxPixelSize)
-                guard let data = image.jpegData(compressionQuality: 0.82) else { continue }
-                didWriteImage = try store.writeImageData(data, for: item) || didWriteImage
-            } catch {
-                continue
-            }
-        }
-
-        return didWriteImage
     }
     
     private func startProgressiveLoading() {

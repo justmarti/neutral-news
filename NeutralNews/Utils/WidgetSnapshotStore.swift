@@ -1,4 +1,6 @@
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 
 struct WidgetSnapshotStore: @unchecked Sendable {
     enum StoreError: Error {
@@ -82,6 +84,11 @@ struct WidgetImageStore: @unchecked Sendable {
         return try? Data(contentsOf: fileURL)
     }
 
+    func hasImageData(for item: WidgetNewsItem) -> Bool {
+        guard let fileURL = fileURL(for: item) else { return false }
+        return fileManager.fileExists(atPath: fileURL.path)
+    }
+
     @discardableResult
     func writeImageData(_ data: Data, for item: WidgetNewsItem) throws -> Bool {
         guard let directoryURL, let fileURL = fileURL(for: item) else {
@@ -100,6 +107,88 @@ struct WidgetImageStore: @unchecked Sendable {
     private func fileURL(for item: WidgetNewsItem) -> URL? {
         let fileName = item.id.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? item.id
         return directoryURL?.appendingPathComponent("\(fileName).jpg", isDirectory: false)
+    }
+}
+
+enum WidgetImageCache {
+    private static let maxImageBytes = 8 * 1024 * 1024
+    private static let maxPixelSize: Double = 900
+    private static let compressionQuality = 0.82
+
+    static func cacheImages(for snapshot: WidgetNewsSnapshot, store: WidgetImageStore) async -> Bool {
+        await withTaskGroup(of: Bool.self) { group in
+            for item in snapshot.items {
+                guard item.imageURL != nil, !store.hasImageData(for: item) else { continue }
+
+                group.addTask {
+                    await cacheImage(for: item, store: store)
+                }
+            }
+
+            var didWriteImage = false
+            for await result in group {
+                didWriteImage = result || didWriteImage
+            }
+
+            return didWriteImage
+        }
+    }
+
+    private static func cacheImage(for item: WidgetNewsItem, store: WidgetImageStore) async -> Bool {
+        guard let imageURL = item.imageURL else { return false }
+
+        do {
+            var request = URLRequest(url: imageURL)
+            request.timeoutInterval = 4
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200..<300).contains(httpResponse.statusCode),
+                  data.count <= maxImageBytes,
+                  let image = downsampledImage(from: data),
+                  let imageData = encodedJPEGData(from: image) else {
+                return false
+            }
+
+            return (try? store.writeImageData(imageData, for: item)) ?? false
+        } catch {
+            return false
+        }
+    }
+
+    private static func downsampledImage(from data: Data) -> CGImage? {
+        let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let imageSource = CGImageSourceCreateWithData(data as CFData, imageSourceOptions) else {
+            return nil
+        }
+
+        let downsampleOptions = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize
+        ] as CFDictionary
+
+        return CGImageSourceCreateThumbnailAtIndex(imageSource, 0, downsampleOptions)
+    }
+
+    private static func encodedJPEGData(from image: CGImage) -> Data? {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            data,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+
+        let options = [kCGImageDestinationLossyCompressionQuality: compressionQuality] as CFDictionary
+        CGImageDestinationAddImage(destination, image, options)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+
+        return data as Data
     }
 }
 
