@@ -74,18 +74,13 @@ struct NeutralNewsOptionsActions: View {
         let regionRaw = currentSavedRegionRaw
         guard !savedNewsState.hasStatus(for: news.id, regionRaw: regionRaw) else { return }
 
-        let isSaved = SavedNewsService.shared.isNewsSaved(
-            newsId: news.id,
-            context: NewsListViewModel.shared.coreDataContext,
-            regionRaw: regionRaw
-        )
+        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, regionRaw: regionRaw)
         await MainActor.run {
             savedNewsState.setSaved(isSaved, for: news.id, regionRaw: regionRaw)
         }
     }
 
     private func handleSaveArticle() async {
-        let context = NewsListViewModel.shared.coreDataContext
 #if DEBUG
         print("🔄 Attempting to save article: \(news.id)")
 #endif
@@ -99,7 +94,7 @@ struct NeutralNewsOptionsActions: View {
                 let unsaveRegionRaw = NewsListViewModel.shared.isShowingSavedNews
                     ? currentSavedRegionRaw
                     : nil
-                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context, regionRaw: unsaveRegionRaw)
+                try SavedNewsService.shared.unsaveNews(newsId: news.id, regionRaw: unsaveRegionRaw)
                 await MainActor.run {
                     savedNewsState.setSaved(false, for: news.id, regionRaw: unsaveRegionRaw)
                     AppFeedbackCenter.shared.show("Removed from saved", systemImage: "bookmark.slash", style: .info, haptic: .success)
@@ -117,7 +112,6 @@ struct NeutralNewsOptionsActions: View {
                 let savedRegionRaw = currentSavedRegionRaw ?? ContentRegionProvider().currentRegion.rawValue
                 try SavedNewsService.shared.saveNews(
                     news,
-                    context: context,
                     regionRaw: savedRegionRaw,
                     relatedNews: relatedNews
                 )

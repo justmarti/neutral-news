@@ -24,7 +24,7 @@ extension NewsListViewModel {
     /// Fetches saved news items, converts them back to `NeutralNews` objects,
     /// and updates the `savedNews` array for display.
     ///
-    /// - Note: Uses SwiftData as primary store and Core Data as temporary migration fallback.
+    /// - Note: Uses SwiftData as the saved news store.
     /// - Note: This is an async operation that updates `isLoadingSavedNews` state
     func loadSavedNews() async {
 #if DEBUG
@@ -42,7 +42,7 @@ extension NewsListViewModel {
         }
 
         do {
-            let savedNewsItems = try savedNewsService.getSavedNeutralNews(context: coreDataContext)
+            let savedNewsItems = try savedNewsService.getSavedNeutralNews()
 #if DEBUG
             print("📰 Found \(savedNewsItems.count) saved news items")
 #endif

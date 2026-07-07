@@ -10,6 +10,11 @@ enum SavedNewsRegionScope: String {
     case legacy = "LEGACY"
 }
 
+enum SavedNewsType: String, CaseIterable {
+    case neutralNews = "neutral_news"
+    case news = "news"
+}
+
 private struct SavedRelatedNewsSnapshotSwiftData: Codable {
     let id: String
     let title: String

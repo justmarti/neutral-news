@@ -16,8 +16,8 @@ struct SavedNewsSourcesPayloadTests {
         let legacyData = try JSONEncoder().encode(legacyIds)
         let legacyString = String(decoding: legacyData, as: UTF8.self)
 
-        let decodedIds = SavedNews.decodeStoredSourceIds(from: legacyString)
-        let decodedRelated = SavedNews.decodeStoredRelatedNews(from: legacyString)
+        let decodedIds = SavedNewsItem.decodeStoredSourceIds(from: legacyString)
+        let decodedRelated = SavedNewsItem.decodeStoredRelatedNews(from: legacyString)
 
         #expect(decodedIds == legacyIds)
         #expect(decodedRelated.isEmpty)
@@ -54,72 +54,14 @@ struct SavedNewsSourcesPayloadTests {
             )
         ]
 
-        let encoded = SavedNews.encodeStoredSources(sourceIds: ["related-1"], relatedNews: relatedNews)
-        let decodedIds = SavedNews.decodeStoredSourceIds(from: encoded)
-        let decodedRelated = SavedNews.decodeStoredRelatedNews(from: encoded)
+        let encoded = SavedNewsItem.encodeStoredSources(sourceIds: ["related-1"], relatedNews: relatedNews)
+        let decodedIds = SavedNewsItem.decodeStoredSourceIds(from: encoded)
+        let decodedRelated = SavedNewsItem.decodeStoredRelatedNews(from: encoded)
 
         #expect(decodedIds == ["related-1"])
         #expect(decodedRelated.count == 1)
         #expect(decodedRelated.first?.id == "related-1")
         #expect(decodedRelated.first?.title == "Related title")
         #expect(decodedRelated.first?.embedding.isEmpty == true)
-
-        let encodedSwiftData = SavedNewsItem.encodeStoredSources(sourceIds: ["related-1"], relatedNews: relatedNews)
-        let decodedSwiftDataIds = SavedNewsItem.decodeStoredSourceIds(from: encodedSwiftData)
-        let decodedSwiftDataRelated = SavedNewsItem.decodeStoredRelatedNews(from: encodedSwiftData)
-
-        #expect(decodedSwiftDataIds == ["related-1"])
-        #expect(decodedSwiftDataRelated.count == 1)
-        #expect(decodedSwiftDataRelated.first?.id == "related-1")
-    }
-
-    @Test("Merge keeps legacy saved news visible when new SwiftData items exist")
-    func mergeSavedNewsEntriesKeepsLegacyItemsVisible() {
-        let legacyEntry = makeSavedEntry(
-            newsId: "legacy-1",
-            regionRaw: SavedNewsRegionScope.legacy.rawValue,
-            createdAt: Date(timeIntervalSince1970: 100)
-        )
-        let newSwiftDataEntry = makeSavedEntry(
-            newsId: "swiftdata-1",
-            regionRaw: "ES",
-            createdAt: Date(timeIntervalSince1970: 200)
-        )
-
-        let mergedEntries = SavedNewsService.mergeSavedNeutralNewsEntries(
-            primary: [newSwiftDataEntry],
-            fallback: [legacyEntry]
-        )
-
-        #expect(mergedEntries.count == 2)
-        #expect(mergedEntries.map(\.neutralNews.id) == ["swiftdata-1", "legacy-1"])
-    }
-
-    private func makeSavedEntry(
-        newsId: String,
-        regionRaw: String,
-        createdAt: Date
-    ) -> SavedNewsService.SavedNeutralNewsEntry {
-        let neutralNews = NeutralNews(
-            id: newsId,
-            neutralTitle: "Title \(newsId)",
-            neutralDescription: "Description \(newsId)",
-            category: Category.business.rawValue,
-            relevance: 10,
-            imageUrl: "https://example.com/\(newsId).jpg",
-            imageMedium: "Example",
-            date: createdAt,
-            createdAt: createdAt,
-            updatedAt: createdAt,
-            group: 1,
-            sourceIds: [newsId]
-        )
-
-        return SavedNewsService.SavedNeutralNewsEntry(
-            neutralNews: neutralNews,
-            relatedNews: [],
-            regionRaw: regionRaw,
-            createdAt: createdAt
-        )
     }
 }

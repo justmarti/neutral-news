@@ -1204,12 +1204,11 @@ private struct HomeNewsCard: View {
     }
 
     private func toggleSave() async {
-        let context = vm.coreDataContext
         let currentlySaved = currentSavedStatus
         do {
             if currentlySaved {
                 let unsaveRegionRaw = vm.isShowingSavedNews ? vm.savedRegionRaw(for: news.id) : nil
-                try SavedNewsService.shared.unsaveNews(newsId: news.id, context: context, regionRaw: unsaveRegionRaw)
+                try SavedNewsService.shared.unsaveNews(newsId: news.id, regionRaw: unsaveRegionRaw)
                 await MainActor.run {
                     vm.removeFromSavedNews(news.id)
                     savedNewsState.setSaved(false, for: news.id, regionRaw: unsaveRegionRaw)
@@ -1218,7 +1217,6 @@ private struct HomeNewsCard: View {
             } else {
                 try SavedNewsService.shared.saveNews(
                     news,
-                    context: context,
                     relatedNews: relatedNews
                 )
                 await MainActor.run {
@@ -1238,7 +1236,7 @@ private struct HomeNewsCard: View {
         guard !vm.isShowingSavedNews else { return }
         guard !savedNewsState.hasStatus(for: news.id) else { return }
 
-        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id, context: vm.coreDataContext)
+        let isSaved = SavedNewsService.shared.isNewsSaved(newsId: news.id)
         await MainActor.run {
             savedNewsState.setSaved(isSaved, for: news.id)
         }

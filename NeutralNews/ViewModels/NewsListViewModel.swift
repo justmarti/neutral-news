@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftData
-import CoreData
 import Observation
 
 @MainActor
@@ -50,9 +49,6 @@ final class NewsListViewModel {
     // Model context for SwiftData (cache) - will be injected
     var modelContext: ModelContext?
 
-    // Core Data context for saved news - will be injected
-    var coreDataContext: NSManagedObjectContext?
-    
     // MARK: - UI State
     var daySelected: DayInfo = .today {
         didSet {

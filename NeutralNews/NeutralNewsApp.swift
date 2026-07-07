@@ -7,7 +7,6 @@
 
 import SwiftUI
 import SwiftData
-import CoreData
 import FirebaseCore
 import FirebaseCrashlytics
 import RevenueCat
@@ -76,8 +75,6 @@ struct NeutralNewsApp: App {
         WindowGroup {
             HomeView(config: config)
                 .onAppear {
-                    // Inject Core Data context
-                    NewsListViewModel.shared.coreDataContext = CoreDataManager.shared.viewContext
                     SavedNewsService.shared.prewarmStore()
                     config.startFetching()
 
