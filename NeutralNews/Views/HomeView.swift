@@ -23,6 +23,27 @@ struct StoryArticleNavigationTarget: Identifiable, Hashable {
     var id: String { news.id }
 }
 
+struct NewsArticleNavigationTarget: Identifiable, Hashable {
+    let news: NeutralNews
+    let relatedNews: [News]
+    let region: ContentRegion?
+
+    var id: String { news.id }
+}
+
+enum HomeNavigationRoute: Hashable {
+    case article(NewsArticleNavigationTarget)
+    case storyArticle(StoryArticleNavigationTarget)
+
+    var isStoryArticleRoute: Bool {
+        if case .storyArticle = self {
+            return true
+        }
+
+        return false
+    }
+}
+
 enum StoryCollectionBuilder {
     private static let briefingLimit = 8
     private static let briefingWindow: TimeInterval = 24 * 60 * 60
@@ -80,8 +101,7 @@ struct HomeView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
     @AppStorage("isBackgroundColorEnabled") private var isBackgroundColorEnabled = true
     @AppStorage("viewedStoryCollectionKeys") private var viewedStoryCollectionKeysStorage = ""
-    @State private var targetNews: NewsListViewModel.DeepLinkNavigationTarget?
-    @State private var storyArticleTarget: StoryArticleNavigationTarget?
+    @State private var navigationPath: [HomeNavigationRoute] = []
     @State private var isStoryOverlayHiddenForArticle = false
     @State private var showingPaywall = false
     @State private var showingSettingsSheet = false
@@ -89,6 +109,7 @@ struct HomeView: View {
     @State private var storyInitialNewsID: String?
     @State private var isStoryArticleExpanded = false
     @State private var isSearchPresented = false
+    @State private var shouldPresentSearchAfterReturningHome = false
     @State private var currentStoryOverlayNews: NeutralNews?
     @State private var currentStoryOverlayRelatedNews: [News] = []
     @State private var currentStoryOverlayRegion: ContentRegion?
@@ -182,7 +203,7 @@ struct HomeView: View {
                 if config.isInMaintenance {
                     MaintenanceView(config: config)
                 } else {
-                    NavigationStack {
+                    NavigationStack(path: $navigationPath) {
                         navigationContent(relatedNewsRefreshToken: relatedNewsRefreshToken)
                     }
                     .allowsHitTesting(storyPresentation == nil || isStoryOverlayHiddenForArticle)
@@ -194,7 +215,15 @@ struct HomeView: View {
 #if DEBUG
                             print("🎯 View received target news: \(target.news.neutralTitle)")
 #endif
-                            targetNews = target
+                            navigationPath = [
+                                .article(
+                                    NewsArticleNavigationTarget(
+                                        news: target.news,
+                                        relatedNews: target.relatedNews,
+                                        region: target.region
+                                    )
+                                )
+                            ]
 
                             Task {
                                 try? await Task.sleep(nanoseconds: 100_000_000)
@@ -211,6 +240,9 @@ struct HomeView: View {
                     }
                     .onChange(of: homeScreenQuickActionService.pendingAction) { _, _ in
                         handlePendingHomeScreenQuickAction()
+                    }
+                    .onChange(of: navigationPath) { _, newValue in
+                        handleNavigationPathChange(newValue)
                     }
                     .onReceive(NotificationCenter.default.publisher(for: PushNotificationService.didReceiveDeepLinkNotification)) { notification in
                         guard let deepLink = notification.userInfo?[PushNotificationService.deepLinkUserInfoKey] as? DeepLinkService.DeepLinkData else {
@@ -229,11 +261,6 @@ struct HomeView: View {
                     }
                     .onChange(of: premiumManager.paywallPresentationToken) { _, _ in
                         showingPaywall = true
-                    }
-                    .onChange(of: storyArticleTarget) { _, newValue in
-                        if newValue == nil {
-                            isStoryOverlayHiddenForArticle = false
-                        }
                     }
                     .sheet(isPresented: $showingPaywall) {
                         PaywallView(isPresented: $showingPaywall)
@@ -299,35 +326,38 @@ struct HomeView: View {
             .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
             .animation(.default, value: vm.isShowingSavedNews)
             .animation(.default, value: relatedNewsRefreshToken)
-            .navigationDestination(item: $targetNews) { target in
-                NeutralNewsView(
-                    news: target.news,
-                    relatedNews: target.relatedNews,
-                    region: target.region,
-                    namespace: animationNamespace,
-                    relatedNewsProvider: vm.getRelatedNews
-                )
-                    .toolbarVisibility(.visible, for: .navigationBar)
-                    .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
-                    .onAppear {
-                        RatingManager.shared.incrementNewsReadCount()
-                        RatingManager.shared.requestRatingAfterPositiveInteraction()
+            .navigationDestination(for: HomeNavigationRoute.self) { route in
+                switch route {
+                case .article(let target):
+                    NeutralNewsView(
+                        news: target.news,
+                        relatedNews: target.relatedNews,
+                        region: target.region,
+                        namespace: animationNamespace,
+                        relatedNewsProvider: vm.getRelatedNews
+                    )
+                        .navigationTransition(.zoom(sourceID: target.news.id, in: animationNamespace))
+                        .toolbarVisibility(.visible, for: .navigationBar)
+                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                        .onAppear {
+                            RatingManager.shared.incrementNewsReadCount()
+                            RatingManager.shared.requestRatingAfterPositiveInteraction()
 
-                        if hasSeenOnboarding {
-                            pushNotificationService.handleOpenedArticle()
+                            if hasSeenOnboarding {
+                                pushNotificationService.handleOpenedArticle()
+                            }
                         }
-                    }
-            }
-            .navigationDestination(item: $storyArticleTarget) { target in
-                NeutralNewsView(
-                    news: target.news,
-                    relatedNews: target.relatedNews,
-                    region: target.region,
-                    namespace: animationNamespace,
-                    relatedNewsProvider: vm.getRelatedNews
-                )
-                    .toolbarVisibility(.visible, for: .navigationBar)
-                    .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                case .storyArticle(let target):
+                    NeutralNewsView(
+                        news: target.news,
+                        relatedNews: target.relatedNews,
+                        region: target.region,
+                        namespace: animationNamespace,
+                        relatedNewsProvider: vm.getRelatedNews
+                    )
+                        .toolbarVisibility(.visible, for: .navigationBar)
+                        .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
+                }
             }
 
         baseContent
@@ -446,7 +476,14 @@ struct HomeView: View {
                         isBackgroundColorEnabled: isBackgroundColorEnabled,
                         vm: vm,
                         premiumManager: premiumManager,
-                        savedNewsState: savedNewsState
+                        savedNewsState: savedNewsState,
+                        route: .article(
+                            NewsArticleNavigationTarget(
+                                news: neutralNews,
+                                relatedNews: vm.getRelatedNews(from: neutralNews),
+                                region: nil
+                            )
+                        )
                     )
                 }
                 .animation(.default, value: newsItems)
@@ -617,7 +654,6 @@ struct HomeView: View {
     private func resetStoryPresentationState() {
         storyPresentation = nil
         storyInitialNewsID = nil
-        storyArticleTarget = nil
         isStoryOverlayHiddenForArticle = false
         isStoryArticleExpanded = false
         currentStoryOverlayNews = nil
@@ -661,10 +697,14 @@ struct HomeView: View {
     ) {
         storyInitialNewsID = news.id
         isStoryOverlayHiddenForArticle = true
-        storyArticleTarget = StoryArticleNavigationTarget(
-            news: news,
-            relatedNews: relatedNews,
-            region: region ?? ContentRegionProvider().currentRegion
+        navigationPath.append(
+            .storyArticle(
+                StoryArticleNavigationTarget(
+                    news: news,
+                    relatedNews: relatedNews,
+                    region: region ?? ContentRegionProvider().currentRegion
+                )
+            )
         )
     }
 
@@ -716,29 +756,58 @@ struct HomeView: View {
     }
 
     private func handleHomeScreenQuickAction(_ action: HomeScreenQuickAction) {
-        resetStoryPresentationState()
-
         switch action {
         case .search:
             presentSearchFromHomeScreen()
         case .savedNews:
+            resetStoryPresentationState()
             presentSavedNewsFromHomeScreen()
         case .randomNews:
+            resetStoryPresentationState()
             openRandomNewsFromHomeScreen()
         }
     }
 
     private func presentSearchFromHomeScreen() {
+        homeScreenQuickActionTask?.cancel()
+        let needsReturnHome = !navigationPath.isEmpty
+
+        shouldPresentSearchAfterReturningHome = true
+        isSearchPresented = false
+
         if vm.isShowingSavedNews {
             vm.toggleSavedNewsMode()
         } else {
             vm.clearFilters()
         }
 
+        resetStoryPresentationState()
+        navigationPath.removeAll()
+
+        if !needsReturnHome {
+            presentPendingSearchIfNeeded()
+        }
+    }
+
+    private func presentPendingSearchIfNeeded() {
+        guard shouldPresentSearchAfterReturningHome else { return }
+        shouldPresentSearchAfterReturningHome = false
         isSearchPresented = true
     }
 
+    private func handleNavigationPathChange(_ path: [HomeNavigationRoute]) {
+        if !path.contains(where: { $0.isStoryArticleRoute }) {
+            isStoryOverlayHiddenForArticle = false
+        }
+
+        if path.isEmpty {
+            presentPendingSearchIfNeeded()
+        }
+    }
+
     private func presentSavedNewsFromHomeScreen() {
+        navigationPath.removeAll()
+
         if !vm.isShowingSavedNews {
             vm.toggleSavedNewsMode()
         } else {
@@ -750,6 +819,8 @@ struct HomeView: View {
 
     private func openRandomNewsFromHomeScreen() {
         homeScreenQuickActionTask?.cancel()
+        navigationPath.removeAll()
+
         homeScreenQuickActionTask = Task {
             if vm.isShowingSavedNews {
                 vm.toggleSavedNewsMode()
@@ -763,11 +834,15 @@ struct HomeView: View {
                   let news = vm.newsToShow.randomElement()
             else { return }
 
-            targetNews = NewsListViewModel.DeepLinkNavigationTarget(
-                news: news,
-                relatedNews: vm.getRelatedNews(from: news),
-                region: ContentRegionProvider().currentRegion
-            )
+            navigationPath = [
+                .article(
+                    NewsArticleNavigationTarget(
+                        news: news,
+                        relatedNews: vm.getRelatedNews(from: news),
+                        region: ContentRegionProvider().currentRegion
+                    )
+                )
+            ]
         }
     }
 
@@ -1115,6 +1190,7 @@ private struct HomeNewsCard: View {
     let vm: NewsListViewModel
     let premiumManager: PremiumManager
     let savedNewsState: SavedNewsState
+    let route: HomeNavigationRoute
 
     init(
         news: NeutralNews,
@@ -1123,7 +1199,8 @@ private struct HomeNewsCard: View {
         isBackgroundColorEnabled: Bool,
         vm: NewsListViewModel,
         premiumManager: PremiumManager,
-        savedNewsState: SavedNewsState
+        savedNewsState: SavedNewsState,
+        route: HomeNavigationRoute
     ) {
         self.news = news
         self.relatedNews = relatedNews
@@ -1132,24 +1209,11 @@ private struct HomeNewsCard: View {
         self.vm = vm
         self.premiumManager = premiumManager
         self.savedNewsState = savedNewsState
+        self.route = route
     }
 
     var body: some View {
-        NavigationLink {
-            NeutralNewsView(
-                news: news,
-                relatedNews: relatedNews,
-                region: nil,
-                namespace: namespace,
-                relatedNewsProvider: vm.getRelatedNews
-            )
-                .environment(\.isBackgroundColorEnabled, isBackgroundColorEnabled)
-                .navigationTransition(.zoom(sourceID: news.id, in: namespace))
-                .onAppear {
-                    RatingManager.shared.incrementNewsReadCount()
-                    RatingManager.shared.requestRatingAfterPositiveInteraction()
-                }
-        } label: {
+        NavigationLink(value: route) {
             NewsImageView(news: news, imageUrl: news.imageUrl)
                 .padding(.vertical, 4)
                 .matchedTransitionSource(id: news.id, in: namespace)
