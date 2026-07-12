@@ -17,6 +17,7 @@ struct NeutralNewsView: View {
     @Environment(\.isBackgroundColorEnabled) private var isBackgroundColorEnabled
 
     @State private var isShowingReportProblemSheet = false
+    @State private var isShowingNewsQuestionSheet = false
 
     private var currentRelatedNews: [News] {
         guard let resolvedRelatedNews = relatedNewsProvider?(news), !resolvedRelatedNews.isEmpty else {
@@ -91,8 +92,8 @@ struct NeutralNewsView: View {
                                                 .clipShape(.rect(cornerRadius: 16))
                                             
                                             Text("Image: \(news.imageMedium). Source at the end of the page.")
-                                                    .font(.footnote)
-                                                    .foregroundStyle(.secondary)
+                                                .font(.footnote)
+                                                .foregroundStyle(.secondary)
                                         }
                                     case .failure:
                                         EmptyView()
@@ -105,6 +106,16 @@ struct NeutralNewsView: View {
                             
                             Text(news.neutralDescription)
 //                                .fontDesign(.serif)
+
+                            NewsQuestionControl(
+                                availability: NewsQuestionAvailability.current,
+                                hasContext: NewsQuestionContext(
+                                    news: news,
+                                    relatedNews: resolvedRelatedNews
+                                ).hasUsableContent,
+                                action: showNewsQuestionSheet
+                            )
+                            .padding(.top, 8)
                         }
                         .padding()
 
@@ -154,6 +165,12 @@ struct NeutralNewsView: View {
                 ReportProblemView(news: news)
                     .presentationDetents([.height(200)])
             }
+            .sheet(isPresented: $isShowingNewsQuestionSheet) {
+                NewsQuestionSheet(context: NewsQuestionContext(
+                    news: news,
+                    relatedNews: currentRelatedNews
+                ))
+            }
             .dominantColorBackground(from: news.imageUrl, isEnabled: isBackgroundColorEnabled)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -166,6 +183,125 @@ struct NeutralNewsView: View {
                 }
             }
         }
+    }
+
+    private func showNewsQuestionSheet() {
+        isShowingNewsQuestionSheet = true
+    }
+}
+
+private struct NewsQuestionControl: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var borderPhase = 0.0
+
+    let availability: NewsQuestionAvailability
+    let hasContext: Bool
+    let action: () -> Void
+
+    var body: some View {
+        switch availability {
+        case .available where hasContext:
+            Button(action: action) {
+                Label("Ask about this story", systemImage: "apple.intelligence")
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 4)
+                    .modifier(NewsQuestionButtonBackgroundModifier())
+                    .background {
+                        if !reduceMotion {
+                            Capsule()
+                                .stroke(animatedBorderGradient, lineWidth: 7)
+                                .blur(radius: 7)
+                                .opacity(colorScheme == .dark ? 0.52 : 0.28)
+                        }
+                    }
+                    .overlay {
+                        Capsule()
+                            .stroke(
+                                .primary.opacity(colorScheme == .dark ? 0.16 : 0.08),
+                                lineWidth: 1
+                            )
+                    }
+                    .overlay {
+                        if !reduceMotion {
+                            Capsule()
+                                .stroke(animatedBorderGradient, lineWidth: 1.25)
+                                .shadow(
+                                    color: .primary.opacity(colorScheme == .dark ? 0.24 : 0.1),
+                                    radius: 4
+                                )
+                        }
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityInputLabels(["Ask about this story", "Ask"])
+            .onAppear {
+                guard !reduceMotion else {
+                    return
+                }
+
+                withAnimation(.linear(duration: 9).repeatForever(autoreverses: false)) {
+                    borderPhase = 360
+                }
+            }
+        case .modelNotReady:
+            NewsQuestionStatusLabel(
+                title: "Apple Intelligence is still getting ready on this device.",
+                systemImage: "apple.intelligence"
+            )
+        case .appleIntelligenceNotEnabled:
+            NewsQuestionStatusLabel(
+                title: "Turn on Apple Intelligence to ask about this story.",
+                systemImage: "apple.intelligence"
+            )
+        case .available, .deviceNotEligible, .unavailable:
+            EmptyView()
+        }
+    }
+
+    private var animatedBorderGradient: AngularGradient {
+        AngularGradient(
+            colors: [
+                .clear,
+                .clear,
+                .primary.opacity(colorScheme == .dark ? 0.65 : 0.3),
+                .primary.opacity(colorScheme == .dark ? 0.12 : 0.06),
+                .clear,
+                .clear
+            ],
+            center: .center,
+            startAngle: .degrees(borderPhase),
+            endAngle: .degrees(borderPhase + 360)
+        )
+    }
+}
+
+private struct NewsQuestionButtonBackgroundModifier: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content
+                .glassEffect(.regular.interactive(), in: Capsule())
+        } else {
+            content
+                .background(.regularMaterial, in: Capsule())
+        }
+    }
+}
+
+private struct NewsQuestionStatusLabel: View {
+    let title: LocalizedStringKey
+    let systemImage: String
+
+    var body: some View {
+        Label(title, systemImage: systemImage)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
