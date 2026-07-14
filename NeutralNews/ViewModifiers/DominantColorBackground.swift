@@ -48,11 +48,10 @@ struct DominantColorBackground: ViewModifier {
         isLoading = true
         
         let color = await imageService.getDominantColor(from: imageUrl)
-        
-        await MainActor.run {
-            self.dominantColor = color
-            self.isLoading = false
-        }
+        guard !Task.isCancelled else { return }
+
+        dominantColor = color
+        isLoading = false
     }
 }
 

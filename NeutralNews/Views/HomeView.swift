@@ -850,7 +850,13 @@ struct HomeView: View {
         var attempts = 0
 
         while !vm.hasCompletedInitialLaunchLoad && attempts < 40 {
-            try? await Task.sleep(for: .milliseconds(100))
+            do {
+                try await Task.sleep(for: .milliseconds(100))
+            } catch is CancellationError {
+                return
+            } catch {
+                return
+            }
             attempts += 1
         }
     }
