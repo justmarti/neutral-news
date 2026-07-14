@@ -43,6 +43,14 @@ private extension UIImage {
 }
 
 enum CachedAsyncImageHelper {
+    private enum ImageLoadingError: Error {
+        case invalidResponse
+        case unexpectedStatusCode(Int)
+    }
+
+    private static let imageRequestTimeout: TimeInterval = 15
+    private static let retryDelay: Duration = .milliseconds(500)
+
     static let urlSession: URLSession = {
         let cache = URLCache(
             memoryCapacity: 100 * 1024 * 1024,
@@ -53,6 +61,7 @@ enum CachedAsyncImageHelper {
         let configuration = URLSessionConfiguration.default
         configuration.urlCache = cache
         configuration.requestCachePolicy = .returnCacheDataElseLoad
+        configuration.timeoutIntervalForRequest = imageRequestTimeout
         return URLSession(configuration: configuration)
     }()
     
@@ -87,13 +96,7 @@ enum CachedAsyncImageHelper {
             if decodedImageCache.object(forKey: key) != nil { continue }
 
             do {
-                let (data, _) = try await urlSession.data(from: url)
-                guard !Task.isCancelled else { return }
-
-                if let uiImage = await decodeUIImage(data, maxPixelSize: targetPixelSize) {
-                    guard !Task.isCancelled else { return }
-                    decodedImageCache.setObject(uiImage, forKey: key, cost: uiImage.decodedMemoryCost)
-                }
+                _ = try await loadUIImage(url: url, maxPixelSize: targetPixelSize)
             } catch {
                 continue
             }
@@ -110,16 +113,60 @@ enum CachedAsyncImageHelper {
             return cachedImage
         }
 
-        let (data, _) = try await urlSession.data(from: url)
-        try Task.checkCancellation()
-
-        guard let uiImage = await decodeUIImage(data, maxPixelSize: targetPixelSize) else {
-            throw URLError(.cannotDecodeContentData)
-        }
-        try Task.checkCancellation()
+        let uiImage = try await downloadUIImage(from: url, maxPixelSize: targetPixelSize)
 
         decodedImageCache.setObject(uiImage, forKey: key, cost: uiImage.decodedMemoryCost)
         return uiImage
+    }
+
+    private static func downloadUIImage(from url: URL, maxPixelSize: Double) async throws -> UIImage {
+        for attempt in 0...1 {
+            do {
+                let (data, response) = try await urlSession.data(from: url)
+                try Task.checkCancellation()
+                try validateImageResponse(response)
+
+                guard let uiImage = await decodeUIImage(data, maxPixelSize: maxPixelSize) else {
+                    throw URLError(.cannotDecodeContentData)
+                }
+                try Task.checkCancellation()
+                return uiImage
+            } catch {
+                guard attempt == 0, shouldRetry(after: error) else {
+                    throw error
+                }
+                try await Task.sleep(for: retryDelay)
+            }
+        }
+
+        throw URLError(.unknown)
+    }
+
+    private static func validateImageResponse(_ response: URLResponse) throws {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw ImageLoadingError.invalidResponse
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw ImageLoadingError.unexpectedStatusCode(httpResponse.statusCode)
+        }
+    }
+
+    private static func shouldRetry(after error: Error) -> Bool {
+        if let error = error as? URLError {
+            switch error.code {
+            case .timedOut, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed:
+                return true
+            default:
+                return false
+            }
+        }
+
+        if let error = error as? ImageLoadingError,
+           case let .unexpectedStatusCode(statusCode) = error {
+            return statusCode == 408 || statusCode == 429 || (500..<600).contains(statusCode)
+        }
+
+        return false
     }
 
     fileprivate static func decodeUIImage(_ data: Data, maxPixelSize: Double) async -> UIImage? {
@@ -165,34 +212,12 @@ struct CachedAsyncImage<Content: View>: View {
             return
         }
 
-        let targetPixelSize = maxPixelSize ?? CachedAsyncImageHelper.defaultPixelSize
-        let key = CachedAsyncImageHelper.cacheKey(for: url, maxPixelSize: targetPixelSize)
-
-        if let cachedImage = CachedAsyncImageHelper.decodedImageCache.object(forKey: key) {
-            updatePhase(.success(Image(uiImage: cachedImage)))
-            return
-        }
-
         updatePhase(.empty)
 
         do {
-            let (data, _) = try await CachedAsyncImageHelper.urlSession.data(from: url)
+            let uiImage = try await CachedAsyncImageHelper.loadUIImage(url: url, maxPixelSize: maxPixelSize)
             guard !Task.isCancelled else { return }
-
-            if let uiImage = await CachedAsyncImageHelper.decodeUIImage(
-                data,
-                maxPixelSize: targetPixelSize
-            ) {
-                guard !Task.isCancelled else { return }
-                CachedAsyncImageHelper.decodedImageCache.setObject(
-                    uiImage,
-                    forKey: key,
-                    cost: uiImage.decodedMemoryCost
-                )
-                updatePhase(.success(Image(uiImage: uiImage)))
-            } else {
-                updatePhase(.failure(URLError(.cannotDecodeContentData)))
-            }
+            updatePhase(.success(Image(uiImage: uiImage)))
         } catch {
             guard !Task.isCancelled else { return }
             updatePhase(.failure(error))
