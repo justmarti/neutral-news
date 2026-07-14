@@ -110,6 +110,7 @@ private actor DayLoadGate {
     }
 }
 
+@MainActor
 @Observable
 final class NewsDataManager {
     static let shared = NewsDataManager()
@@ -178,7 +179,7 @@ final class NewsDataManager {
         }
     }
     
-    deinit {
+    isolated deinit {
         backgroundLoadingTask?.cancel()
         Task { @MainActor [regularNewsLoadCoordinator] in
             regularNewsLoadCoordinator.cancelAll()
@@ -245,8 +246,9 @@ final class NewsDataManager {
     /// This keeps foreground activation cheap when the in-memory data is still fresh, while allowing
     /// already-loaded days to fetch new Firebase data after the cache TTL expires.
     func refreshNewsIfNeeded(for day: DayInfo) async {
-        let shouldRefresh = !cacheService.isNeutralNewsCacheValid(for: day)
-            || !cacheService.isNewsCacheValid(for: day)
+        let hasValidNeutralNews = await cacheService.isNeutralNewsCacheValid(for: day)
+        let hasValidNews = await cacheService.isNewsCacheValid(for: day)
+        let shouldRefresh = !hasValidNeutralNews || !hasValidNews
 
         await loadNews(for: day, forceRefresh: shouldRefresh)
     }
@@ -263,14 +265,26 @@ final class NewsDataManager {
         }
 
         // Step 1: Try cached neutral news first (unless force refresh).
-        if !forceRefresh && cacheService.isNeutralNewsCacheValid(for: day) {
+        let shouldLoadFromCache: Bool
+        if forceRefresh {
+            shouldLoadFromCache = false
+        } else {
+            shouldLoadFromCache = await cacheService.isNeutralNewsCacheValid(for: day)
+        }
+
+        if shouldLoadFromCache {
 #if DEBUG
             print("📱 Cache HIT for \(day.dayName)")
 #endif
 
-            let hasRegularCache = cacheService.isNewsCacheValid(for: day)
-            let cachedNeutralNews = cacheService.getCachedNeutralNews(for: day)
-            let cachedNews = hasRegularCache ? cacheService.getCachedNews(for: day) : []
+            let hasRegularCache = await cacheService.isNewsCacheValid(for: day)
+            let cachedNeutralNews = await cacheService.getCachedNeutralNews(for: day)
+            let cachedNews: [News]
+            if hasRegularCache {
+                cachedNews = await cacheService.getCachedNews(for: day)
+            } else {
+                cachedNews = []
+            }
 
             await MainActor.run {
                 self.addNewNewsForDay(
@@ -329,16 +343,16 @@ final class NewsDataManager {
                     await dayLoadGate.markLoaded(startOfDay)
                     let dayInfo = DayInfo(date: dayDate)
                     Task(priority: .utility) { [cacheService] in
-                        cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
-                        cacheService.cacheNews(fetchedNews, for: dayInfo)
+                        await cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
+                        await cacheService.cacheNews(fetchedNews, for: dayInfo)
                     }
                 }
             } catch {
                 print("❌ Error loading news for \(dayName): \(error.localizedDescription)")
 
                 // Fallback: try to load from local cache even if it is past the refresh TTL.
-                let cachedNeutralNews = cacheService.getStaleCachedNeutralNews(for: day)
-                let cachedNews = cacheService.getStaleCachedNews(for: day)
+                let cachedNeutralNews = await cacheService.getStaleCachedNeutralNews(for: day)
+                let cachedNews = await cacheService.getStaleCachedNews(for: day)
 
                 if !cachedNeutralNews.isEmpty || !cachedNews.isEmpty {
 #if DEBUG
@@ -384,14 +398,14 @@ final class NewsDataManager {
                 await dayLoadGate.markLoaded(startOfDay)
                 let dayInfo = DayInfo(date: dayDate)
                 Task(priority: .utility) { [cacheService] in
-                    cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
+                    await cacheService.cacheNeutralNews(fetchedNeutralNews, for: dayInfo)
                 }
             }
         } catch {
             print("❌ Error loading neutral news for \(dayName): \(error.localizedDescription)")
 
             // Fallback: try local neutral cache even if it is past the refresh TTL.
-            let cachedNeutralNews = cacheService.getStaleCachedNeutralNews(for: day)
+            let cachedNeutralNews = await cacheService.getStaleCachedNeutralNews(for: day)
 
             if !cachedNeutralNews.isEmpty {
 #if DEBUG
@@ -448,7 +462,7 @@ final class NewsDataManager {
                 }
 
                 if shouldCache {
-                    self.cacheService.cacheNews(fetchedNews, for: dayInfo)
+                    await self.cacheService.cacheNews(fetchedNews, for: dayInfo)
                 }
             } catch is CancellationError {
                 await MainActor.run {
@@ -459,7 +473,7 @@ final class NewsDataManager {
 
                 // Fallback to stale regular cache to keep related-news lookups usable.
                 let dayInfo = DayInfo(date: dayDate)
-                let cachedNews = self.cacheService.getStaleCachedNews(for: dayInfo)
+                let cachedNews = await self.cacheService.getStaleCachedNews(for: dayInfo)
                 guard !cachedNews.isEmpty else {
                     await MainActor.run {
                         self.regularNewsLoadCoordinator.removeTask(for: startOfDay)
@@ -559,9 +573,9 @@ final class NewsDataManager {
     /// - Returns: A tuple containing:
     ///   - `memory`: Number of days currently loaded in memory
     ///   - `persistent`: Tuple with counts of cached neutral news and regular news in SwiftData
-    func getCacheStats() -> (memory: Int, persistent: (neutralNews: Int, news: Int)) {
+    func getCacheStats() async -> (memory: Int, persistent: (neutralNews: Int, news: Int)) {
         let memoryCount = newsByDay.count
-        let persistentStats = cacheService.getCacheStats()
+        let persistentStats = await cacheService.getCacheStats()
         return (memory: memoryCount, persistent: persistentStats)
     }
 
@@ -572,7 +586,7 @@ final class NewsDataManager {
     func preloadCache() async {
         // Pre-load today in case it's not cached yet
         let today = DayInfo.today
-        if !cacheService.isCacheValid(for: today) {
+        if !(await cacheService.isCacheValid(for: today)) {
 #if DEBUG
             print("🔥 Pre-loading today's cache")
 #endif
@@ -725,7 +739,7 @@ final class NewsDataManager {
             let dayInfo = DayInfo(date: dayDate)
             
             // Check cache validity first - if valid, load immediately without delay
-            if cacheService.isCacheValid(for: dayInfo) {
+            if await cacheService.isCacheValid(for: dayInfo) {
 #if DEBUG
                 print("🚀 Fast cache load for background day: \(dayInfo.dayName)")
 #endif

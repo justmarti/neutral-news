@@ -8,6 +8,7 @@ import SwiftData
 import Testing
 @testable import NeutralNews
 
+@MainActor
 @Suite("Saved News Service Tests", .serialized)
 struct SavedNewsServiceTests {
     @Test("isNewsSaved detects active region item")

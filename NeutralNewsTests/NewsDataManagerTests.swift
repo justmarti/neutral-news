@@ -9,6 +9,7 @@ import Foundation
 import Testing
 @testable import NeutralNews
 
+@MainActor
 @Suite("NewsDataManager Tests")
 struct NewsDataManagerTests {
     private let manager = NewsDataManager.shared
@@ -40,9 +41,9 @@ struct NewsDataManagerTests {
             date: day.date
         )
 
-        cacheService.cacheNeutralNews([olderStory, newerStory], for: day)
+        await cacheService.cacheNeutralNews([olderStory, newerStory], for: day)
 
-        #expect(cacheService.isCacheValid(for: day) == true)
+        #expect(await cacheService.isCacheValid(for: day) == true)
 
         await manager.loadNews(for: day)
 
@@ -70,8 +71,8 @@ struct NewsDataManagerTests {
             sourceIds: [sourceTwo.id, "manager-related-missing", sourceOne.id]
         )
 
-        cacheService.cacheNeutralNews([neutral], for: day)
-        cacheService.cacheNews([sourceOne, sourceTwo], for: day)
+        await cacheService.cacheNeutralNews([neutral], for: day)
+        await cacheService.cacheNews([sourceOne, sourceTwo], for: day)
 
         await manager.loadNews(for: day)
 
@@ -93,8 +94,8 @@ struct NewsDataManagerTests {
             pubDate: day.date
         )
 
-        cacheService.cacheNeutralNews([neutral], for: day)
-        cacheService.cacheNews([source], for: day)
+        await cacheService.cacheNeutralNews([neutral], for: day)
+        await cacheService.cacheNews([source], for: day)
 
         await manager.loadNews(for: day)
         await manager.loadNews(for: day)

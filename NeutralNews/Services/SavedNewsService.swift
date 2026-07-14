@@ -18,7 +18,6 @@ final class SavedNewsService {
     }
 
     static let shared = SavedNewsService()
-    private let newsDataManager = NewsDataManager.shared
     private let regionProvider: ContentRegionProviding
 
     private var modelContainer: ModelContainer?
@@ -159,6 +158,7 @@ final class SavedNewsService {
         prepareStoreIfNeeded()
     }
 
+    @MainActor
     func saveNews(
         _ news: Any,
         regionRaw: String? = nil,
@@ -208,7 +208,7 @@ final class SavedNewsService {
 
         // Create the object ONLY if not already saved
         if let neutralNews = news as? NeutralNews {
-            let resolvedRelatedNews = relatedNews ?? newsDataManager.getRelatedNews(from: neutralNews)
+            let resolvedRelatedNews = relatedNews ?? NewsDataManager.shared.getRelatedNews(from: neutralNews)
             modelContext.insert(
                 SavedNewsItem(
                     from: neutralNews,

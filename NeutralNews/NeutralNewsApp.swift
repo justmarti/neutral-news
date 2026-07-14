@@ -79,7 +79,9 @@ struct NeutralNewsApp: App {
                     config.startFetching()
 
                     // Perform cache cleanup if needed (runs in background)
-                    CacheService.shared.cleanExpiredCacheIfNeeded()
+                    Task {
+                        await CacheService.shared.cleanExpiredCacheIfNeeded()
+                    }
                     NewsDataManager.shared.refreshTodayWidgetSnapshot()
                 }
                 .onChange(of: scenePhase) { oldValue, newValue in
@@ -88,7 +90,9 @@ struct NeutralNewsApp: App {
                     PushNotificationService.shared.handleAppDidBecomeActive()
 
                     // Also cleanup when app returns from background
-                    CacheService.shared.cleanExpiredCacheIfNeeded()
+                    Task {
+                        await CacheService.shared.cleanExpiredCacheIfNeeded()
+                    }
                     SavedNewsService.shared.prewarmStore()
                     NewsDataManager.shared.refreshTodayWidgetSnapshot()
 

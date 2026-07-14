@@ -161,7 +161,7 @@ struct NewsListViewModelTests {
             viewModel.searchScope = previousSearchScope
         }
 
-        cacheService.cacheNeutralNews([politicsStory, businessStory], for: day)
+        await cacheService.cacheNeutralNews([politicsStory, businessStory], for: day)
         await manager.loadNews(for: day)
 
         viewModel.isShowingSavedNews = false

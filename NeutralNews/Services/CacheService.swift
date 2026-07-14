@@ -8,25 +8,11 @@
 import Foundation
 import SwiftData
 
-private actor CacheCleanupGate {
-    private var isRunning = false
-
-    func reserve() -> Bool {
-        guard !isRunning else { return false }
-        isRunning = true
-        return true
-    }
-
-    func clear() {
-        isRunning = false
-    }
-}
-
-final class CacheService {
+@ModelActor
+actor CacheService {
     static let shared = CacheService()
 
-    private var modelContainer: ModelContainer
-    private let cleanupGate = CacheCleanupGate()
+    private var isCleanupRunning = false
     private static let lastCleanupKey = "CacheService.lastCleanupDate"
 
     // TTL Configuration (more aggressive for better performance)
@@ -47,14 +33,16 @@ final class CacheService {
                 url: URL.documentsDirectory.appending(path: "LocalCache.store"),
                 cloudKitDatabase: .none
             )
-            modelContainer = try ModelContainer(for: Schema([CachedNeutralNews.self, CachedNews.self]), configurations: [configuration])
+            let modelContainer = try ModelContainer(
+                for: Schema([CachedNeutralNews.self, CachedNews.self]),
+                configurations: [configuration]
+            )
+            let modelContext = ModelContext(modelContainer)
+            self.modelContainer = modelContainer
+            self.modelExecutor = DefaultSerialModelExecutor(modelContext: modelContext)
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
-    }
-    
-    private func createContext() -> ModelContext {
-        return ModelContext(modelContainer)
     }
     
     // MARK: - Auto-Cleanup
@@ -112,7 +100,7 @@ final class CacheService {
     /// Checks if cached neutral news for a specific day is still valid based on TTL (Time To Live).
     func isNeutralNewsCacheValid(for day: DayInfo) -> Bool {
         cleanExpiredCacheIfNeeded()
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)
         let cutoffDate = Date().addingTimeInterval(-ttl)
@@ -135,7 +123,7 @@ final class CacheService {
     /// Checks if cached regular news for a specific day is still valid based on TTL (Time To Live).
     func isNewsCacheValid(for day: DayInfo) -> Bool {
         cleanExpiredCacheIfNeeded()
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)
         let cutoffDate = Date().addingTimeInterval(-ttl)
@@ -164,7 +152,7 @@ final class CacheService {
     /// - Note: Triggers cache cleanup check as a side effect
     func getCachedNeutralNews(for day: DayInfo) -> [NeutralNews] {
         cleanExpiredCacheIfNeeded()
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)
         let cutoffDate = Date().addingTimeInterval(-ttl)
@@ -192,7 +180,7 @@ final class CacheService {
     func getStaleCachedNeutralNews(for day: DayInfo) -> [NeutralNews] {
         guard isWithinCacheRetention(day.date) else { return [] }
 
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
 
         let descriptor = FetchDescriptor<CachedNeutralNews>(
@@ -222,7 +210,7 @@ final class CacheService {
     func cacheNeutralNews(_ news: [NeutralNews], for day: DayInfo) {
         guard !news.isEmpty else { return }
         
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         
         // First, remove any existing cache for this day
@@ -266,7 +254,7 @@ final class CacheService {
     /// - Note: Triggers cache cleanup check as a side effect
     func getCachedNews(for day: DayInfo) -> [News] {
         cleanExpiredCacheIfNeeded()
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         let ttl = getTTL(for: day.date)
         let cutoffDate = Date().addingTimeInterval(-ttl)
@@ -294,7 +282,7 @@ final class CacheService {
     func getStaleCachedNews(for day: DayInfo) -> [News] {
         guard isWithinCacheRetention(day.date) else { return [] }
 
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
 
         let descriptor = FetchDescriptor<CachedNews>(
@@ -324,7 +312,7 @@ final class CacheService {
     func cacheNews(_ news: [News], for day: DayInfo) {
         guard !news.isEmpty else { return }
         
-        let context = createContext()
+        let context = modelContext
         let startOfDay = Calendar.current.startOfDay(for: day.date)
         
         // Remove existing cache for this day
@@ -374,7 +362,7 @@ final class CacheService {
     }
     
     private func cleanExpiredNeutralNews() async {
-        let context = createContext()
+        let context = modelContext
         let sevenDaysAgo = oldestRetainedDay()
 
         let descriptor = FetchDescriptor<CachedNeutralNews>(
@@ -398,7 +386,7 @@ final class CacheService {
     }
 
     private func cleanExpiredNews() async {
-        let context = createContext()
+        let context = modelContext
         let sevenDaysAgo = oldestRetainedDay()
 
         let descriptor = FetchDescriptor<CachedNews>(
@@ -456,7 +444,8 @@ final class CacheService {
     }
 
     private func runCleanupIfNeeded(startedAt date: Date) async {
-        guard await cleanupGate.reserve() else { return }
+        guard !isCleanupRunning else { return }
+        isCleanupRunning = true
 
 #if DEBUG
         print("🧹 Starting cache cleanup...")
@@ -464,7 +453,7 @@ final class CacheService {
 
         await cleanExpiredCache()
         lastCleanupDate = date
-        await cleanupGate.clear()
+        isCleanupRunning = false
 
 #if DEBUG
         print("✅ Cache cleanup completed")
@@ -479,7 +468,7 @@ final class CacheService {
     ///   - `neutralNews`: Number of cached neutral news items in SwiftData
     ///   - `news`: Number of cached regular news items in SwiftData
     func getCacheStats() -> (neutralNews: Int, news: Int) {
-        let context = createContext()
+        let context = modelContext
         do {
             let neutralCount = try context.fetchCount(FetchDescriptor<CachedNeutralNews>())
             let newsCount = try context.fetchCount(FetchDescriptor<CachedNews>())
@@ -497,7 +486,7 @@ final class CacheService {
     /// - Warning: This permanently deletes all cached news data. Use with caution.
     /// - Note: This is an async operation
     func clearAllCache() async {
-        let context = createContext()
+        let context = modelContext
         do {
             try context.delete(model: CachedNeutralNews.self)
             try context.delete(model: CachedNews.self)
