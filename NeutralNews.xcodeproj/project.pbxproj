@@ -226,8 +226,8 @@
 				419D2FB32D11C96500D95E22 /* Sources */,
 				419D2FB42D11C96500D95E22 /* Frameworks */,
 				419D2FB52D11C96500D95E22 /* Resources */,
-				4199F4102EB2B08400BFAF43 /* ShellScript */,
 				41EF9F0A2FEDDC5E0079B0CE /* Embed Foundation Extensions */,
+				4199F4102EB2B08400BFAF43 /* ShellScript */,
 			);
 			buildRules = (
 			);
