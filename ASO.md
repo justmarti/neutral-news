@@ -67,3 +67,20 @@ Keywords: periodicos,prensa,diario,titulares,politica,actualidad,ultima,hora,med
 Title: Facts: Daily News Digest
 Subtitle: Coverage from multiple sources
 Keywords: headlines,media,bias,balance,balanced,compare,summary,objective,unbiased,ai summarize,today,politics
+
+
+
+# 1.3.0
+
+## ES
+
+Title: Noticias 24 horas - Facts
+Subtitle: Múltiples fuentes y resumen IA
+Keywords: periodicos,prensa,diario,titulares,politica,actualidad,ultima,hora,medios,sesgo,neutral,bulos,espana
+
+
+## US
+
+Title: Daily News Digest - Facts
+Subtitle: Coverage from multiple sources
+Keywords: headlines,media,bias,balance,balanced,compare,summary,objective,unbiased,ai summarize,today,politics
