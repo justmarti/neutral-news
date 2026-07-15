@@ -695,7 +695,7 @@ final class NewsDataManager {
 
         Task(priority: .utility) { [widgetSnapshotStore, widgetImageStore] in
             do {
-                _ = try widgetSnapshotStore.writeSnapshot(snapshot)
+                _ = try await widgetSnapshotStore.writeSnapshot(snapshot)
                 WidgetCenter.shared.reloadTimelines(ofKind: WidgetSnapshotConstants.widgetKind)
 
                 let didCacheImages = await WidgetImageCache.cacheImages(for: snapshot, store: widgetImageStore)

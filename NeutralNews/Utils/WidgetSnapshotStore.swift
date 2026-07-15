@@ -2,7 +2,7 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
-struct WidgetSnapshotStore: @unchecked Sendable {
+actor WidgetSnapshotStore {
     enum StoreError: Error {
         case appGroupUnavailable
     }
@@ -67,7 +67,7 @@ struct WidgetSnapshotStore: @unchecked Sendable {
     }
 }
 
-struct WidgetImageStore: @unchecked Sendable {
+actor WidgetImageStore {
     private let directoryURL: URL?
     private let fileManager: FileManager
 
@@ -118,7 +118,7 @@ enum WidgetImageCache {
     static func cacheImages(for snapshot: WidgetNewsSnapshot, store: WidgetImageStore) async -> Bool {
         await withTaskGroup(of: Bool.self) { group in
             for item in snapshot.items {
-                guard item.imageURL != nil, !store.hasImageData(for: item) else { continue }
+                guard item.imageURL != nil, !(await store.hasImageData(for: item)) else { continue }
 
                 group.addTask {
                     await cacheImage(for: item, store: store)
@@ -151,7 +151,7 @@ enum WidgetImageCache {
                 return false
             }
 
-            return (try? store.writeImageData(imageData, for: item)) ?? false
+            return (try? await store.writeImageData(imageData, for: item)) ?? false
         } catch {
             return false
         }

@@ -60,7 +60,7 @@ struct DailyBriefingEntry: TimelineEntry {
     )
 }
 
-struct DailyBriefingProvider: TimelineProvider {
+struct DailyBriefingProvider: TimelineProvider, Sendable {
     private static let storyRotationInterval: TimeInterval = 60 * 60
     private static let maximumTimelineEntryCount = 6
     private let store = WidgetSnapshotStore()
@@ -78,24 +78,29 @@ struct DailyBriefingProvider: TimelineProvider {
         )
     }
 
-    func getSnapshot(in context: Context, completion: @escaping (DailyBriefingEntry) -> Void) {
+    func getSnapshot(in context: Context, completion: @escaping @Sendable (DailyBriefingEntry) -> Void) {
+        let family = context.family
+        let isPreview = context.isPreview
+
         Task {
-            if context.isPreview {
-                completion(await makePreviewEntry(for: context.family))
+            if isPreview {
+                completion(await makePreviewEntry(for: family))
             } else {
-                completion(await makeCurrentEntry(for: context.family))
+                completion(await makeCurrentEntry(for: family))
             }
         }
     }
 
-    func getTimeline(in context: Context, completion: @escaping (Timeline<DailyBriefingEntry>) -> Void) {
+    func getTimeline(in context: Context, completion: @escaping @Sendable (Timeline<DailyBriefingEntry>) -> Void) {
+        let family = context.family
+
         Task {
-            completion(await makeTimeline(for: context.family))
+            completion(await makeTimeline(for: family))
         }
     }
 
     private func makePreviewEntry(for family: WidgetFamily) async -> DailyBriefingEntry {
-        guard let snapshot = try? store.readSnapshot(), !snapshot.items.isEmpty else {
+        guard let snapshot = try? await store.readSnapshot(), !snapshot.items.isEmpty else {
             return DailyBriefingEntry(
                 date: .now,
                 items: placeholderItems(for: family),
@@ -107,7 +112,7 @@ struct DailyBriefingProvider: TimelineProvider {
         }
 
         let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
-        let imageDataByItemID = cachedImageData(for: snapshot.items)
+        let imageDataByItemID = await cachedImageData(for: snapshot.items)
         return makeEntry(
             from: snapshot,
             family: family,
@@ -138,7 +143,7 @@ struct DailyBriefingProvider: TimelineProvider {
 
         let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
         _ = await WidgetImageCache.cacheImages(for: snapshot, store: imageStore)
-        let imageDataByItemID = cachedImageData(for: snapshot.items)
+        let imageDataByItemID = await cachedImageData(for: snapshot.items)
         return makeEntry(
             from: snapshot,
             family: family,
@@ -215,7 +220,7 @@ struct DailyBriefingProvider: TimelineProvider {
         }
 
         _ = await WidgetImageCache.cacheImages(for: snapshot, store: imageStore)
-        let imageDataByItemID = cachedImageData(for: snapshot.items)
+        let imageDataByItemID = await cachedImageData(for: snapshot.items)
         let entries = timelineEntries(
             from: snapshot,
             family: family,
@@ -252,14 +257,16 @@ struct DailyBriefingProvider: TimelineProvider {
         return Int(elapsed / Self.storyRotationInterval) % snapshot.items.count
     }
 
-    private func cachedImageData(for items: [WidgetNewsItem]) -> [String: Data] {
-        Dictionary(uniqueKeysWithValues: items.compactMap { item in
-            guard let data = imageStore.readImageData(for: item) else {
-                return nil
-            }
+    private func cachedImageData(for items: [WidgetNewsItem]) async -> [String: Data] {
+        var imageDataByItemID: [String: Data] = [:]
 
-            return (item.id, data)
-        })
+        for item in items {
+            if let data = await imageStore.readImageData(for: item) {
+                imageDataByItemID[item.id] = data
+            }
+        }
+
+        return imageDataByItemID
     }
 
     private func visibleItemCount(for family: WidgetFamily) -> Int {
@@ -295,24 +302,24 @@ struct DailyBriefingProvider: TimelineProvider {
     }
 
     private func loadSnapshot(for region: String) async -> WidgetNewsSnapshot? {
-        if let cachedSnapshot = cachedSnapshot(matching: region, requireFresh: true) {
+        if let cachedSnapshot = await cachedSnapshot(matching: region, requireFresh: true) {
             return cachedSnapshot
         }
 
         if let remoteSnapshot = try? await remoteClient.fetchSnapshot(for: region) {
-            _ = try? store.writeSnapshot(remoteSnapshot)
+            _ = try? await store.writeSnapshot(remoteSnapshot)
             return remoteSnapshot
         }
 
-        if let staleRegionalSnapshot = cachedSnapshot(matching: region) {
+        if let staleRegionalSnapshot = await cachedSnapshot(matching: region) {
             return staleRegionalSnapshot
         }
 
-        return cachedSnapshot()
+        return await cachedSnapshot()
     }
 
-    private func cachedSnapshot(matching region: String? = nil, requireFresh: Bool = false) -> WidgetNewsSnapshot? {
-        guard let snapshot = try? store.readSnapshot(),
+    private func cachedSnapshot(matching region: String? = nil, requireFresh: Bool = false) async -> WidgetNewsSnapshot? {
+        guard let snapshot = try? await store.readSnapshot(),
               snapshot.isUsableForWidget else {
             return nil
         }
