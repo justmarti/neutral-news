@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ContentRegion: String {
+enum ContentRegion: String, Sendable {
     case us = "US"
     case es = "ES"
 }

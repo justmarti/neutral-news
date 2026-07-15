@@ -42,6 +42,7 @@ private extension UIImage {
     }
 }
 
+@MainActor
 enum CachedAsyncImageHelper {
     private enum ImageLoadingError: Error {
         case invalidResponse

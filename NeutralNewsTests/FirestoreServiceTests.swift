@@ -213,8 +213,9 @@ struct FirestoreServiceTests {
         )
 
         let snapshot = try await client.fetchArchivedNews(newsId: "story-123", region: .us)
+        let requestedURL = await session.requestedURL
 
-        #expect(session.requestedURL?.absoluteString == "https://share.example.com/api/us/news/story-123")
+        #expect(requestedURL?.absoluteString == "https://share.example.com/api/us/news/story-123")
         #expect(snapshot?.id == "story-123")
         #expect(snapshot?.neutralTitle == "Archived title")
     }
@@ -312,7 +313,7 @@ struct FirestoreServiceTests {
     }
 }
 
-private final class ArchiveSessionMock: URLSessionDataProviding {
+private actor ArchiveSessionMock: URLSessionDataProviding {
     let data: Data
     let statusCode: Int
     private(set) var requestedURL: URL?

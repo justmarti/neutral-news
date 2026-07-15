@@ -30,9 +30,13 @@ private actor DominantColorCache {
     }
 }
 
+private enum DominantColorConfiguration {
+    static let downsamplePixelSize: Double = 128
+}
+
+@MainActor
 final class ImageService {
     static let shared = ImageService()
-    private static let dominantColorDownsamplePixelSize: Double = 128
     
     private let colorCache = DominantColorCache()
     private let processingQueue = DispatchQueue(label: "imageservice.processing", qos: .utility)
@@ -88,8 +92,8 @@ final class ImageService {
         }
     }
     
-    private static func processDominantColor(from data: Data) -> DominantColorCache.Components? {
-        guard let image = data.downsampledImage(maxPixelSize: Self.dominantColorDownsamplePixelSize),
+    private nonisolated static func processDominantColor(from data: Data) -> DominantColorCache.Components? {
+        guard let image = data.downsampledImage(maxPixelSize: DominantColorConfiguration.downsamplePixelSize),
               let cgImage = image.cgImage else {
             return nil
         }
@@ -97,7 +101,7 @@ final class ImageService {
         return extractDominantColor(from: cgImage)
     }
 
-    private static func extractDominantColor(from cgImage: CGImage) -> DominantColorCache.Components? {
+    private nonisolated static func extractDominantColor(from cgImage: CGImage) -> DominantColorCache.Components? {
         let originalWidth = cgImage.width
         let originalHeight = cgImage.height
         

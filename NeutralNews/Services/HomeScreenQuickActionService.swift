@@ -46,6 +46,7 @@ enum HomeScreenQuickAction: String, CaseIterable {
     }
 }
 
+@MainActor
 @Observable
 final class HomeScreenQuickActionService {
     static let shared = HomeScreenQuickActionService()
@@ -73,6 +74,7 @@ final class HomeScreenQuickActionService {
     }
 }
 
+@MainActor
 final class HomeScreenQuickActionSceneDelegate: NSObject, UIWindowSceneDelegate {
     func scene(
         _ scene: UIScene,

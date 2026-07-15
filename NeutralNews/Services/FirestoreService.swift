@@ -8,7 +8,7 @@
 import Foundation
 import FirebaseFirestore
 
-protocol URLSessionDataProviding {
+protocol URLSessionDataProviding: Sendable {
     func fetchData(from url: URL) async throws -> (Data, URLResponse)
 }
 
@@ -18,11 +18,11 @@ extension URLSession: URLSessionDataProviding {
     }
 }
 
-protocol ShareArchiveClientProtocol {
+protocol ShareArchiveClientProtocol: Sendable {
     func fetchArchivedNews(newsId: String, region: ContentRegion) async throws -> ArchivedNewsSnapshot?
 }
 
-enum ShareArchiveError: Error {
+enum ShareArchiveError: Error, Sendable {
     case invalidURL
     case invalidResponse
     case requestFailed(Int)
@@ -33,7 +33,7 @@ struct NeutralNewsLookupResult {
     let relatedNews: [News]
 }
 
-struct ArchivedNewsSnapshot: Decodable {
+struct ArchivedNewsSnapshot: Decodable, Sendable {
     let id: String
     let neutralTitle: String
     let neutralDescription: String
@@ -65,7 +65,7 @@ struct ArchivedNewsSnapshot: Decodable {
     }
 }
 
-struct ArchivedSourceSnapshot: Decodable {
+struct ArchivedSourceSnapshot: Decodable, Sendable {
     let id: String
     let title: String
     let descriptionShort: String
@@ -124,6 +124,7 @@ struct ShareArchiveClient: ShareArchiveClientProtocol {
     }
 }
 
+@MainActor
 final class FirestoreService {
     static let shared = FirestoreService()
     private let db = Firestore.firestore()
@@ -298,7 +299,7 @@ final class FirestoreService {
         region ?? regionProvider.currentRegion
     }
     
-    static func decodeNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
+    nonisolated static func decodeNeutralNews(from data: [String: Any], documentID: String) -> NeutralNews? {
         guard let neutralTitle = data["neutral_title"] as? String,
               let neutralDescription = data["neutral_description"] as? String,
               let category = (data["category_id"] as? String) ?? (data["category"] as? String),
@@ -328,7 +329,7 @@ final class FirestoreService {
         )
     }
     
-    static func decodeNews(from data: [String: Any], documentID: String) -> News? {
+    nonisolated static func decodeNews(from data: [String: Any], documentID: String) -> News? {
         guard let title = data["title"] as? String,
               let description = data["description_short"] as? String,
               let group = data["group"] as? Int,
@@ -363,7 +364,7 @@ final class FirestoreService {
         )
     }
 
-    static func decodeArchivedNewsSnapshot(_ snapshot: ArchivedNewsSnapshot) -> NeutralNewsLookupResult? {
+    nonisolated static func decodeArchivedNewsSnapshot(_ snapshot: ArchivedNewsSnapshot) -> NeutralNewsLookupResult? {
         guard let date = parseArchiveDate(snapshot.date),
               let createdAt = parseArchiveDate(snapshot.createdAt),
               let updatedAt = parseArchiveDate(snapshot.updatedAt) else {
@@ -412,7 +413,7 @@ final class FirestoreService {
         return NeutralNewsLookupResult(news: neutralNews, relatedNews: relatedNews)
     }
 
-    private static func parseArchiveDate(_ value: String?) -> Date? {
+    private nonisolated static func parseArchiveDate(_ value: String?) -> Date? {
         guard let value, !value.isEmpty else {
             return nil
         }

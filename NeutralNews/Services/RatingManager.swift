@@ -8,6 +8,7 @@
 import Foundation
 import StoreKit
 
+@MainActor
 final class RatingManager {
     static let shared = RatingManager()
 
@@ -67,7 +68,7 @@ final class RatingManager {
     func requestRatingIfAppropriate() {
         guard shouldRequestRating else { return }
 
-        Task { @MainActor in
+        Task {
             try? await Task.sleep(nanoseconds: 1_000_000_000)
 
             if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {

@@ -13,6 +13,7 @@ import UserNotifications
 import FirebaseMessaging
 #endif
 
+@MainActor
 final class PushNotificationAppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
@@ -59,7 +60,7 @@ final class PushNotificationAppDelegate: NSObject, UIApplicationDelegate {
     }
 }
 
-extension PushNotificationAppDelegate: UNUserNotificationCenterDelegate {
+extension PushNotificationAppDelegate: @preconcurrency UNUserNotificationCenterDelegate {
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification
@@ -82,7 +83,7 @@ extension PushNotificationAppDelegate: UNUserNotificationCenterDelegate {
 }
 
 #if canImport(FirebaseMessaging)
-extension PushNotificationAppDelegate: MessagingDelegate {
+extension PushNotificationAppDelegate: @preconcurrency MessagingDelegate {
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         guard let fcmToken, !fcmToken.isEmpty else { return }
         PushNotificationService.shared.handleDidReceiveRegistrationToken(fcmToken)

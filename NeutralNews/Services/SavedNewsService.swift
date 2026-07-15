@@ -9,6 +9,7 @@ import Foundation
 import SwiftData
 
 // MARK: - Service
+@MainActor
 final class SavedNewsService {
     struct SavedNeutralNewsEntry {
         let neutralNews: NeutralNews
@@ -158,7 +159,6 @@ final class SavedNewsService {
         prepareStoreIfNeeded()
     }
 
-    @MainActor
     func saveNews(
         _ news: Any,
         regionRaw: String? = nil,
@@ -236,15 +236,11 @@ final class SavedNewsService {
         print("✅ SwiftData context saved successfully")
 #endif
 
-        Task { @MainActor in
-            SavedNewsState.shared.setSaved(true, for: newsId, regionRaw: activeRegionRaw)
-        }
+        SavedNewsState.shared.setSaved(true, for: newsId, regionRaw: activeRegionRaw)
 
         // Track positive interaction for rating
-        Task { @MainActor in
-            RatingManager.shared.incrementSavedNewsCount()
-            RatingManager.shared.requestRatingAfterPositiveInteraction()
-        }
+        RatingManager.shared.incrementSavedNewsCount()
+        RatingManager.shared.requestRatingAfterPositiveInteraction()
     }
 
     func unsaveNews(newsId: String, regionRaw: String? = nil) throws {
@@ -266,11 +262,9 @@ final class SavedNewsService {
         try modelContext.save()
 
         let shouldClearLegacyState = regionRaw == nil
-        Task { @MainActor in
-            SavedNewsState.shared.setSaved(false, for: newsId, regionRaw: targetRegionRaw)
-            if shouldClearLegacyState {
-                SavedNewsState.shared.setSaved(false, for: newsId, regionRaw: SavedNewsRegionScope.legacy.rawValue)
-            }
+        SavedNewsState.shared.setSaved(false, for: newsId, regionRaw: targetRegionRaw)
+        if shouldClearLegacyState {
+            SavedNewsState.shared.setSaved(false, for: newsId, regionRaw: SavedNewsRegionScope.legacy.rawValue)
         }
     }
 
