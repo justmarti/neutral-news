@@ -107,6 +107,37 @@ struct WidgetSnapshotStoreTests {
         #expect(writeResults.filter { $0 }.count == 1)
         #expect(await store.readImageData(for: item) == imageData)
     }
+
+    @Test("Writes and reads an image focus point")
+    func writesAndReadsImageFocusPoint() async throws {
+        let directoryURL = makeTemporaryDirectory()
+        defer { removeTemporaryDirectory(at: directoryURL) }
+
+        let store = WidgetImageStore(directoryURL: directoryURL)
+        let item = makeItem()
+        let focusPoint = ImageFocusPoint(x: 0.8, y: 0.3)
+
+        let didWrite = try await store.writeFocusPoint(focusPoint, for: item)
+
+        #expect(didWrite)
+        #expect(await store.readFocusPoint(for: item) == focusPoint)
+    }
+
+    @Test("Persists a missing focus result")
+    func persistsMissingFocusResult() async throws {
+        let directoryURL = makeTemporaryDirectory()
+        defer { removeTemporaryDirectory(at: directoryURL) }
+
+        let store = WidgetImageStore(directoryURL: directoryURL)
+        let item = makeItem()
+
+        #expect(await store.hasFocusRecord(for: item) == false)
+        let didWrite = try await store.writeFocusPoint(nil, for: item)
+
+        #expect(didWrite)
+        #expect(await store.hasFocusRecord(for: item))
+        #expect(await store.readFocusPoint(for: item) == nil)
+    }
 }
 
 private func makeTemporaryDirectory() -> URL {

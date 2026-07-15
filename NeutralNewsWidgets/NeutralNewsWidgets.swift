@@ -8,6 +8,7 @@ struct DailyBriefingEntry: TimelineEntry {
     let items: [WidgetNewsItem]
     let region: String
     let imageDataByItemID: [String: Data]
+    let imageFocusPointByItemID: [String: ImageFocusPoint]
     let isPlaceholder: Bool
     let isPremiumLocked: Bool
 
@@ -55,6 +56,7 @@ struct DailyBriefingEntry: TimelineEntry {
         ],
         region: "US",
         imageDataByItemID: [:],
+        imageFocusPointByItemID: [:],
         isPlaceholder: false,
         isPremiumLocked: false
     )
@@ -73,6 +75,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
             items: placeholderItems(for: context.family),
             region: "US",
             imageDataByItemID: [:],
+            imageFocusPointByItemID: [:],
             isPlaceholder: true,
             isPremiumLocked: false
         )
@@ -106,6 +109,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
                 items: placeholderItems(for: family),
                 region: "US",
                 imageDataByItemID: [:],
+                imageFocusPointByItemID: [:],
                 isPlaceholder: true,
                 isPremiumLocked: false
             )
@@ -113,13 +117,15 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
 
         let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
         let imageDataByItemID = await cachedImageData(for: snapshot.items)
+        let imageFocusPointByItemID = await cachedFocusPoints(for: snapshot.items)
         return makeEntry(
             from: snapshot,
             family: family,
             startingAt: rotationIndex,
             region: snapshot.region,
             date: .now,
-            imageDataByItemID: imageDataByItemID
+            imageDataByItemID: imageDataByItemID,
+            imageFocusPointByItemID: imageFocusPointByItemID
         )
     }
 
@@ -136,6 +142,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
                 items: placeholderItems(for: family),
                 region: region,
                 imageDataByItemID: [:],
+                imageFocusPointByItemID: [:],
                 isPlaceholder: true,
                 isPremiumLocked: false
             )
@@ -144,13 +151,15 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         let rotationIndex = currentRotationIndex(for: snapshot, date: .now)
         _ = await WidgetImageCache.cacheImages(for: snapshot, store: imageStore)
         let imageDataByItemID = await cachedImageData(for: snapshot.items)
+        let imageFocusPointByItemID = await cachedFocusPoints(for: snapshot.items)
         return makeEntry(
             from: snapshot,
             family: family,
             startingAt: rotationIndex,
             region: snapshot.region,
             date: .now,
-            imageDataByItemID: imageDataByItemID
+            imageDataByItemID: imageDataByItemID,
+            imageFocusPointByItemID: imageFocusPointByItemID
         )
     }
 
@@ -160,7 +169,8 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         startingAt index: Int = 0,
         region: String,
         date: Date,
-        imageDataByItemID: [String: Data]
+        imageDataByItemID: [String: Data],
+        imageFocusPointByItemID: [String: ImageFocusPoint]
     ) -> DailyBriefingEntry {
         let itemCount = visibleItemCount(for: family)
         let candidates = candidateItems(from: snapshot, startingAt: index)
@@ -183,6 +193,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
                 items: placeholderItems(for: family),
                 region: region,
                 imageDataByItemID: [:],
+                imageFocusPointByItemID: [:],
                 isPlaceholder: true,
                 isPremiumLocked: false
             )
@@ -193,6 +204,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
             items: selectedItems,
             region: region,
             imageDataByItemID: imageDataByItemID,
+            imageFocusPointByItemID: imageFocusPointByItemID,
             isPlaceholder: false,
             isPremiumLocked: false
         )
@@ -213,6 +225,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
                 items: placeholderItems(for: family),
                 region: region,
                 imageDataByItemID: [:],
+                imageFocusPointByItemID: [:],
                 isPlaceholder: true,
                 isPremiumLocked: false
             )
@@ -221,11 +234,13 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
 
         _ = await WidgetImageCache.cacheImages(for: snapshot, store: imageStore)
         let imageDataByItemID = await cachedImageData(for: snapshot.items)
+        let imageFocusPointByItemID = await cachedFocusPoints(for: snapshot.items)
         let entries = timelineEntries(
             from: snapshot,
             family: family,
             startingAt: now,
-            imageDataByItemID: imageDataByItemID
+            imageDataByItemID: imageDataByItemID,
+            imageFocusPointByItemID: imageFocusPointByItemID
         )
         return Timeline(entries: entries, policy: .atEnd)
     }
@@ -236,6 +251,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
             items: placeholderItems(for: family),
             region: region,
             imageDataByItemID: [:],
+            imageFocusPointByItemID: [:],
             isPlaceholder: false,
             isPremiumLocked: true
         )
@@ -267,6 +283,18 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         }
 
         return imageDataByItemID
+    }
+
+    private func cachedFocusPoints(for items: [WidgetNewsItem]) async -> [String: ImageFocusPoint] {
+        var imageFocusPointByItemID: [String: ImageFocusPoint] = [:]
+
+        for item in items {
+            if let focusPoint = await imageStore.readFocusPoint(for: item) {
+                imageFocusPointByItemID[item.id] = focusPoint
+            }
+        }
+
+        return imageFocusPointByItemID
     }
 
     private func visibleItemCount(for family: WidgetFamily) -> Int {
@@ -339,7 +367,8 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         from snapshot: WidgetNewsSnapshot,
         family: WidgetFamily,
         startingAt date: Date,
-        imageDataByItemID: [String: Data]
+        imageDataByItemID: [String: Data],
+        imageFocusPointByItemID: [String: ImageFocusPoint]
     ) -> [DailyBriefingEntry] {
         let entryCount = max(1, min(snapshot.items.count, Self.maximumTimelineEntryCount))
 
@@ -352,7 +381,8 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
                 startingAt: rotationIndex,
                 region: snapshot.region,
                 date: entryDate,
-                imageDataByItemID: imageDataByItemID
+                imageDataByItemID: imageDataByItemID,
+                imageFocusPointByItemID: imageFocusPointByItemID
             )
         }
     }
@@ -396,6 +426,7 @@ struct NeutralNewsWidgetsEntryView: View {
             DailyBriefingStoryTile(
                 item: entry.item,
                 imageData: imageData(for: entry.item),
+                focusPoint: focusPoint(for: entry.item),
                 isPlaceholder: entry.isPlaceholder,
                 family: family
             )
@@ -429,6 +460,7 @@ struct NeutralNewsWidgetsEntryView: View {
         DailyBriefingStoryTile(
             item: item,
             imageData: imageData(for: item),
+            focusPoint: focusPoint(for: item),
             isPlaceholder: entry.isPlaceholder,
             family: .systemMedium
         )
@@ -438,6 +470,11 @@ struct NeutralNewsWidgetsEntryView: View {
     private func imageData(for item: WidgetNewsItem?) -> Data? {
         guard let item else { return nil }
         return entry.imageDataByItemID[item.id]
+    }
+
+    private func focusPoint(for item: WidgetNewsItem?) -> ImageFocusPoint? {
+        guard let item else { return nil }
+        return entry.imageFocusPointByItemID[item.id]
     }
 
     private var multiStoryPadding: CGFloat {
@@ -477,14 +514,14 @@ private struct PremiumLockedWidgetView: View {
 private struct DailyBriefingStoryTile: View {
     let item: WidgetNewsItem?
     let imageData: Data?
+    let focusPoint: ImageFocusPoint?
     let isPlaceholder: Bool
     let family: WidgetFamily
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottomLeading) {
-                backgroundImage
-                    .frame(width: proxy.size.width, height: proxy.size.height)
+                backgroundImage(containerSize: proxy.size)
 
                 if !isPlaceholder {
                     bottomGradient
@@ -500,15 +537,22 @@ private struct DailyBriefingStoryTile: View {
     }
 
     @ViewBuilder
-    private var backgroundImage: some View {
+    private func backgroundImage(containerSize: CGSize) -> some View {
         if isPlaceholder {
             Color(.tertiarySystemFill)
         } else if let imageData,
            let image = Self.image(from: imageData) {
+            let metrics = ImageCrop.metrics(
+                imageSize: CGSize(width: image.width, height: image.height),
+                containerSize: containerSize,
+                focusPoint: focusPoint
+            )
+
             Image(decorative: image, scale: 1, orientation: .up)
                 .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(width: metrics.renderedSize.width, height: metrics.renderedSize.height)
+                .offset(x: metrics.offset.width, y: metrics.offset.height)
+                .frame(width: containerSize.width, height: containerSize.height)
                 .clipped()
         } else {
             Color(.tertiarySystemFill)

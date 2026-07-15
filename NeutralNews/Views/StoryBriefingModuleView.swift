@@ -62,12 +62,7 @@ struct StoryBriefingModuleView: View {
             previousItem = nil
             thumbnailTransitionProgress = 1
 
-            async let prefetchedThumbnails = prefetchThumbnailImages()
-            async let prefetchedFocusPoints: Void = prefetchImageFocusPoints()
             dominantColor = await dominantColor(for: currentItem.imageUrl)
-
-            await prefetchedThumbnails
-            await prefetchedFocusPoints
 
             guard items.count > 1, !accessibilityReduceMotion else { return }
 
@@ -76,6 +71,7 @@ struct StoryBriefingModuleView: View {
             while !Task.isCancelled {
                 let targetIndex = nextIndex
                 async let prefetchedColor = dominantColor(for: items[targetIndex].imageUrl)
+                async let preparedThumbnail = prepareThumbnail(for: items[targetIndex])
 
                 do {
                     try await Task.sleep(for: rotationInterval)
@@ -84,9 +80,12 @@ struct StoryBriefingModuleView: View {
                 }
 
                 let nextDominantColor = await prefetchedColor
+                let isThumbnailReady = await preparedThumbnail
                 guard !Task.isCancelled else { break }
 
-                transitionToItem(at: targetIndex, dominantColor: nextDominantColor)
+                if isThumbnailReady {
+                    transitionToItem(at: targetIndex, dominantColor: nextDominantColor)
+                }
 
                 nextIndex = (targetIndex + 1) % items.count
             }
@@ -124,57 +123,23 @@ struct StoryBriefingModuleView: View {
         return "\(ids)|motion:\(accessibilityReduceMotion)"
     }
 
-    @ViewBuilder
     private func briefingThumbnail(for news: NeutralNews) -> some View {
-        if let url = URL(string: news.imageUrl),
-           let cachedImage = CachedAsyncImageHelper.cachedUIImage(
-            url: url,
-            maxPixelSize: thumbnailPixelSize
-           ) {
-            Image(uiImage: cachedImage)
-                .resizable()
-                .scaledToFill()
-                .frame(width: thumbnailSize.width, height: thumbnailSize.height)
-                .clipped()
-                .id(news.id)
-        } else {
-            CachedAsyncImage(url: URL(string: news.imageUrl), maxPixelSize: thumbnailPixelSize) { phase in
-                switch phase {
-                case .empty:
-                    ShimmerView()
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    Rectangle()
-                        .fill(.quaternary)
-                @unknown default:
-                    Rectangle()
-                        .fill(.quaternary)
-                }
-            }
-            .frame(width: thumbnailSize.width, height: thumbnailSize.height)
-            .clipped()
+        let url = URL(string: news.imageUrl)
+        return StoryBriefingThumbnailView(
+            imageURL: news.imageUrl,
+            size: thumbnailSize,
+            initialImage: url.flatMap(ImageFocusResolver.cachedImage(for:))
+        )
             .id(news.id)
-        }
     }
 
     private func dominantColor(for imageUrl: String?) async -> Color {
         return await imageService.getDominantColor(from: imageUrl)
     }
 
-    private var thumbnailPixelSize: Double {
-        max(thumbnailSize.width, thumbnailSize.height) * UIScreen.main.scale
-    }
-
-    private func prefetchThumbnailImages() async {
-        let urls = items.compactMap { URL(string: $0.imageUrl) }
-        await CachedAsyncImageHelper.prefetchImages(from: urls, maxPixelSize: thumbnailPixelSize)
-    }
-
-    private func prefetchImageFocusPoints() async {
-        await StoryHeroImageView.prefetchFocusPoints(for: items)
+    private func prepareThumbnail(for news: NeutralNews) async -> Bool {
+        guard let url = URL(string: news.imageUrl) else { return false }
+        return await ImageFocusResolver.prepareImage(for: url)
     }
 
     @MainActor
