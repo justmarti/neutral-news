@@ -49,10 +49,10 @@ struct WidgetBriefingBuilderTests {
         #expect(snapshot?.items.map(\.id) == ["newer", "older"])
     }
 
-    @Test("Limits snapshot to five stories")
-    func limitsSnapshotToFiveStories() {
+    @Test("Limits snapshot to twelve stories")
+    func limitsSnapshotToTwelveStories() {
         let referenceDate = Date(timeIntervalSince1970: 2_000_000)
-        let news = (0..<7).map { index in
+        let news = (0..<14).map { index in
             makeWidgetNews(
                 id: "story-\(index)",
                 title: "Story \(index)",
@@ -67,7 +67,7 @@ struct WidgetBriefingBuilderTests {
             referenceDate: referenceDate
         )
 
-        #expect(snapshot?.items.map(\.id) == ["story-0", "story-1", "story-2", "story-3", "story-4"])
+        #expect(snapshot?.items.map(\.id) == (0..<12).map { "story-\($0)" })
     }
 
     @Test("Uses id as final stable sort key")

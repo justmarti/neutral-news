@@ -120,8 +120,8 @@ struct WidgetNewsSnapshotTests {
         #expect(snapshot.isFresh(referenceDate: referenceDate) == false)
     }
 
-    @Test("Remote client accepts stale but usable widget snapshots")
-    func remoteClientAcceptsStaleButUsableWidgetSnapshots() async throws {
+    @Test("Remote client rejects stale widget snapshots")
+    func remoteClientRejectsStaleWidgetSnapshots() async throws {
         let payload = """
         {
           "schemaVersion": 1,
@@ -154,7 +154,20 @@ struct WidgetNewsSnapshotTests {
             referenceDate: Date(timeIntervalSince1970: 3_000_000)
         )
 
-        #expect(snapshot?.items.map(\.id) == ["story-1"])
+        #expect(snapshot == nil)
+    }
+
+    @Test("Rotates through every available story without dropping image-less items")
+    func rotatesThroughEveryAvailableStory() {
+        let items = [
+            WidgetNewsItem(id: "with-image", title: "With image", imageURL: URL(string: "https://example.com/1.jpg"), date: .now, relevance: 3),
+            WidgetNewsItem(id: "without-image", title: "Without image", imageURL: nil, date: .now, relevance: 2),
+            WidgetNewsItem(id: "last", title: "Last", imageURL: URL(string: "https://example.com/3.jpg"), date: .now, relevance: 1)
+        ]
+        let snapshot = WidgetNewsSnapshot(generatedAt: .now, region: "ES", items: items)
+
+        #expect(snapshot.rotatingItems(startingAt: 1, count: 2).map(\.id) == ["without-image", "last"])
+        #expect(snapshot.rotatingItems(startingAt: 2, count: 2).map(\.id) == ["last", "with-image"])
     }
 
     @Test("Builds Spain widget deep link")

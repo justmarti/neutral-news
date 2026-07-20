@@ -64,7 +64,7 @@ struct DailyBriefingEntry: TimelineEntry {
 
 struct DailyBriefingProvider: TimelineProvider, Sendable {
     private static let storyRotationInterval: TimeInterval = 60 * 60
-    private static let maximumTimelineEntryCount = 6
+    private static let maximumTimelineEntryCount = 2
     private let store = WidgetSnapshotStore()
     private let imageStore = WidgetImageStore()
     private let remoteClient = WidgetRemoteSnapshotClient()
@@ -136,7 +136,10 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
             return makePremiumLockedEntry(for: family, region: region, date: .now)
         }
 
-        guard let snapshot = await loadSnapshot(for: region), !snapshot.items.isEmpty else {
+        guard let snapshot = await loadSnapshot(
+            for: region,
+            minimumItemCount: visibleItemCount(for: family)
+        ) else {
             return DailyBriefingEntry(
                 date: .now,
                 items: placeholderItems(for: family),
@@ -173,19 +176,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         imageFocusPointByItemID: [String: ImageFocusPoint]
     ) -> DailyBriefingEntry {
         let itemCount = visibleItemCount(for: family)
-        let candidates = candidateItems(from: snapshot, startingAt: index)
-        let itemsWithLoadedImages = candidates.filter { imageDataByItemID[$0.id] != nil }
-        let selectedItems: [WidgetNewsItem]
-
-        if itemsWithLoadedImages.count >= itemCount {
-            selectedItems = Array(itemsWithLoadedImages.prefix(itemCount))
-        } else {
-            let loadedItemIDs = Set(itemsWithLoadedImages.map(\.id))
-            selectedItems = Array(
-                (itemsWithLoadedImages + candidates.filter { !loadedItemIDs.contains($0.id) })
-                    .prefix(itemCount)
-            )
-        }
+        let selectedItems = snapshot.rotatingItems(startingAt: index, count: itemCount)
 
         if selectedItems.isEmpty {
             return DailyBriefingEntry(
@@ -219,7 +210,10 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
             return Timeline(entries: [entry], policy: .after(now.addingTimeInterval(Self.storyRotationInterval)))
         }
 
-        guard let snapshot = await loadSnapshot(for: region), !snapshot.items.isEmpty else {
+        guard let snapshot = await loadSnapshot(
+            for: region,
+            minimumItemCount: visibleItemCount(for: family)
+        ) else {
             let entry = DailyBriefingEntry(
                 date: now,
                 items: placeholderItems(for: family),
@@ -257,20 +251,11 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         )
     }
 
-    private func candidateItems(from snapshot: WidgetNewsSnapshot, startingAt index: Int) -> [WidgetNewsItem] {
-        let sourceItems = snapshot.items.filter { $0.imageURL != nil }
-        let items = sourceItems.isEmpty ? snapshot.items : sourceItems
-        guard !items.isEmpty else { return [] }
-
-        return items.indices.map { offset in
-            items[(index + offset) % items.count]
-        }
-    }
-
     private func currentRotationIndex(for snapshot: WidgetNewsSnapshot, date: Date) -> Int {
         guard !snapshot.items.isEmpty else { return 0 }
-        let elapsed = max(0, date.timeIntervalSince(snapshot.generatedAt))
-        return Int(elapsed / Self.storyRotationInterval) % snapshot.items.count
+        let rotationPeriod = Int(date.timeIntervalSinceReferenceDate / Self.storyRotationInterval)
+        let remainder = rotationPeriod % snapshot.items.count
+        return remainder >= 0 ? remainder : remainder + snapshot.items.count
     }
 
     private func cachedImageData(for items: [WidgetNewsItem]) async -> [String: Data] {
@@ -329,26 +314,39 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         }
     }
 
-    private func loadSnapshot(for region: String) async -> WidgetNewsSnapshot? {
-        if let cachedSnapshot = await cachedSnapshot(matching: region, requireFresh: true) {
+    private func loadSnapshot(for region: String, minimumItemCount: Int) async -> WidgetNewsSnapshot? {
+        if let cachedSnapshot = await cachedSnapshot(
+            matching: region,
+            requireFresh: true,
+            minimumItemCount: minimumItemCount
+        ) {
             return cachedSnapshot
         }
 
-        if let remoteSnapshot = try? await remoteClient.fetchSnapshot(for: region) {
+        if let remoteSnapshot = try? await remoteClient.fetchSnapshot(for: region),
+           remoteSnapshot.items.count >= minimumItemCount {
             _ = try? await store.writeSnapshot(remoteSnapshot)
             return remoteSnapshot
         }
 
-        if let staleRegionalSnapshot = await cachedSnapshot(matching: region) {
+        if let staleRegionalSnapshot = await cachedSnapshot(
+            matching: region,
+            minimumItemCount: minimumItemCount
+        ) {
             return staleRegionalSnapshot
         }
 
-        return await cachedSnapshot()
+        return await cachedSnapshot(minimumItemCount: minimumItemCount)
     }
 
-    private func cachedSnapshot(matching region: String? = nil, requireFresh: Bool = false) async -> WidgetNewsSnapshot? {
+    private func cachedSnapshot(
+        matching region: String? = nil,
+        requireFresh: Bool = false,
+        minimumItemCount: Int = 1
+    ) async -> WidgetNewsSnapshot? {
         guard let snapshot = try? await store.readSnapshot(),
-              snapshot.isUsableForWidget else {
+              snapshot.isUsableForWidget,
+              snapshot.items.count >= minimumItemCount else {
             return nil
         }
 
@@ -370,7 +368,7 @@ struct DailyBriefingProvider: TimelineProvider, Sendable {
         imageDataByItemID: [String: Data],
         imageFocusPointByItemID: [String: ImageFocusPoint]
     ) -> [DailyBriefingEntry] {
-        let entryCount = max(1, min(snapshot.items.count, Self.maximumTimelineEntryCount))
+        let entryCount = Self.maximumTimelineEntryCount
 
         return (0..<entryCount).map { offset in
             let entryDate = date.addingTimeInterval(TimeInterval(offset) * Self.storyRotationInterval)
@@ -446,10 +444,6 @@ struct NeutralNewsWidgetsEntryView: View {
                 } else {
                     multiStoryTile(for: item)
                 }
-            }
-
-            if entry.items.isEmpty {
-                multiStoryTile(for: nil)
             }
         }
         .padding(multiStoryPadding)

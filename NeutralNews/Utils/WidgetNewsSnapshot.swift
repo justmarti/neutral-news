@@ -94,7 +94,7 @@ enum WidgetSnapshotConstants {
     static let appGroupIdentifier = "group.dev.itram.news"
     static let fileName = "daily-briefing-widget.json"
     static let widgetKind = "DailyBriefingWidget"
-    static let snapshotFreshnessInterval: TimeInterval = 36 * 60 * 60
+    static let snapshotFreshnessInterval: TimeInterval = 2 * 60 * 60
 
     private static let remoteSnapshotBaseURL = URL(string: "https://share.getfacts.app/api")!
 
@@ -142,6 +142,18 @@ extension WidgetNewsSnapshot {
         let allowedClockSkew: TimeInterval = 5 * 60
         guard generatedAt <= referenceDate.addingTimeInterval(allowedClockSkew) else { return false }
         return referenceDate.timeIntervalSince(generatedAt) <= maxAge
+    }
+
+    func rotatingItems(startingAt index: Int, count: Int) -> [WidgetNewsItem] {
+        guard !items.isEmpty, count > 0 else { return [] }
+
+        let remainder = index % items.count
+        let startIndex = remainder >= 0 ? remainder : remainder + items.count
+        let selectedCount = min(count, items.count)
+
+        return (0..<selectedCount).map { offset in
+            items[(startIndex + offset) % items.count]
+        }
     }
 }
 
@@ -251,7 +263,7 @@ struct WidgetRemoteSnapshotClient: Sendable {
             return nil
         }
 
-        guard snapshot.isUsableForWidget else {
+        guard snapshot.isFresh(referenceDate: referenceDate) else {
             return nil
         }
 

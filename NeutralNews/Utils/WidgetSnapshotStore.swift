@@ -415,8 +415,14 @@ enum WidgetImageCache {
     private static let maxPixelSize = ImageFocusConfiguration.analysisMaxPixelSize
     private static let compressionQuality = 0.82
     private static let maxConcurrentPreparations = 2
+    private static let imageRequestTimeout: TimeInterval = 8
+    private static let imageDownloadAttemptCount = 2
 
-    static func cacheImages(for snapshot: WidgetNewsSnapshot, store: WidgetImageStore) async -> Bool {
+    static func cacheImages(
+        for snapshot: WidgetNewsSnapshot,
+        store: WidgetImageStore,
+        retryingFailedDownloads: Bool = false
+    ) async -> Bool {
         var itemsToPrepare: [WidgetNewsItem] = []
 
         for item in snapshot.items {
@@ -430,6 +436,7 @@ enum WidgetImageCache {
         }
 
         guard !itemsToPrepare.isEmpty else { return false }
+        let imageDownloadAttemptCount = retryingFailedDownloads ? Self.imageDownloadAttemptCount : 1
 
         return await withTaskGroup(of: Bool.self) { group in
             var nextIndex = 0
@@ -437,7 +444,11 @@ enum WidgetImageCache {
                 let item = itemsToPrepare[nextIndex]
                 nextIndex += 1
                 group.addTask {
-                    await prepareImage(for: item, store: store)
+                    await prepareImage(
+                        for: item,
+                        store: store,
+                        imageDownloadAttemptCount: imageDownloadAttemptCount
+                    )
                 }
             }
 
@@ -450,7 +461,11 @@ enum WidgetImageCache {
                 let item = itemsToPrepare[nextIndex]
                 nextIndex += 1
                 group.addTask {
-                    await prepareImage(for: item, store: store)
+                    await prepareImage(
+                        for: item,
+                        store: store,
+                        imageDownloadAttemptCount: imageDownloadAttemptCount
+                    )
                 }
             }
 
@@ -458,7 +473,11 @@ enum WidgetImageCache {
         }
     }
 
-    private static func prepareImage(for item: WidgetNewsItem, store: WidgetImageStore) async -> Bool {
+    private static func prepareImage(
+        for item: WidgetNewsItem,
+        store: WidgetImageStore,
+        imageDownloadAttemptCount: Int
+    ) async -> Bool {
         if let cachedImageData = await store.readImageData(for: item),
            let cachedImage = image(from: cachedImageData) {
             return await cacheFocusPoint(for: item, image: cachedImage, store: store)
@@ -466,26 +485,40 @@ enum WidgetImageCache {
 
         guard let imageURL = item.imageURL else { return false }
 
-        do {
-            var request = URLRequest(url: imageURL)
-            request.timeoutInterval = 4
-            request.cachePolicy = .reloadIgnoringLocalCacheData
+        for attempt in 0..<imageDownloadAttemptCount {
+            if Task.isCancelled { return false }
 
-            let (data, response) = try await URLSession.shared.data(for: request)
-            guard let httpResponse = response as? HTTPURLResponse,
-                  (200..<300).contains(httpResponse.statusCode),
-                  data.count <= maxImageBytes,
-                  let image = downsampledImage(from: data),
-                  let imageData = encodedJPEGData(from: image) else {
+            do {
+                var request = URLRequest(url: imageURL)
+                request.timeoutInterval = imageRequestTimeout
+                request.cachePolicy = .reloadIgnoringLocalCacheData
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                if let httpResponse = response as? HTTPURLResponse,
+                   (200..<300).contains(httpResponse.statusCode),
+                   data.count <= maxImageBytes,
+                   let image = downsampledImage(from: data),
+                   let imageData = encodedJPEGData(from: image) {
+                    let didWriteImage = (try? await store.writeImageData(imageData, for: item)) ?? false
+                    let didWriteFocus = await cacheFocusPoint(for: item, image: image, store: store)
+                    return didWriteImage || didWriteFocus
+                }
+            } catch is CancellationError {
                 return false
+            } catch {
+                // The retry below handles transient download failures.
             }
 
-            let didWriteImage = (try? await store.writeImageData(imageData, for: item)) ?? false
-            let didWriteFocus = await cacheFocusPoint(for: item, image: image, store: store)
-            return didWriteImage || didWriteFocus
-        } catch {
-            return false
+            guard attempt < imageDownloadAttemptCount - 1 else { return false }
+
+            do {
+                try await Task.sleep(nanoseconds: 500_000_000)
+            } catch {
+                return false
+            }
         }
+
+        return false
     }
 
     private static func cacheFocusPoint(

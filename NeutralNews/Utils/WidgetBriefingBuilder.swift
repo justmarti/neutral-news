@@ -9,7 +9,7 @@ protocol WidgetBriefingNews {
 }
 
 enum WidgetBriefingBuilder {
-    private static let briefingLimit = 5
+    private static let briefingLimit = 12
     private static let briefingWindow: TimeInterval = 24 * 60 * 60
 
     static func buildSnapshot<NewsItem: WidgetBriefingNews>(
