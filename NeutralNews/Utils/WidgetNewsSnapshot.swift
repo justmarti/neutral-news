@@ -173,19 +173,34 @@ enum WidgetRegionPreferenceStore {
 
 enum WidgetPremiumAccessStore {
     private static let storageKey = "widget_premium_access"
+#if DEBUG
+    private static let debugStorageKey = "debug_widget_premium_access"
+#endif
 
     static func sync(isPremium: Bool) {
         UserDefaults(suiteName: WidgetSnapshotConstants.appGroupIdentifier)?
             .set(isPremium, forKey: storageKey)
     }
 
+#if DEBUG
+    static func syncDebug(isPremium: Bool) {
+        UserDefaults(suiteName: WidgetSnapshotConstants.appGroupIdentifier)?
+            .set(isPremium, forKey: debugStorageKey)
+    }
+#endif
+
     static func currentValue() -> Bool? {
-        guard let defaults = UserDefaults(suiteName: WidgetSnapshotConstants.appGroupIdentifier),
-              defaults.object(forKey: storageKey) != nil else {
+        guard let defaults = UserDefaults(suiteName: WidgetSnapshotConstants.appGroupIdentifier) else {
             return nil
         }
 
+#if DEBUG
+        guard defaults.object(forKey: debugStorageKey) != nil else { return nil }
+        return defaults.bool(forKey: debugStorageKey)
+#else
+        guard defaults.object(forKey: storageKey) != nil else { return nil }
         return defaults.bool(forKey: storageKey)
+#endif
     }
 }
 

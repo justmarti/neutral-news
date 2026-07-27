@@ -93,7 +93,7 @@ final class PushNotificationService {
         case .authorized, .provisional, .ephemeral:
             return nil
         case .denied:
-            return "Notifications are disabled. Enable them in Settings."
+            return "Notifications are turned off in Settings."
         case .notDetermined:
             return "Allow notifications to receive alerts."
         @unknown default:

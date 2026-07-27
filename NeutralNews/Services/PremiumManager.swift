@@ -17,6 +17,10 @@ final class PremiumManager {
         case missingCustomerInfo
     }
 
+#if DEBUG
+    private static let debugPremiumEnabledKey = "debugPremiumEnabled"
+#endif
+
     static let shared = PremiumManager()
 
     private(set) var isPremium = false
@@ -24,12 +28,23 @@ final class PremiumManager {
     private(set) var subscriptionExpirationDate: Date?
     private(set) var subscriptionWillRenew: Bool?
     private(set) var paywallPresentationToken = UUID()
+#if DEBUG
+    var isDebugPremiumEnabled = UserDefaults.standard.bool(forKey: debugPremiumEnabledKey) {
+        didSet {
+            UserDefaults.standard.set(isDebugPremiumEnabled, forKey: Self.debugPremiumEnabledKey)
+            updatePremiumAccess(isEnabled: isDebugPremiumEnabled)
+        }
+    }
+#endif
     private let entitlementId = "pro"
 
     private var pendingAction: (() -> Void)?
     private var customerInfoTask: Task<Void, Never>?
 
     private init() {
+#if DEBUG
+        updatePremiumAccess(isEnabled: isDebugPremiumEnabled)
+#endif
         checkPremiumStatus()
         setupCustomerInfoStream()
     }
@@ -204,9 +219,21 @@ final class PremiumManager {
     }
 
     private func apply(customerInfo: CustomerInfo) {
-        isPremium = !customerInfo.entitlements.active.isEmpty
-        WidgetPremiumAccessStore.sync(isPremium: isPremium)
+#if DEBUG
+        updatePremiumAccess(isEnabled: isDebugPremiumEnabled)
+#else
+        updatePremiumAccess(isEnabled: !customerInfo.entitlements.active.isEmpty)
+#endif
         updateEntitlementInfo(from: customerInfo)
+    }
+
+    private func updatePremiumAccess(isEnabled: Bool) {
+        isPremium = isEnabled
+#if DEBUG
+        WidgetPremiumAccessStore.syncDebug(isPremium: isPremium)
+#else
+        WidgetPremiumAccessStore.sync(isPremium: isPremium)
+#endif
 
         if isPremium, let action = pendingAction {
             pendingAction = nil

@@ -54,6 +54,9 @@ struct SettingsView: View {
 
     private var settingsList: some View {
         @Bindable var bindablePushNotificationService = pushNotificationService
+#if DEBUG
+        @Bindable var bindablePremiumManager = premiumManager
+#endif
 
         return List {
             if !premiumManager.isPremium {
@@ -130,7 +133,7 @@ struct SettingsView: View {
                         openSystemSettings()
                     } label: {
                         SettingsRowLabel(
-                            title: "Open System Settings",
+                            title: "Open Notification Settings",
                             systemImage: "gear",
                             tint: .gray,
                             showsExternalIndicator: true
@@ -218,6 +221,15 @@ struct SettingsView: View {
 
 #if DEBUG
             Section("Developer") {
+                Toggle(isOn: $bindablePremiumManager.isDebugPremiumEnabled) {
+                    SettingsRowLabel(
+                        title: "Facts Pro",
+                        systemImage: "crown.fill",
+                        tint: .orange
+                    )
+                }
+                .tint(.accentColor)
+
                 Button {
                     showPaywall()
                     dismiss()
