@@ -138,6 +138,40 @@ struct WidgetSnapshotStoreTests {
         #expect(await store.hasFocusRecord(for: item))
         #expect(await store.readFocusPoint(for: item) == nil)
     }
+
+    @Test("Replaces a focus record from an older analysis version")
+    func replacesStaleFocusRecord() async throws {
+        let directoryURL = makeTemporaryDirectory()
+        defer { removeTemporaryDirectory(at: directoryURL) }
+
+        let item = makeItem()
+        let focusFileName = item.id
+            .addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? item.id
+        let focusDirectoryURL = directoryURL
+            .appendingPathComponent("daily-briefing-widget-images", isDirectory: true)
+        let focusFileURL = focusDirectoryURL
+            .appendingPathComponent("\(focusFileName).focus.json", isDirectory: false)
+        try FileManager.default.createDirectory(
+            at: focusDirectoryURL,
+            withIntermediateDirectories: true
+        )
+        let staleRecord = Data(
+            """
+            {"analysisVersion":1,"focusPoint":{"x":0.8,"y":0.3}}
+            """.utf8
+        )
+        try staleRecord.write(to: focusFileURL)
+
+        let store = WidgetImageStore(directoryURL: directoryURL)
+        let updatedFocusPoint = ImageFocusPoint(x: 0.5, y: 0.4)
+
+        #expect(await store.hasFocusRecord(for: item) == false)
+        let didWrite = try await store.writeFocusPoint(updatedFocusPoint, for: item)
+
+        #expect(didWrite)
+        #expect(await store.hasFocusRecord(for: item))
+        #expect(await store.readFocusPoint(for: item) == updatedFocusPoint)
+    }
 }
 
 private func makeTemporaryDirectory() -> URL {

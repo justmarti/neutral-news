@@ -9,10 +9,12 @@ struct ImageFocusPoint: Codable, Equatable, Sendable {
 }
 
 enum ImageFocusConfiguration {
+    static let analysisVersion = 2
     static let analysisMaxPixelSize: Double = 900
+    static let headlineOverlayFocusTargetY: CGFloat = 0.36
 
     static func cacheKey(for url: URL) -> String {
-        "\(url.absoluteString)|\(Int(analysisMaxPixelSize))"
+        "\(url.absoluteString)|\(Int(analysisMaxPixelSize))|v\(analysisVersion)"
     }
 }
 
@@ -26,6 +28,7 @@ enum ImageCrop {
         imageSize: CGSize,
         containerSize: CGSize,
         focusPoint: ImageFocusPoint?,
+        focusTargetY: CGFloat = 0.5,
         fallbackScale: CGFloat = 1
     ) -> ImageCropMetrics {
         guard imageSize.width > 0,
@@ -64,12 +67,13 @@ enum ImageCrop {
 
         let focusX = clamp(CGFloat(focusPoint.x))
         let focusY = clamp(CGFloat(focusPoint.y))
+        let resolvedFocusTargetY = clamp(focusTargetY)
         let cropOriginX = clamp(
             focusX - (normalizedCropWidth / 2),
             maxValue: 1 - normalizedCropWidth
         )
         let cropOriginY = clamp(
-            focusY - (normalizedCropHeight / 2),
+            focusY - (normalizedCropHeight * resolvedFocusTargetY),
             maxValue: 1 - normalizedCropHeight
         )
         let scale = containerSize.width / (imageSize.width * normalizedCropWidth)
@@ -140,6 +144,9 @@ actor ImageFocusCache {
 }
 
 enum ImageFocusDetector {
+    private static let minimumPrimaryFaceArea: CGFloat = 0.025
+    private static let significantSecondaryFaceAreaRatio: CGFloat = 0.4
+
     static func detectPrimarySubjectFocus(
         in cgImage: CGImage,
         orientation: CGImagePropertyOrientation,
@@ -180,18 +187,33 @@ enum ImageFocusDetector {
         }
 
         let primaryArea = primaryFace.boundingBox.width * primaryFace.boundingBox.height
-        guard primaryArea >= 0.025 else {
+        let secondaryArea = sortedFaces.dropFirst().first.map {
+            $0.boundingBox.width * $0.boundingBox.height
+        }
+
+        guard shouldFocusOnPrimaryFace(
+            primaryArea: primaryArea,
+            secondaryArea: secondaryArea
+        ) else {
             return nil
         }
 
-        if let secondaryFace = sortedFaces.dropFirst().first {
-            let secondaryArea = secondaryFace.boundingBox.width * secondaryFace.boundingBox.height
-            if secondaryArea / primaryArea > 0.72 {
-                return nil
-            }
+        return primaryFace
+    }
+
+    static func shouldFocusOnPrimaryFace(
+        primaryArea: CGFloat,
+        secondaryArea: CGFloat?
+    ) -> Bool {
+        guard primaryArea >= minimumPrimaryFaceArea else {
+            return false
         }
 
-        return primaryFace
+        guard let secondaryArea else {
+            return true
+        }
+
+        return secondaryArea / primaryArea < significantSecondaryFaceAreaRatio
     }
 
     private static func faceFocusPoint(
@@ -348,9 +370,7 @@ actor WidgetImageStore {
     }
 
     func readFocusPoint(for item: WidgetNewsItem) -> ImageFocusPoint? {
-        guard let fileURL = focusFileURL(for: item),
-              let data = try? Data(contentsOf: fileURL),
-              let record = try? JSONDecoder().decode(WidgetImageFocusRecord.self, from: data) else {
+        guard let record = currentFocusRecord(for: item) else {
             return nil
         }
 
@@ -358,8 +378,7 @@ actor WidgetImageStore {
     }
 
     func hasFocusRecord(for item: WidgetNewsItem) -> Bool {
-        guard let fileURL = focusFileURL(for: item) else { return false }
-        return fileManager.fileExists(atPath: fileURL.path)
+        currentFocusRecord(for: item) != nil
     }
 
     @discardableResult
@@ -383,14 +402,29 @@ actor WidgetImageStore {
             throw WidgetSnapshotStore.StoreError.appGroupUnavailable
         }
 
-        guard !fileManager.fileExists(atPath: fileURL.path) else {
+        guard currentFocusRecord(for: item) == nil else {
             return false
         }
 
         try fileManager.createDirectory(at: directoryURL, withIntermediateDirectories: true)
-        let data = try JSONEncoder().encode(WidgetImageFocusRecord(focusPoint: focusPoint))
+        let record = WidgetImageFocusRecord(
+            analysisVersion: ImageFocusConfiguration.analysisVersion,
+            focusPoint: focusPoint
+        )
+        let data = try JSONEncoder().encode(record)
         try data.write(to: fileURL, options: [.atomic])
         return true
+    }
+
+    private func currentFocusRecord(for item: WidgetNewsItem) -> WidgetImageFocusRecord? {
+        guard let fileURL = focusFileURL(for: item),
+              let data = try? Data(contentsOf: fileURL),
+              let record = try? JSONDecoder().decode(WidgetImageFocusRecord.self, from: data),
+              record.analysisVersion == ImageFocusConfiguration.analysisVersion else {
+            return nil
+        }
+
+        return record
     }
 
     private func fileURL(for item: WidgetNewsItem) -> URL? {
@@ -407,6 +441,7 @@ actor WidgetImageStore {
 }
 
 private struct WidgetImageFocusRecord: Codable {
+    let analysisVersion: Int
     let focusPoint: ImageFocusPoint?
 }
 

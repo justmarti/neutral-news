@@ -11,6 +11,9 @@ struct NewsImageView: View {
     let news: NeutralNews
     let imageUrl: String?
     @Environment(\.displayScale) private var displayScale
+    @State private var loadedImage: UIImage?
+    @State private var loadedImageIdentifier: String?
+    @State private var focusPoint: ImageFocusPoint?
     private static let cardHeight: CGFloat = 250
     private static let cornerRadius: CGFloat = 16
 
@@ -29,21 +32,38 @@ struct NewsImageView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let imageIdentifier = imageLoadIdentifier(width: geometry.size.width)
+
             ZStack(alignment: .bottom) {
-                CachedAsyncImage(
-                    url: URL(string: imageUrl ?? ""),
-                    maxPixelSize: Double(geometry.size.width * displayScale)
-                ) { phase in
-                    if let image = phase.image {
-                        image
+                Group {
+                    if let loadedImage,
+                       loadedImageIdentifier == imageIdentifier {
+                        let metrics = ImageCrop.metrics(
+                            imageSize: loadedImage.size,
+                            containerSize: CGSize(
+                                width: geometry.size.width,
+                                height: Self.cardHeight
+                            ),
+                            focusPoint: focusPoint,
+                            focusTargetY: ImageFocusConfiguration.headlineOverlayFocusTargetY
+                        )
+
+                        Image(uiImage: loadedImage)
                             .resizable()
-                            .scaledToFill()
+                            .frame(
+                                width: metrics.renderedSize.width,
+                                height: metrics.renderedSize.height
+                            )
+                            .offset(x: metrics.offset.width, y: metrics.offset.height)
                             .frame(width: geometry.size.width, height: Self.cardHeight)
                             .clipped()
                     } else {
                         ShimmerView()
                             .frame(width: geometry.size.width, height: Self.cardHeight)
                     }
+                }
+                .task(id: imageIdentifier) {
+                    await loadImage(width: geometry.size.width, identifier: imageIdentifier)
                 }
                 
                 Rectangle()
@@ -67,6 +87,51 @@ struct NewsImageView: View {
         .frame(height: Self.cardHeight)
         .clipShape(RoundedRectangle(cornerRadius: Self.cornerRadius))
         .contentShape(.interaction, RoundedRectangle(cornerRadius: Self.cornerRadius))
+    }
+
+    private func loadImage(width: CGFloat, identifier: String) async {
+        loadedImage = nil
+        loadedImageIdentifier = identifier
+        focusPoint = nil
+
+        guard let imageUrl,
+              let url = URL(string: imageUrl) else {
+            return
+        }
+
+        do {
+            let image = try await CachedAsyncImageHelper.loadUIImage(
+                url: url,
+                maxPixelSize: imageLoadMaxPixelSize(width: width)
+            )
+            try Task.checkCancellation()
+            let resolvedFocusPoint = await ImageFocusResolver.focusPoint(
+                for: url,
+                image: image
+            )
+
+            guard !Task.isCancelled,
+                  loadedImageIdentifier == identifier else {
+                return
+            }
+
+            focusPoint = resolvedFocusPoint
+            loadedImage = image
+        } catch is CancellationError {
+            return
+        } catch {
+            guard loadedImageIdentifier == identifier else { return }
+            loadedImage = nil
+            focusPoint = nil
+        }
+    }
+
+    private func imageLoadIdentifier(width: CGFloat) -> String {
+        "\(imageUrl ?? "nil")|\(Int(imageLoadMaxPixelSize(width: width).rounded()))"
+    }
+
+    private func imageLoadMaxPixelSize(width: CGFloat) -> Double {
+        Double(width * displayScale)
     }
 }
 

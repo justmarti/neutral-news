@@ -539,7 +539,8 @@ private struct DailyBriefingStoryTile: View {
             let metrics = ImageCrop.metrics(
                 imageSize: CGSize(width: image.width, height: image.height),
                 containerSize: containerSize,
-                focusPoint: focusPoint
+                focusPoint: focusPoint,
+                focusTargetY: ImageFocusConfiguration.headlineOverlayFocusTargetY
             )
 
             Image(decorative: image, scale: 1, orientation: .up)
