@@ -34,7 +34,7 @@ final class NewsListViewModel {
         
         Task {
             // Wait for premium status to be ready before starting background loading
-            await PremiumManager.shared.checkSubscriptionStatus()
+            await PremiumManager.shared.refreshSubscriptionStatus()
 
             // Now start background loading with correct premium status
             newsDataManager.startBackgroundLoadingIfNeeded()

@@ -13,9 +13,15 @@ import RevenueCat
 
 @main
 struct NeutralNewsApp: App {
+#if DEBUG
+    private static let debugRevenueCatUserDefaults =
+        UserDefaults(suiteName: "dev.itram.news.revenuecat.debug") ?? .standard
+#endif
+
     @Environment(\.scenePhase) private var scenePhase
     @UIApplicationDelegateAdaptor(PushNotificationAppDelegate.self) private var pushNotificationAppDelegate
     @State private var config = AppConfig()
+    @State private var wasInBackground = false
     @AppStorage(AppColorScheme.storageKey) private var appColorScheme = AppColorScheme.system.rawValue
 
     // Local cache container (no iCloud)
@@ -46,7 +52,14 @@ struct NeutralNewsApp: App {
         #endif
 
         if let apiKey = Bundle.main.object(forInfoDictionaryKey: "RevenueCatAPIKey") as? String {
-            let configuration = Configuration.Builder(withAPIKey: apiKey)
+#if DEBUG
+            let configurationBuilder = Configuration.Builder(withAPIKey: apiKey)
+                .with(userDefaults: Self.debugRevenueCatUserDefaults)
+#else
+            let configurationBuilder = Configuration.Builder(withAPIKey: apiKey)
+#endif
+
+            let configuration = configurationBuilder
                 .with(storeKitVersion: .storeKit2)
                 .with(purchasesAreCompletedBy: .revenueCat, storeKitVersion: .storeKit2)
                 .build()
@@ -70,7 +83,6 @@ struct NeutralNewsApp: App {
         RatingManager.shared.incrementLaunchCount()
     }
 
-
     var body: some Scene {
         WindowGroup {
             HomeView(config: config)
@@ -84,8 +96,17 @@ struct NeutralNewsApp: App {
                     }
                     NewsDataManager.shared.refreshTodayWidgetSnapshot()
                 }
-                .onChange(of: scenePhase) { oldValue, newValue in
-                    guard oldValue == .background, newValue == .active else { return }
+                .task {
+                    await PremiumManager.shared.refreshSubscriptionStatus()
+                }
+                .onChange(of: scenePhase) { _, newValue in
+                    if newValue == .background {
+                        wasInBackground = true
+                        return
+                    }
+
+                    guard newValue == .active, wasInBackground else { return }
+                    wasInBackground = false
                     config.startFetching()
                     PushNotificationService.shared.handleAppDidBecomeActive()
 
@@ -99,7 +120,7 @@ struct NeutralNewsApp: App {
                     // Refresh subscription state and capture external redemptions
                     // without forcing a user-facing restore flow.
                     Task {
-                        await PremiumManager.shared.refreshSubscriptionStatusAfterActivation()
+                        await PremiumManager.shared.refreshSubscriptionStatus()
                     }
                 }
                 .onOpenURL { url in

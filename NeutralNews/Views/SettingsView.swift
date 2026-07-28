@@ -169,7 +169,7 @@ struct SettingsView: View {
                 .tint(.accentColor)
             }
 
-            Section("Promote") {
+            Section("Support") {
                 Button {
                     openAppStoreReview()
                 } label: {
@@ -190,22 +190,6 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
-            }
-
-            Section("Support") {
-//                Button {
-//                    Task {
-//                        await premiumManager.presentOfferCodeRedemption()
-//                        await premiumManager.refreshSubscriptionStatusAfterActivation()
-//                    }
-//                } label: {
-//                    SettingsRowLabel(
-//                        title: "Redeem Code",
-//                        systemImage: "ticket.fill",
-//                        tint: .purple
-//                    )
-//                }
-//                .buttonStyle(.plain)
 
                 Button {
                     contactSupport()
@@ -217,18 +201,35 @@ struct SettingsView: View {
                     )
                 }
                 .buttonStyle(.plain)
+
+                Button {
+                    Task {
+                        await premiumManager.presentOfferCodeRedemption()
+                        await premiumManager.refreshSubscriptionStatus()
+                    }
+                } label: {
+                    SettingsRowLabel(
+                        title: "Redeem Code",
+                        systemImage: "ticket.fill",
+                        tint: .purple
+                    )
+                }
+                .buttonStyle(.plain)
             }
 
 #if DEBUG
             Section("Developer") {
-                Toggle(isOn: $bindablePremiumManager.isDebugPremiumEnabled) {
+                Picker(selection: $bindablePremiumManager.debugPremiumAccessMode) {
+                    Text("RevenueCat").tag(DebugPremiumAccessMode.revenueCat)
+                    Text("Force Free").tag(DebugPremiumAccessMode.forceFree)
+                    Text("Force Pro").tag(DebugPremiumAccessMode.forcePro)
+                } label: {
                     SettingsRowLabel(
                         title: "Facts Pro",
                         systemImage: "crown.fill",
                         tint: .orange
                     )
                 }
-                .tint(.accentColor)
 
                 Button {
                     showPaywall()
@@ -424,12 +425,18 @@ struct SettingsView: View {
             return String(localized: "Lifetime")
         }
 
+        let remainingTime = max(0, expirationDate.timeIntervalSinceNow)
+
+        guard remainingTime >= 60 else {
+            return String(localized: "Less than a minute")
+        }
+
         let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = [.year, .month, .weekOfMonth, .day]
+        formatter.allowedUnits = [.year, .month, .weekOfMonth, .day, .hour, .minute]
         formatter.unitsStyle = .full
         formatter.maximumUnitCount = 1
 
-        return formatter.string(from: Date(), to: expirationDate) ?? ""
+        return formatter.string(from: remainingTime) ?? ""
     }
 
     private var selectedColorScheme: AppColorScheme {

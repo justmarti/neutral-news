@@ -13,12 +13,8 @@ import Observation
 @MainActor
 @Observable
 final class PremiumManager {
-    private enum PremiumManagerError: Error {
-        case missingCustomerInfo
-    }
-
 #if DEBUG
-    private static let debugPremiumEnabledKey = "debugPremiumEnabled"
+    private static let debugPremiumAccessModeKey = "debugPremiumAccessMode"
 #endif
 
     static let shared = PremiumManager()
@@ -29,23 +25,39 @@ final class PremiumManager {
     private(set) var subscriptionWillRenew: Bool?
     private(set) var paywallPresentationToken = UUID()
 #if DEBUG
-    var isDebugPremiumEnabled = UserDefaults.standard.bool(forKey: debugPremiumEnabledKey) {
+    var debugPremiumAccessMode = DebugPremiumAccessMode(
+        rawValue: UserDefaults.standard.string(forKey: debugPremiumAccessModeKey) ?? ""
+    ) ?? .revenueCat {
         didSet {
-            UserDefaults.standard.set(isDebugPremiumEnabled, forKey: Self.debugPremiumEnabledKey)
-            updatePremiumAccess(isEnabled: isDebugPremiumEnabled)
+            UserDefaults.standard.set(
+                debugPremiumAccessMode.rawValue,
+                forKey: Self.debugPremiumAccessModeKey
+            )
+            updatePremiumAccess(
+                isEnabled: debugPremiumAccessMode.resolvesAccess(
+                    revenueCatIsPremium: hasRevenueCatPremiumEntitlement
+                )
+            )
         }
     }
+    private var hasRevenueCatPremiumEntitlement = false
 #endif
     private let entitlementId = "pro"
 
     private var pendingAction: (() -> Void)?
     private var customerInfoTask: Task<Void, Never>?
+    private var entitlementExpirationTask: Task<Void, Never>?
+    private var subscriptionRefreshTask: Task<Void, Never>?
 
     private init() {
 #if DEBUG
-        updatePremiumAccess(isEnabled: isDebugPremiumEnabled)
+        updatePremiumAccess(
+            isEnabled: debugPremiumAccessMode.resolvesAccess(revenueCatIsPremium: false)
+        )
 #endif
-        checkPremiumStatus()
+        if let customerInfo = Purchases.shared.cachedCustomerInfo {
+            apply(customerInfo: customerInfo)
+        }
         setupCustomerInfoStream()
     }
 
@@ -71,30 +83,6 @@ final class PremiumManager {
     }
 
     // MARK: - Premium Status Management
-
-    private func checkPremiumStatus() {
-        guard !isLoading else { return }
-
-        isLoading = true
-
-        Task { [weak self] in
-            guard let self else { return }
-
-            defer {
-                self.isLoading = false
-            }
-
-            do {
-                let customerInfo = try await self.fetchCustomerInfo()
-                self.apply(customerInfo: customerInfo)
-#if DEBUG
-                print("✅ Premium status: \(self.isPremium)")
-#endif
-            } catch {
-                print("❌ Error checking premium status: \(error)")
-            }
-        }
-    }
 
     private func setupCustomerInfoStream() {
         customerInfoTask = Task { [weak self] in
@@ -122,16 +110,16 @@ final class PremiumManager {
 
     func restorePurchases() async {
 #if DEBUG
-        print("🔄 Syncing purchases...")
+        print("🔄 Restoring purchases...")
 #endif
         do {
-            let customerInfo = try await Purchases.shared.syncPurchases()
+            let customerInfo = try await Purchases.shared.restorePurchases()
             apply(customerInfo: customerInfo)
 #if DEBUG
-            print("✅ Purchases synced. Premium: \(self.isPremium)")
+            print("✅ Purchases restored. Premium: \(self.isPremium)")
 #endif
         } catch {
-            print("❌ Error syncing purchases: \(error)")
+            print("❌ Error restoring purchases: \(error)")
         }
     }
 
@@ -150,6 +138,11 @@ final class PremiumManager {
     // MARK: - Subscription Management
 
     func checkSubscriptionStatus() async {
+        if let subscriptionRefreshTask {
+            await subscriptionRefreshTask.value
+            return
+        }
+
         guard !isLoading else { return }
 
         isLoading = true
@@ -169,25 +162,49 @@ final class PremiumManager {
         }
     }
 
-    /// Refreshes premium state when app becomes active.
-    ///
-    /// Uses a lightweight status check first, and only attempts `syncPurchases()`
-    /// when still non-premium to capture redemptions made outside the app
-    /// (for example, App Store offer-code flows).
-    func refreshSubscriptionStatusAfterActivation() async {
-        await checkSubscriptionStatus()
+    /// Refreshes RevenueCat and imports purchases redeemed outside the app.
+    func refreshSubscriptionStatus() async {
+        if let subscriptionRefreshTask {
+            await subscriptionRefreshTask.value
+            return
+        }
 
-        // If already premium, no sync is needed.
-        guard !isPremium else { return }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.performSubscriptionRefresh()
+        }
+
+        subscriptionRefreshTask = task
+        await task.value
+        subscriptionRefreshTask = nil
+    }
+
+    private func performSubscriptionRefresh() async {
+        isLoading = true
+
+        defer {
+            isLoading = false
+        }
+
+        do {
+            let customerInfo = try await fetchCustomerInfo()
+            apply(customerInfo: customerInfo)
+
+            guard !hasActivePremiumEntitlement(in: customerInfo) else {
+                return
+            }
+        } catch {
+            print("⚠️ Error refreshing subscription status: \(error)")
+        }
 
         do {
             let customerInfo = try await Purchases.shared.syncPurchases()
-            await updatePremiumStatus(customerInfo)
+            apply(customerInfo: customerInfo)
 #if DEBUG
-            print("✅ Foreground sync completed")
+            print("✅ External purchases synced. Premium: \(self.isPremium)")
 #endif
         } catch {
-            print("⚠️ Foreground sync failed: \(error)")
+            print("⚠️ Error syncing external purchases: \(error)")
         }
     }
 
@@ -201,30 +218,26 @@ final class PremiumManager {
     }
 
     private func fetchCustomerInfo() async throws -> CustomerInfo {
-        try await withCheckedThrowingContinuation { continuation in
-            Purchases.shared.getCustomerInfo { customerInfo, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                guard let customerInfo else {
-                    continuation.resume(throwing: PremiumManagerError.missingCustomerInfo)
-                    return
-                }
-
-                continuation.resume(returning: customerInfo)
-            }
-        }
+        try await Purchases.shared.customerInfo()
     }
 
     private func apply(customerInfo: CustomerInfo) {
+        let hasPremiumEntitlement = hasActivePremiumEntitlement(in: customerInfo)
 #if DEBUG
-        updatePremiumAccess(isEnabled: isDebugPremiumEnabled)
+        hasRevenueCatPremiumEntitlement = hasPremiumEntitlement
+        updatePremiumAccess(
+            isEnabled: debugPremiumAccessMode.resolvesAccess(
+                revenueCatIsPremium: hasPremiumEntitlement
+            )
+        )
 #else
-        updatePremiumAccess(isEnabled: !customerInfo.entitlements.active.isEmpty)
+        updatePremiumAccess(isEnabled: hasPremiumEntitlement)
 #endif
         updateEntitlementInfo(from: customerInfo)
+    }
+
+    private func hasActivePremiumEntitlement(in customerInfo: CustomerInfo) -> Bool {
+        customerInfo.entitlements.active[entitlementId] != nil
     }
 
     private func updatePremiumAccess(isEnabled: Bool) {
@@ -245,6 +258,35 @@ final class PremiumManager {
         let entitlement = customerInfo.entitlements.active[entitlementId]
         subscriptionExpirationDate = entitlement?.expirationDate
         subscriptionWillRenew = entitlement?.willRenew
+        scheduleEntitlementRefresh(at: entitlement?.expirationDate)
+    }
+
+    private func scheduleEntitlementRefresh(at expirationDate: Date?) {
+        entitlementExpirationTask?.cancel()
+
+        guard let expirationDate else {
+            return
+        }
+
+        let refreshDelay = expirationDate.timeIntervalSinceNow
+
+        guard refreshDelay > 0 else {
+            return
+        }
+
+        entitlementExpirationTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(refreshDelay))
+                guard let self else { return }
+
+                let customerInfo = try await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent)
+                self.apply(customerInfo: customerInfo)
+            } catch is CancellationError {
+                return
+            } catch {
+                print("⚠️ Error refreshing expired subscription: \(error)")
+            }
+        }
     }
 
 }
