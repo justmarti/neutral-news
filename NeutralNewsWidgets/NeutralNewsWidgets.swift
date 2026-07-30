@@ -656,9 +656,11 @@ struct NeutralNewsWidgets: Widget {
     private static var supportedFamilies: [WidgetFamily] {
         var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge, .systemExtraLarge]
 
+#if compiler(>=6.4)
         if #available(iOSApplicationExtension 27.0, *) {
             families.append(.systemExtraLargePortrait)
         }
+#endif
 
         return families
     }
@@ -670,9 +672,11 @@ private extension WidgetFamily {
             return true
         }
 
+#if compiler(>=6.4)
         if #available(iOSApplicationExtension 27.0, *), family == .systemExtraLargePortrait {
             return true
         }
+#endif
 
         return false
     }

@@ -43,11 +43,19 @@ final class NewsQuestionFoundationModelsService: NewsQuestionAnswering {
         let isNewSession = session == nil
         let session = session ?? LanguageModelSession(instructions: Self.instructions)
         self.session = session
+#if compiler(>=6.4)
         let options = GenerationOptions(
             samplingMode: nil,
             temperature: 0.2,
             maximumResponseTokens: 550
         )
+#else
+        let options = GenerationOptions(
+            sampling: nil,
+            temperature: 0.2,
+            maximumResponseTokens: 550
+        )
+#endif
         do {
             let response = try await session.respond(
                 to: isNewSession ? context.initialPrompt(for: question) : context.followUpPrompt(for: question),
@@ -90,6 +98,7 @@ final class NewsQuestionFoundationModelsService: NewsQuestionAnswering {
             }
         }
 
+#if compiler(>=6.4)
         if #available(iOS 27.0, *), let languageModelError = error as? LanguageModelError {
             switch languageModelError {
             case .contextSizeExceeded:
@@ -108,6 +117,7 @@ final class NewsQuestionFoundationModelsService: NewsQuestionAnswering {
                 return String(localized: "The answer could not be generated. Try again.")
             }
         }
+#endif
 
         return String(localized: "The answer could not be generated. Try again.")
     }
@@ -119,11 +129,13 @@ final class NewsQuestionFoundationModelsService: NewsQuestionAnswering {
             }
         }
 
+#if compiler(>=6.4)
         if #available(iOS 27.0, *), let languageModelError = error as? LanguageModelError {
             if case .contextSizeExceeded = languageModelError {
                 return true
             }
         }
+#endif
 
         return false
     }
