@@ -5,9 +5,9 @@ Facts is an iOS news app that brings together coverage of the same story from mu
 [Download Facts on the App Store](https://apps.apple.com/app/id6748583935)
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/d96a732f-bdbf-42f5-bfee-06984c12d2c8" alt="Facts home feed" width="320">
-  <img src="https://github.com/user-attachments/assets/f9d8d019-7dd0-4039-86db-0c71ccf24a06" alt="Facts news detail" width="320">
-  <img src="https://github.com/user-attachments/assets/64d0e8ad-8df9-477e-abd1-c880c0f08676" alt="Facts story mode" width="320">
+  <img src="https://github.com/user-attachments/assets/d96a732f-bdbf-42f5-bfee-06984c12d2c8" alt="Facts home feed" width="260">
+  <img src="https://github.com/user-attachments/assets/f9d8d019-7dd0-4039-86db-0c71ccf24a06" alt="Facts news detail" width="260">
+  <img src="https://github.com/user-attachments/assets/64d0e8ad-8df9-477e-abd1-c880c0f08676" alt="Facts story mode" width="260">
 </p>
 
 ## Features
